@@ -25,12 +25,12 @@ Telegnome moves your private messages out of the busy main chat and into a messe
    (Or use **Code > Download ZIP** on this page.)
 2. Unzip it and copy the **`Telegnome`** folder into:
    ```
-   World of Warcraft/_classic_beta_/Interface/AddOns/
+   World of Warcraft/_forever_/Interface/AddOns/
    ```
    You should end up with `.../AddOns/Telegnome/Telegnome.toc`.
 3. Start the game (or type `/reload`) and make sure Telegnome is ticked in the AddOns list.
 
-> Forever installs to `_classic_beta_` (Battle.net may call it "Classic" or "Classic Beta").
+> WoW Forever uses the `_forever_` folder.
 
 ## Using it
 
