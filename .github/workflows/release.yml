@@ -1,0 +1,32 @@
+name: Release
+
+# Push a tag like v0.5.0 to build Telegnome-v0.5.0.zip and attach it to a GitHub release.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that the tag matches the TOC version
+        run: |
+          TOC_VERSION=$(grep -m1 '^## Version:' Telegnome/Telegnome.toc | sed 's/^## Version: *//' | tr -d '\r')
+          if [ "v$TOC_VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "Telegnome.toc says $TOC_VERSION but the tag is $GITHUB_REF_NAME"
+            exit 1
+          fi
+
+      - name: Package
+        run: zip -r "Telegnome-${GITHUB_REF_NAME}.zip" Telegnome -x '*.DS_Store'
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: Telegnome-*.zip
+          generate_release_notes: true

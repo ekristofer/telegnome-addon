@@ -1,0 +1,7 @@
+# macOS / Windows clutter
+.DS_Store
+Thumbs.db
+
+# Build output
+*.zip
+dist/

@@ -1,0 +1,10 @@
+# Normalize text files to LF in the repo
+* text=auto
+*.lua text eol=lf
+*.toc text eol=lf
+*.md  text eol=lf
+*.yml text eol=lf
+
+# Binary assets
+*.tga binary
+*.png binary
