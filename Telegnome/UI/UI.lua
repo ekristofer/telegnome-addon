@@ -804,11 +804,18 @@ function UI:SetTab(tab)
     self:UpdateNewButton()
     self:UpdateTabs()
     if self.tab ~= tab then return end -- the tab isn't available (no requests); UpdateTabs moved on
+    -- The conversation last open in this tab - unless it has moved to another tab since
+    -- (a request that was starred, a stranger who became a request...).
     local key = self.selectedByTab[tab]
-    if not key or not TG.db.threads[key] then key = self:SortedKeys(tab)[1] end
+    local th = key and TG.db.threads[key]
+    if not th or UI.TabOf(th) ~= tab then
+        key = self:SortedKeys(tab)[1]
+        self.selectedByTab[tab] = key
+    end
     if key then self:Select(key) else self:ShowEmpty() end
+    self.tab = tab
     self:RefreshList()
-    if tab == "requests" then TG.Requests:OpenPanel() end -- start on the overview
+    if tab == "requests" then TG.Requests:OpenPanel(true) end -- start on the overview
 end
 
 function UI:UpdateTitle()

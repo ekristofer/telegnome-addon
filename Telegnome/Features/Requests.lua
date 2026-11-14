@@ -101,6 +101,19 @@ function R:ScanApplicants()
     if not (C_LFGList and C_LFGList.GetApplicants and C_LFGList.GetApplicantInfo and C_LFGList.GetApplicantMemberInfo) then
         return
     end
+    if self.scanning or not self:IsListed() then return end
+    -- Applications are for the group leader (and raid assistants); ordinary members have none to read.
+    if IsInGroup and IsInGroup() and UnitIsGroupLeader and not UnitIsGroupLeader("player")
+        and not (UnitIsGroupAssistant and UnitIsGroupAssistant("player")) then
+        return
+    end
+    self.scanning = true
+    local okScan, err = pcall(self.DoScanApplicants, self)
+    self.scanning = false
+    if not okScan then TG:Debug("Applicant scan failed: " .. tostring(err)) end
+end
+
+function R:DoScanApplicants()
     local ok, ids = pcall(C_LFGList.GetApplicants)
     if not ok or type(ids) ~= "table" then return end
     local changed = false
@@ -547,11 +560,13 @@ function R:IsPanelShown()
     return self.panel and self.panel:IsShown() or false
 end
 
-function R:OpenPanel()
+-- fromTab: called by UI:SetTab, which has already switched to the Requests tab.
+function R:OpenPanel(fromTab)
     if not self:TabVisible() then return end
     UI:Show()
     self:Create()
     if UI.tab ~= "requests" then
+        if fromTab then return end -- never bounce back and forth with SetTab
         UI:SetTab("requests") -- which opens this panel
         return
     end
@@ -593,7 +608,14 @@ f:SetScript("OnEvent", function(_, event)
     elseif event == "GROUP_ROSTER_UPDATE" then
         R:CheckGroup()
     elseif event == "LFG_LIST_APPLICANT_UPDATED" or event == "LFG_LIST_APPLICANT_LIST_UPDATED" then
-        R:ScanApplicants()
+        -- these can arrive in bursts: look once, a moment later
+        if not R.scanQueued then
+            R.scanQueued = true
+            C_Timer.After(0.5, function()
+                R.scanQueued = false
+                R:ScanApplicants()
+            end)
+        end
     else
         local listed = R:IsListed()
         if listed and not R.wasListed and TG.db.settings.requestsTab then
