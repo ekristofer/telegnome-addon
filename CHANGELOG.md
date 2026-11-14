@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0
+- Requests tab: while you or your group are listed in the group finder, whispers from people who aren't friends, guild members or favorites are collected in their own tab instead of under Direct messages.
+- Each request shows the player's class, level and latest message, with Invite, look-up and dismiss buttons. Click a request to open the conversation.
+- Level comes from the whisper ("70 mage", "lvl 45"), from their group finder application, or from the Level? button (a /who look-up).
+- Star a request to keep the person (they move to Direct messages); Clear all removes the rest.
+- `/tg recruit` or the tick in the Requests view collects whispers there at any time; a setting turns the automatic collecting off.
+- Colour themes: Brass (the original), Orange, Horde red, Alliance blue, Arcane, Fel green and Steel. Choose in Settings > Window or with `/tg theme <name>`.
+
 ## 0.6.0
 - Direct messages are grouped into Favorites, Friends and Others. Star a conversation to pin it to Favorites; Friends are Battle.net friends, your friends list and guild members; Others can be folded away or closed all at once.
 - Delivery feedback: "player offline / not found", away, busy and ignored replies now show in the conversation.

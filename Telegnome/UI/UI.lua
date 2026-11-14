@@ -31,12 +31,12 @@ function UI:MakeRow(parent, top, i)
 
     local sel = row:CreateTexture(nil, "BACKGROUND")
     sel:SetAllPoints()
-    sel:SetColorTexture(1, 0.82, 0, 0.12)
+    S.Paint(sel, "hi", 0.12)
     local bar = row:CreateTexture(nil, "ARTWORK")
     bar:SetPoint("TOPLEFT")
     bar:SetPoint("BOTTOMLEFT")
     bar:SetWidth(2)
-    bar:SetColorTexture(1, 0.82, 0, 0.9)
+    S.Paint(bar, "hi", 0.9)
     function row:SetSelected(v)
         sel:SetShown(v)
         bar:SetShown(v)
@@ -151,8 +151,9 @@ function UI:Create()
     -- Tabs
     self.tabs = {}
     local prevTab
-    for _, def in ipairs({ { "dm", "Direct messages" }, { "groups", "Group chats" }, { "channels", "Followed channels" } }) do
-        local tab = S.Button(f, def[2], 160, 26)
+    for _, def in ipairs({ { "dm", "Direct messages", 150 }, { "groups", "Group chats", 130 },
+        { "channels", "Followed channels", 160 }, { "requests", "Requests", 120 } }) do
+        local tab = S.Button(f, def[2], def[3], 26)
         if prevTab then
             tab:SetPoint("LEFT", prevTab, "RIGHT", 4, 0)
         else
@@ -179,7 +180,9 @@ function UI:Create()
     local newBtn = S.Button(left, "+ New message", LIST_W - 12, 24)
     newBtn:SetPoint("TOP", 0, -6)
     newBtn:SetScript("OnClick", function()
-        if UI.tab == "groups" then
+        if UI.tab == "requests" then
+            TG.Requests:TogglePanel()
+        elseif UI.tab == "groups" then
             TG.Groups:TogglePanel()
         elseif UI.tab == "channels" then
             TG.Channels:TogglePanel()
@@ -256,12 +259,23 @@ function UI:Create()
         local th = UI.selected and TG.db.threads[UI.selected]
         GameTooltip:SetOwner(s, "ANCHOR_BOTTOM")
         GameTooltip:SetText(th and th.fav and "Remove from favorites" or "Add to favorites")
-        GameTooltip:AddLine("Favorites always stay at the top of the list.", 1, 1, 1, true)
+        GameTooltip:AddLine(th and th.req and "Keeps this person: they move from Requests to your Direct messages."
+            or "Favorites always stay at the top of the list.", 1, 1, 1, true)
         GameTooltip:Show()
     end)
     favBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     favBtn:Hide()
     self.favBtn = favBtn
+
+    -- Requests: invite to your group
+    local inviteBtn = S.Button(right, "Invite", 64, 22)
+    inviteBtn:SetPoint("RIGHT", favBtn, "LEFT", -6, 0)
+    inviteBtn:SetScript("OnClick", function()
+        if UI.selected then TG.Requests:Invite(UI.selected) end
+    end)
+    S.Tooltip(inviteBtn, "Invite", "Invites this player to your group.")
+    inviteBtn:Hide()
+    self.inviteBtn = inviteBtn
 
     local headerBtn = CreateFrame("Button", nil, right)
     headerBtn:SetPoint("TOPLEFT", 10, -6)
@@ -287,6 +301,8 @@ function UI:Create()
     msgs:SetPoint("TOPLEFT", 10, -38)
     msgs:SetPoint("BOTTOMRIGHT", -10, 42)
     msgs:SetFontObject(ChatFontNormal)
+    self.msgs = msgs
+    self:ApplyTextSize()
     msgs:SetJustifyH("LEFT")
     msgs:SetFading(false)
     msgs:SetMaxLines(1000)
@@ -387,7 +403,7 @@ function UI:Create()
     f:SetScript("OnUpdate", function(_, elapsed) UI:UpdateAlpha(elapsed) end)
     f:SetScript("OnShow", function() UI:OnShow() end)
     f:SetScript("OnHide", function()
-        TG.Picker:Close(); TG.Settings:Close(); TG.Groups:ClosePanel(); TG.Channels:ClosePanel(); TG.ChannelList:Close()
+        TG.Picker:Close(); TG.Settings:Close(); TG.Groups:ClosePanel(); TG.Channels:ClosePanel(); TG.ChannelList:Close(); TG.Requests:ClosePanel()
     end)
 
     self:RestorePos()
@@ -459,6 +475,9 @@ end
 function UI.AddMenuEntries(root, key)
     local th = TG.db.threads[key]
     if th then
+        root:CreateButton(th.muted and "Unmute" or "Mute (no pop-ups or sound)", function()
+            TG:SetMuted(key, not th.muted)
+        end)
         root:CreateButton(th.fav and "Remove from favorites" or "Add to favorites", function()
             TG:SetFavorite(key, not th.fav)
         end)
@@ -569,6 +588,7 @@ function UI:GetRow(i)
             TG.Groups:ClosePanel()
             TG.Channels:ClosePanel()
             TG.ChannelList:Close()
+            TG.Requests:ClosePanel()
             UI:Select(s.key)
             UI.input:SetFocus()
         end
@@ -579,6 +599,7 @@ function UI:GetRow(i)
 end
 
 function UI.TabOf(th)
+    if th.req then return "requests" end
     if th.kind == "GROUP" then return "groups" end
     if th.kind == "CHANNEL" then return "channels" end
     return "dm"
@@ -669,6 +690,7 @@ function UI:RefreshList()
         elseif key then
             local th = TG.db.threads[key]
             UI.SetRowContact(row, TG:ThreadDisplay(key))
+            if th.muted then row.name:SetText((TG:ThreadDisplay(key)) .. " |cff888888(muted)|r") end
             row.key = key
             local selected = key == self.selected
             local unread = th.unread or 0
@@ -702,6 +724,8 @@ function UI:UpdateHeaderButtons(th)
     self.renameBtn:SetShown(isGroup or false)
     self.whoBtn:SetShown(isGroup or false)
     self.favBtn:SetShown(isDM or false)
+    local isReq = th and th.req and true or false
+    self.inviteBtn:SetShown(isReq)
     if isDM then
         if th.fav then
             self.favBtn.star:SetVertexColor(1, 0.82, 0.1)
@@ -711,7 +735,7 @@ function UI:UpdateHeaderButtons(th)
             self.favBtn.star:SetAlpha(0.45)
         end
     end
-    self.headerBtn:SetPoint("TOPRIGHT", -(isGroup and 262 or isDM and 148 or 120), -6)
+    self.headerBtn:SetPoint("TOPRIGHT", -(isGroup and 262 or isReq and 218 or isDM and 148 or 120), -6)
 end
 
 -- Closes whatever panel is open over the conversation.
@@ -721,6 +745,7 @@ function UI:CloseOverlays()
     TG.Groups:ClosePanel()
     TG.Channels:ClosePanel()
     TG.ChannelList:Close()
+    TG.Requests:ClosePanel()
 end
 
 -- A passing note in the open conversation (not saved), e.g. who is online in a group.
@@ -732,21 +757,28 @@ end
 
 function UI:UpdateTabs()
     if not self.tabs then return end
-    local counts = { dm = 0, groups = 0, channels = 0 }
+    local counts = { dm = 0, groups = 0, channels = 0, requests = 0 }
     for _, th in pairs(TG.db.threads) do
         local t = UI.TabOf(th)
         counts[t] = counts[t] + (th.unread or 0)
     end
+    -- The Requests tab only exists while you're recruiting or still have requests.
+    local showReq = TG.Requests:TabVisible()
+    self.tabs.requests:SetShown(showReq)
+    if self.tab == "requests" and not showReq then
+        TG.Requests:ClosePanel()
+        self:SetTab("dm")
+        return
+    end
     for id, tab in pairs(self.tabs) do
         local n = counts[id]
         tab:SetText(n > 0 and ("%s |cffff5555(%d)|r"):format(tab.baseText, n) or tab.baseText)
+        local r, g, b, border = S.TabColors(id == self.tab)
+        tab:SetBackdropColor(r, g, b, 1)
+        tab:SetBackdropBorderColor(border[1], border[2], border[3], 1)
         if id == self.tab then
-            tab:SetBackdropColor(0.24, 0.17, 0.08, 1)
-            tab:SetBackdropBorderColor(1, 0.82, 0, 1)
             tab.fs:SetTextColor(1, 0.82, 0)
         else
-            tab:SetBackdropColor(0.09, 0.065, 0.04, 1)
-            tab:SetBackdropBorderColor(S.BRONZE[1], S.BRONZE[2], S.BRONZE[3], 1)
             tab.fs:SetTextColor(0.65, 0.6, 0.5)
         end
     end
@@ -754,7 +786,7 @@ end
 
 function UI:UpdateNewButton()
     if not self.newBtn then return end
-    local labels = { dm = "+ New message", groups = "+ New group", channels = "+ Follow channel" }
+    local labels = { dm = "+ New message", groups = "+ New group", channels = "+ Follow channel", requests = "All requests" }
     self.newBtn:SetText(labels[self.tab] or "+ New message")
 end
 
@@ -765,15 +797,18 @@ function UI:SetTab(tab)
         TG.Groups:ClosePanel()
         TG.Channels:ClosePanel()
         TG.ChannelList:Close()
+        TG.Requests:ClosePanel()
     end
     self.tab = tab
     self.offset = 0
     self:UpdateNewButton()
     self:UpdateTabs()
+    if self.tab ~= tab then return end -- the tab isn't available (no requests); UpdateTabs moved on
     local key = self.selectedByTab[tab]
     if not key or not TG.db.threads[key] then key = self:SortedKeys(tab)[1] end
     if key then self:Select(key) else self:ShowEmpty() end
     self:RefreshList()
+    if tab == "requests" then TG.Requests:OpenPanel() end -- start on the overview
 end
 
 function UI:UpdateTitle()
@@ -889,7 +924,7 @@ end
 -- A panel (settings, new group, follow channels, your channels) covers the conversation.
 function UI:OverlayShown()
     return TG.Settings:IsShown() or TG.Groups:IsPanelShown() or TG.Channels:IsPanelShown()
-        or TG.ChannelList:IsShown() or false
+        or TG.ChannelList:IsShown() or TG.Requests:IsPanelShown() or false
 end
 
 function UI:IsViewing(key)
@@ -937,6 +972,17 @@ end
 ---------------------------------------------------------------------------
 -- Public
 ---------------------------------------------------------------------------
+
+-- Message text size (Settings > Window): the chat font, two points smaller or larger.
+local TEXT_SIZES = { small = -2, normal = 0, large = 2 }
+
+function UI:ApplyTextSize()
+    if not self.msgs or not ChatFontNormal then return end
+    local path, size, flags = ChatFontNormal:GetFont()
+    if type(path) ~= "string" or type(size) ~= "number" then return end
+    local delta = TEXT_SIZES[TG.db and TG.db.settings.textSize or "normal"] or 0
+    self.msgs:SetFont(path, math.max(8, math.floor(size + 0.5) + delta), flags or "")
+end
 
 -- Main window opacity (Settings > Window). The notifier and minimap button aren't affected.
 UI.MIN_OPACITY = 30

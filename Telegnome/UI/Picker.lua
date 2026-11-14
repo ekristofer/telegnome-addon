@@ -25,7 +25,7 @@ function P:Create()
     end)
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
-    bg:SetColorTexture(0.11, 0.08, 0.05, 1)
+    S.Paint(bg, "paneltex")
     f:Hide()
     self.frame = f
 
@@ -214,6 +214,7 @@ function P:Open()
     TG.Groups:ClosePanel()
     TG.Channels:ClosePanel()
     TG.ChannelList:Close()
+    TG.Requests:ClosePanel()
     self.offset = 0
     self.frame:Show()
     self.search:SetText("")

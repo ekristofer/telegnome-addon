@@ -26,7 +26,7 @@ function O:Create()
     f:SetAllPoints(UI.right)
     f:SetFrameLevel(UI.right:GetFrameLevel() + 30)
     S.Inset(f)
-    f:SetBackdropColor(0.11, 0.08, 0.05, 1)
+    S.Solid(f)
     f:EnableMouse(true)
     f:Hide()
     self.frame = f
@@ -62,7 +62,7 @@ function O:Create()
     trackBg:SetColorTexture(0, 0, 0, 0.35)
     local thumb = track:CreateTexture(nil, "ARTWORK")
     thumb:SetWidth(5)
-    thumb:SetColorTexture(S.BRONZE[1], S.BRONZE[2], S.BRONZE[3], 0.9)
+    S.Paint(thumb, "edgetex", 0.9)
     local function updateThumb()
         local range = clip:GetVerticalScrollRange() or 0
         local trackH = track:GetHeight() or 0
@@ -252,6 +252,51 @@ function O:Create()
 
     ---------------------------------------------------------------- Window
     section("Window")
+    local thLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    thLabel:SetPoint("TOPLEFT", 18, y - 4)
+    thLabel:SetText("Theme")
+    self.swatches = {}
+    local prevSw
+    for _, th in ipairs(S.THEMES) do
+        local sw = CreateFrame("Button", nil, content, "BackdropTemplate")
+        sw:SetSize(24, 24)
+        if prevSw then sw:SetPoint("LEFT", prevSw, "RIGHT", 5, 0) else sw:SetPoint("LEFT", thLabel, "RIGHT", 14, 0) end
+        sw:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 2 })
+        sw:SetBackdropColor(th.cog[1], th.cog[2], th.cog[3], 1)
+        sw.theme = th
+        sw:SetScript("OnClick", function()
+            TG.db.settings.theme = th.id
+            S.SetTheme(th.id)
+            O:Refresh()
+        end)
+        S.Tooltip(sw, th.label)
+        self.swatches[#self.swatches + 1] = sw
+        prevSw = sw
+    end
+    local thName = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    thName:SetPoint("LEFT", prevSw, "RIGHT", 10, 0)
+    self.themeName = thName
+    y = y - 32
+
+    local tsLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    tsLabel:SetPoint("TOPLEFT", 18, y - 2)
+    tsLabel:SetText("Message text")
+    self.sizeRadios = {}
+    local prevT = tsLabel
+    for _, opt in ipairs({ { "small", "Small" }, { "normal", "Normal" }, { "large", "Large" } }) do
+        local r = S.Radio(content, opt[2])
+        r:SetPoint("LEFT", prevT, "RIGHT", prevT == tsLabel and 14 or 12, 0)
+        r.value = opt[1]
+        r:SetScript("OnClick", function()
+            TG.db.settings.textSize = opt[1]
+            UI:ApplyTextSize()
+            O:Refresh()
+        end)
+        prevT = r.label
+        self.sizeRadios[#self.sizeRadios + 1] = r
+    end
+    y = y - 28
+
     local opLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     opLabel:SetPoint("TOPLEFT", 18, y - 2)
     opLabel:SetText("Opacity")
@@ -296,6 +341,11 @@ function O:Create()
     self.groupsHidden = check("Group chats (always)", 30,
         function() return true end, function() end,
         "Group chats", "Group chats are hidden channels, so they always stay in Telegnome.")
+    check("Collect strangers' whispers under Requests while I'm listed in the group finder", 0,
+        function() return s().requestsTab end, function(v) s().requestsTab = v end,
+        "Requests", "While you or your group are listed in the group finder, whispers from people who aren't "
+        .. "friends, guild members or favorites go to a Requests tab that shows their class and level and has an "
+        .. "Invite button. To collect at other times: /tg recruit")
     check("Enter types in Telegnome while its window is open", 0,
         function() return s().enterToTelegnome end, function(v) s().enterToTelegnome = v end,
         "Enter key", "With a conversation open, pressing Enter puts the cursor in Telegnome's message box "
@@ -315,6 +365,41 @@ function O:Create()
         "Every chat channel your character is in - Blizzard, custom and Telegnome group chats - with a Leave button. "
         .. "The game allows 10.")
     y = y - 30
+
+    ---------------------------------------------------------------- Requests
+    gap(4)
+    section("Requests")
+    local qrHint = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    qrHint:SetPoint("TOPLEFT", 18, y)
+    qrHint:SetText("Quick replies (the Reply button on a request):")
+    y = y - 18
+    self.replyBoxes = {}
+    local function replyBox(label, get, set)
+        local l = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        l:SetPoint("TOPLEFT", 18, y - 7)
+        l:SetWidth(56)
+        l:SetJustifyH("LEFT")
+        l:SetText(label)
+        local box = S.EditBox(content)
+        box:SetPoint("TOPLEFT", 78, y)
+        box:SetPoint("RIGHT", content, "RIGHT", -12, 0)
+        box:SetHeight(24)
+        box:SetMaxLetters(120)
+        if box.SetMaxBytes then box:SetMaxBytes(240) end
+        box.get = get
+        box:SetScript("OnTextChanged", function(b, userInput) if userInput then set(b:GetText()) end end)
+        box:SetScript("OnEnterPressed", function(b) b:ClearFocus() end)
+        self.replyBoxes[#self.replyBoxes + 1] = box
+        y = y - 28
+        return box
+    end
+    for i = 1, 3 do
+        replyBox("Reply " .. i, function() return (s().quickReplies or {})[i] or "" end,
+            function(v) s().quickReplies = s().quickReplies or {}; s().quickReplies[i] = v end)
+    end
+    local dBox = replyBox("Decline", function() return s().declineReply or "" end, function(v) s().declineReply = v end)
+    S.Tooltip(dBox, "Decline message", "\"Decline\" in the Reply menu sends this and dismisses the request. "
+        .. "Leave it empty to dismiss without a message.")
 
     ---------------------------------------------------------------- Your data
     gap(4)
@@ -379,6 +464,18 @@ function O:Refresh()
     self.soundLabel:SetTextColor(sshade, sshade, sshade)
     for _, r in ipairs(self.growRadios) do r:SetChecked(r.value == (st.toastGrow or "right")) end
 
+    for _, sw in ipairs(self.swatches) do
+        if sw.theme == S.theme then
+            sw:SetBackdropBorderColor(1, 1, 1, 1)
+        else
+            sw:SetBackdropBorderColor(0, 0, 0, 0.8)
+        end
+    end
+    self.themeName:SetText(S.theme.label)
+    for _, r in ipairs(self.sizeRadios) do r:SetChecked(r.value == (st.textSize or "normal")) end
+    for _, box in ipairs(self.replyBoxes) do
+        if not box:HasFocus() then box:SetText(box.get()) end
+    end
     self.refreshing = true
     self.opacity:SetValue(st.opacity or 100)
     self.refreshing = false
@@ -407,6 +504,7 @@ function O:Open()
     TG.Groups:ClosePanel()
     TG.Channels:ClosePanel()
     TG.ChannelList:Close()
+    TG.Requests:ClosePanel()
     self:Refresh()
     self.frame:Show()
     self.clip:SetVerticalScroll(0)

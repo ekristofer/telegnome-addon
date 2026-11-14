@@ -2,7 +2,7 @@
 ## Title: Telegnome
 ## Notes: Gnomish Universal Messenger - whispers, Battle.net messages, group chats and followed channels in their own chat window.
 ## Author: Kristofer
-## Version: 0.6.0
+## Version: 0.7.0-beta1
 ## Category: Chat
 ## IconTexture: Interface\AddOns\Telegnome\Media\Icon
 ## SavedVariables: TelegnomeDB
@@ -20,6 +20,7 @@ UI\Picker.lua
 Features\Groups.lua
 Features\Channels.lua
 UI\ChannelList.lua
+Features\Requests.lua
 
 # Settings, notifier, minimap button
 UI\Settings.lua

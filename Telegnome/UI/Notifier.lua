@@ -56,8 +56,7 @@ function T:Create()
         edgeSize = 14,
         insets = { left = 3, right = 3, top = 3, bottom = 3 },
     })
-    f:SetBackdropColor(0.09, 0.065, 0.04, 0.95)
-    f:SetBackdropBorderColor(S.BRONZE[1], S.BRONZE[2], S.BRONZE[3], 1)
+    S.Paint(f, "toast")
     f:Hide()
     self.frame = f
 
@@ -117,6 +116,7 @@ function T:Create()
             TG.Groups:ClosePanel()
             TG.Channels:ClosePanel()
             TG.ChannelList:Close()
+            TG.Requests:ClosePanel()
             UI:Select(key)
             UI.input:SetFocus()
         else

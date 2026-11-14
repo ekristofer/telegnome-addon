@@ -34,6 +34,13 @@ local DEFAULTS = {
         groupJoinLeave = true, -- "X joined / left" lines in group chats
         enterToTelegnome = true, -- Enter puts the cursor in Telegnome while its window is open
         slay = false,         -- /tg slaay-mode
+        theme = "brass",      -- colour theme (see Style.THEMES)
+        textSize = "normal",  -- message text: small / normal / large
+        -- one-click answers for requests (Settings > Requests)
+        quickReplies = { "Inviting you now.", "What level and role are you?", "One moment, checking the group." },
+        declineReply = "Sorry, the group is full.",
+        requestsTab = true,   -- collect strangers' whispers under Requests while listed in the group finder
+        recruiting = false,   -- manual switch for the same (/tg recruit)
     },
     collapsed = {}, -- folded sections of the Direct messages list
     minimap = { hide = false, angle = 200 },
@@ -262,7 +269,8 @@ function TG:EnsureThread(key, info)
         local c = db.contacts[key]
         th = {
             kind = info.kind, name = info.name, battleTag = info.battleTag or (c and c.battleTag),
-            class = c and c.class, guid = c and c.guid, fav = c and c.fav or nil, msgs = {}, unread = 0,
+            class = c and c.class, guid = c and c.guid, fav = c and c.fav or nil,
+            muted = c and c.muted or nil, msgs = {}, unread = 0,
             code = info.code, channel = info.channel, pass = info.pass,
         }
         db.threads[key] = th
@@ -285,7 +293,8 @@ function TG:AddMessage(key, info, outgoing, text, extra)
     local th = self:EnsureThread(key, info)
 
     local msgs = th.msgs
-    local alert = extra and extra.alert or false -- an alert word matched (followed channels)
+    -- an alert word matched (followed channels); a muted conversation stays quiet regardless
+    local alert = extra and extra.alert and not th.muted or false
     msgs[#msgs + 1] = {
         t = time(), out = outgoing or nil, text = text,
         from = extra and extra.from, cls = extra and extra.cls, hl = alert or nil,
@@ -376,6 +385,7 @@ end
 
 function TG:PassesNotifyFilter(key)
     local th = self.db.threads[key]
+    if th and th.muted then return false end
     if th and th.kind == "GROUP" then return self.db.settings.notifyGroups end
     if th and th.kind == "CHANNEL" then return th.notify and true or false end
     if th and th.demo then return true end
@@ -411,9 +421,21 @@ function TG:SectionOf(th)
     return self:IsFriendly(th) and "friends" or "others"
 end
 
+-- Muted: no pop-up and no sound for this conversation. Messages still arrive and count.
+function TG:SetMuted(key, on)
+    local th = self.db.threads[key]
+    if th then th.muted = on and true or nil end
+    local c = self.db.contacts[key]
+    if c then c.muted = on and true or nil end
+    self.UI:RefreshList()
+end
+
 function TG:SetFavorite(key, on)
     local th = self.db.threads[key]
-    if th then th.fav = on and true or nil end
+    if th then
+        th.fav = on and true or nil
+        if on then th.req = nil end -- starring a request keeps the person: they move to Direct messages
+    end
     local c = self.db.contacts[key]
     if c then c.fav = on and true or nil end
     self.UI:OnFavoriteChanged(key)
@@ -433,7 +455,9 @@ end
 function TG:OtherKeys()
     local keys = {}
     for key, th in pairs(self.db.threads) do
-        if (th.kind == "WHISPER" or th.kind == "BN") and self:SectionOf(th) == "others" then keys[#keys + 1] = key end
+        if (th.kind == "WHISPER" or th.kind == "BN") and not th.req and self:SectionOf(th) == "others" then
+            keys[#keys + 1] = key
+        end
     end
     return keys
 end
@@ -623,6 +647,7 @@ end
 
 function TG:RefreshUnread()
     self.UI:UpdateTitle()
+    if self.Requests then self.Requests:Refresh() end
     if self.Minimap then self.Minimap:Update() end
     if self.Toast then self.Toast:Update() end
 end
@@ -689,6 +714,13 @@ function TG:OnChatEvent(event, ...)
         return
     end
 
+    if not BN_EVENTS[event] then
+        if outgoing then
+            if self.Requests:WasDeclined(key) then return end -- our "sorry, full" to a dismissed request
+        else
+            self.Requests:OnWhisper(key, info, text)
+        end
+    end
     self:AddMessage(key, info, outgoing, text)
     if not outgoing then self:MaybeAutoReply(key, text) end
 
@@ -805,6 +837,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
         TG.db = TelegnomeDB
         TG.bnIDs = {}
         migrate(TG.db)
+        TG.Style.SetTheme(TG.db.settings.theme)
         for ev in pairs(WHISPER_EVENTS) do self:RegisterEvent(ev) end
         for ev in pairs(BN_EVENTS) do self:RegisterEvent(ev) end
         for ev in pairs(FEEDBACK_EVENTS) do pcall(self.RegisterEvent, self, ev) end
@@ -900,6 +933,23 @@ SlashCmdList.TELEGNOME = function(input)
         else
             TG:Print(("Window opacity is %d%%. Use /tg opacity 30-100."):format(s.opacity or 100))
         end
+    elseif cmd == "theme" or verb == "theme" then
+        local t = rest and TG.Style.FindTheme(strtrim(rest))
+        if t then
+            s.theme = t.id
+            TG.Style.SetTheme(t.id)
+            if TG.Settings then TG.Settings:Refresh() end
+            TG:Print("Theme: " .. t.label)
+        else
+            local names = {}
+            for _, th in ipairs(TG.Style.THEMES) do names[#names + 1] = th.id end
+            TG:Print("Theme is " .. TG.Style.theme.label .. ". Choose with /tg theme " .. table.concat(names, " | "))
+        end
+    elseif cmd == "recruit" or cmd == "requests" then
+        s.recruiting = not s.recruiting
+        TG:Print("Collecting whispers under Requests (manual switch): " .. onOff(s.recruiting))
+        TG:RefreshUnread()
+        if s.recruiting then TG.Requests:OpenPanel() end
     elseif cmd == "dnd" then
         TG:SetDND(not s.dnd)
     elseif cmd == "new" then
@@ -960,6 +1010,8 @@ SlashCmdList.TELEGNOME = function(input)
         print("  /tg mychannels - every chat channel you're in, with Leave buttons")
         print("  /tg opacity <30-100> - main window opacity (" .. (s.opacity or 100) .. "%)")
         print("  /tg dnd - do not disturb (" .. onOff(s.dnd) .. ")")
+        print("  /tg theme <name> - colour theme (" .. TG.Style.theme.label .. ")")
+        print("  /tg recruit - collect strangers' whispers under Requests (" .. onOff(s.recruiting) .. ")")
         print("  /tg config - settings")
         print("  /tg counter - on-screen missed-messages counter (" .. onOff(s.counter) .. ")")
         print("  /tg hide - hide whispers from the main chat (" .. onOff(s.hideFromChat) .. ")")

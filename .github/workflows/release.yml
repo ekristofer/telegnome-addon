@@ -1,6 +1,7 @@
 name: Release
 
-# Push a tag like v0.5.0 to build Telegnome-v0.5.0.zip and attach it to a GitHub release.
+# Push a tag like v0.7.0 to build Telegnome-v0.7.0.zip and attach it to a GitHub release.
+# Test versions: tag like v0.7.0-beta1 (with the same text after "## Version:" in the TOC).
 on:
   push:
     tags:
@@ -30,3 +31,5 @@ jobs:
         with:
           files: Telegnome-*.zip
           generate_release_notes: true
+          # A tag with a hyphen (v0.7.0-beta1) is published as a pre-release, not as the latest version.
+          prerelease: ${{ contains(github.ref_name, '-') }}

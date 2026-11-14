@@ -114,15 +114,7 @@ function Y:Apply()
     self:EnsureBars()
     for _, b in pairs(self.bars) do b:SetShown(on) end
     if not on then
-        -- back to brass and bronze
-        if UI.frame then
-            UI.frame:SetBackdropBorderColor(1, 1, 1, 1)
-            for _, cog in ipairs(UI.cogs or {}) do cog:SetVertexColor(S.BRASS[1], S.BRASS[2], S.BRASS[3]) end
-        end
-        local toast = TG.Toast
-        if toast and toast.frame then
-            toast.frame:SetBackdropBorderColor(S.BRONZE[1], S.BRONZE[2], S.BRONZE[3], 1)
-        end
+        S.Repaint() -- back to the chosen theme's colours
     end
     if TG.Toast then TG.Toast:Update() end
     if TG.Minimap then TG.Minimap:Update() end
@@ -136,7 +128,7 @@ function Y:Toggle()
     if TG.db.settings.slay then
         TG:Print(Y.Text("Slaay mode on.") .. " Same command to turn it off.")
     else
-        TG:Print("Slaay mode off. Back to brass.")
+        TG:Print("Slaay mode off.")
     end
 end
 

@@ -10,6 +10,7 @@ Telegnome moves your private messages out of the busy main chat and into a messe
 ## Features
 
 - **Direct messages**: every whisper and Battle.net whisper gets its own conversation with saved history. Reply from the window. The list is grouped into **Favorites**, **Friends** and **Others**, so a flood of strangers never buries your friends.
+- **Requests**: while you're listed in the group finder, whispers from strangers land in their own tab with class, level and an Invite button.
 - **Group chats**: private, password-protected group chats you join with a friendly invite code like `sprocket-whistle-gizmo-427`.
 - **Followed channels**: mirror Guild, Officer, Party, Raid, Instance, Say, Yell or any joined channel (General, Trade, custom) into their own tab.
 - **Notifier**: a small on-screen cog shows how many messages you've missed. It grows to show new messages, then shrinks back.
@@ -21,7 +22,7 @@ Telegnome moves your private messages out of the busy main chat and into a messe
 - Sound for new messages, with a choice of sounds.
 - Adjustable window opacity, so you can keep it open over the game. It turns solid when you hover or type.
 - Delivery feedback in the conversation (offline, away, ignoring you), shift-click links, key bindings, alert words for followed channels.
-- Classic look, with brass cogs.
+- Classic look, with brass cogs - or pick another colour theme (Orange, Horde red, Alliance blue, Arcane, Fel green, Steel).
 
 ## Installation
 
@@ -48,8 +49,10 @@ Open Telegnome with the minimap button, the addons button by the minimap, or `/t
 | `/tg join <code>` | Join a group chat |
 | `/tg channels` | Choose followed channels |
 | `/tg opacity <30-100>` | Main window opacity |
+| `/tg theme <name>` | Colour theme: brass, orange, horde, alliance, arcane, fel, steel |
 | `/tg config` | Settings |
 | `/tg mychannels` | Every chat channel you're in, with Leave buttons |
+| `/tg recruit` | Collect strangers' whispers under Requests (manual switch) |
 | `/tg dnd` | Toggle Do not disturb |
 | `/tg only` | Keep whispers, Battle.net whispers and followed channels out of the main chat |
 | `/tg hide` | Hide just whispers from the main chat |
@@ -71,6 +74,18 @@ The Direct messages list has three sections, newest conversation first in each:
 - **Others**: everyone else. Click the header to fold the section away; **Close all** closes every conversation in it and forgets those contacts.
 
 Right-click someone in **+ New message** and choose **Forget contact** to take them off that list.
+
+### Requests
+
+List yourself or your group in the group finder and a **Requests** tab appears. Whispers from people who aren't friends, guild members or favorites are collected there, so they don't flood your Direct messages.
+
+- Each request shows the player's class, level and latest message.
+- **Invite** invites them to your group; **x** dismisses the request; clicking the row opens the conversation.
+- The level is read from the whisper ("70 mage", "lvl 45") or from their group finder application. If neither has it, **Level?** looks the player up (the game only answers every few seconds).
+- Click the star in a request's conversation to keep that person - they move to Direct messages.
+- When you're done, **Clear all** removes the remaining requests and the tab disappears.
+
+Recruiting somewhere else, for example in a chat channel? `/tg recruit` (or the tick at the bottom of the Requests view) collects whispers there until you switch it off.
 
 ### Group chats
 
@@ -155,6 +170,7 @@ Telegnome/               the addon folder (this is what goes into AddOns)
   UI/Minimap.lua         minimap button
   Features/Groups.lua    group chats (invite codes, hashing, channels)
   Features/Channels.lua  followed channels
+  Features/Requests.lua  Requests tab (group finder whispers)
   Media/                 icon and cog textures (.tga)
 docs/                    images for this README
 ```

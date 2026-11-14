@@ -54,6 +54,18 @@ local PEOPLE = {
       msgs = { { 12, false, "can i come" } } },
 }
 
+-- Shown under the Requests tab (as if you were listed in the group finder).
+local REQUESTS = {
+    { key = "W:mendwell-gnomeregan", name = "Mendwell-Gnomeregan", class = "PRIEST", level = 70, applied = true, role = "HEALER", ilvl = 478,
+      msgs = { { 2, false, "Holy priest, can heal. Invite?" } }, unread = 1 },
+    { key = "W:stabsworth-gnomeregan", name = "Stabsworth-Gnomeregan", class = "ROGUE", level = 68,
+      msgs = { { 4, false, "68 rogue here, know the tactics" } }, unread = 1 },
+    { key = "W:moonfluff-gnomeregan", name = "Moonfluff-Gnomeregan", class = "DRUID",
+      msgs = { { 6, false, "room for a tank?" }, { 5, true, "Yes - what level are you?" } } },
+    { key = "W:zapgrin-gnomeregan", name = "Zapgrin-Gnomeregan", class = "SHAMAN", level = 70, invited = true,
+      msgs = { { 8, false, "lvl 70 ele shaman, 3k score" }, { 7, true, "Inviting you now" } } },
+}
+
 local GROUPS = {
     { key = "G:tgn0000000000a1", name = "Raid night", code = "cog-gear-flux-417", msgs = {
         { 95, false, "Who's bringing the feast?", "Mirelle", "PRIEST" },
@@ -113,6 +125,11 @@ local function build()
             demoSec = p.sec, demoOnline = p.online, unread = p.unread }, p.msgs)
         contacts[p.key] = { kind = p.kind, name = p.name, battleTag = p.battleTag, class = p.class, last = now,
             fav = p.fav or nil, demo = true, demoOnline = p.online }
+    end
+    for _, r in ipairs(REQUESTS) do
+        add(r.key, { kind = "WHISPER", name = r.name, class = r.class, level = r.level, req = true,
+            applied = r.applied, role = r.role, ilvl = r.ilvl, invited = r.invited and now or nil, demoSec = "others", unread = r.unread }, r.msgs)
+        contacts[r.key] = { kind = "WHISPER", name = r.name, class = r.class, last = now, demo = true }
     end
     for _, g in ipairs(GROUPS) do
         add(g.key, { kind = "GROUP", name = g.name, code = g.code, channel = g.key:sub(3), unread = g.unread }, g.msgs)
