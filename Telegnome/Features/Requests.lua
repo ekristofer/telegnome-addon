@@ -621,6 +621,12 @@ f:SetScript("OnEvent", function(_, event)
         if listed and not R.wasListed and TG.db.settings.requestsTab then
             TG:Print("You're listed in the group finder: whispers from people you don't know are collected under "
                 .. "Requests in Telegnome.")
+            if TG.Toast then
+                TG.Toast:Notice("|cffffd100Requests are on|r",
+                    "You're listed in the group finder. Whispers from people you don't know are collected under "
+                    .. "Requests. Click to open it.",
+                    function() R:OpenPanel() end)
+            end
         end
         R.wasListed = listed
         R:Refresh()

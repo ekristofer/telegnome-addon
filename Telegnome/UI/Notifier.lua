@@ -107,6 +107,14 @@ function T:Create()
             T:Collapse()
             return
         end
+        -- a notice (e.g. "Requests are on") leads to its own place
+        local action = T.expanded and T.action
+        if action then
+            T.action = nil
+            T:Collapse()
+            action()
+            return
+        end
         local key = (T.expanded and T.key and TG.db.threads[T.key] and T.key) or TG:MostRecentUnread()
         T:Collapse()
         if key then
@@ -215,6 +223,7 @@ function T:Collapse()
     if not self.frame or not self.expanded then return end
     self.expanded = false
     self.count = 0
+    self.action = nil
     self.full:Hide()
     self.fullSpin:Stop()
     local keep = self:ShouldShowPill()
@@ -279,16 +288,29 @@ function T:OnIncoming(key, text, from, force)
     local s = TG.db.settings
     if s.dnd or not s.notify or not (force or TG:PassesNotifyFilter(key)) then return end
     if from then text = from .. ": " .. (text or "") end
-    self.count = (self.expanded and self.count or 0) + 1
+    self.count = (self.expanded and not self.action and self.count or 0) + 1
     self.key = key
+    self.action = nil
     local name, color = TG:ThreadDisplay(key)
     local more = self.count > 1 and ("  |cff888888(" .. self.count .. " new)|r") or ""
     self:Show(("|cff%s%s|r%s"):format(UI.hex(color), name, more), text)
 end
 
+-- A pop-up that isn't a message. Clicking it runs `action`.
+function T:Notice(title, body, action)
+    local s = TG.db.settings
+    if s.dnd or not s.notify then return false end
+    self.key = nil
+    self.count = 0
+    self.action = action
+    self:Show(title, body)
+    return true
+end
+
 function T:Preview()
     self.key = nil
     self.count = 0
+    self.action = nil
     self:Show("Telegnome", "This is how new messages will appear. Click to open, right-click to mark all as read.")
 end
 
