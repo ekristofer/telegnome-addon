@@ -9,6 +9,8 @@ S.MEDIA = "Interface\\AddOns\\Telegnome\\Media\\"
 S.ICON = S.MEDIA .. "Icon"
 S.COG = S.MEDIA .. "Cog"
 S.BUBBLE = S.MEDIA .. "Bubble"
+S.WRENCH = S.MEDIA .. "Wrench"
+S.STAR = S.MEDIA .. "Star"
 S.GOLD = { 1, 0.82, 0 }
 S.BRONZE = { 0.62, 0.47, 0.24 }
 S.BRASS = { 0.95, 0.74, 0.38 }
@@ -166,6 +168,27 @@ function S.Radio(parent, label)
     local r = CreateFrame("CheckButton", nil, parent, "UIRadioButtonTemplate")
     r:SetSize(16, 16)
     return labelled(r, label, "GameFontHighlightSmall")
+end
+
+-- Horizontal slider in the classic options style.
+function S.Slider(parent, width, minV, maxV, step)
+    local sl = CreateFrame("Slider", nil, parent, "BackdropTemplate")
+    sl:SetOrientation("HORIZONTAL")
+    sl:SetSize(width, 17)
+    sl:SetBackdrop({
+        bgFile = "Interface\\Buttons\\UI-SliderBar-Background",
+        edgeFile = "Interface\\Buttons\\UI-SliderBar-Border",
+        tile = true, tileSize = 8, edgeSize = 8,
+        insets = { left = 3, right = 3, top = 6, bottom = 6 },
+    })
+    sl:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
+    local thumb = sl:GetThumbTexture()
+    if thumb then thumb:SetSize(32, 32) end
+    sl:SetMinMaxValues(minV, maxV)
+    sl:SetValueStep(step or 1)
+    if sl.SetObeyStepOnDrag then sl:SetObeyStepOnDrag(true) end
+    -- No mouse wheel on purpose: the wheel scrolls the panel the slider sits in.
+    return sl
 end
 
 function S.SetWidgetEnabled(w, enabled)

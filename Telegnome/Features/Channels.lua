@@ -6,7 +6,7 @@ local _, ns = ...
 local TG = ns.TG
 local S = TG.Style
 local UI = TG.UI
-local C = { builtinChecks = {}, channelChecks = {} }
+local C = { builtinChecks = {}, builtinNotify = {}, channelChecks = {}, channelNotify = {} }
 TG.Channels = C
 
 local BUILTIN = {
@@ -85,6 +85,7 @@ function C:Follow(ctype, cname)
     local th = TG:EnsureThread(key, { kind = "CHANNEL", name = name })
     th.ctype = ctype
     th.cname = (ctype == "CHANNEL") and name or nil
+    th.notify = false -- pop-ups are chosen per channel
     th.msgs[#th.msgs + 1] = { t = time(), sys = true, text = "Following " .. name .. ". New messages will show up here." }
     UI:RefreshList()
     TG:RefreshUnread()
@@ -98,6 +99,26 @@ end
 ---------------------------------------------------------------------------
 -- Events, sending, filtering
 ---------------------------------------------------------------------------
+
+-- Alert words (Settings): a followed-channel message containing one pops up and plays the
+-- sound even when that channel's Pop-up tick is off.
+local kwSource, kwList
+function C.MatchKeyword(text)
+    local src = TG.db.settings.keywords or ""
+    if src ~= kwSource then
+        kwSource, kwList = src, {}
+        for part in src:gmatch("[^,;]+") do
+            local word = strtrim(part):lower()
+            if #word >= 2 then kwList[#kwList + 1] = word end
+        end
+    end
+    if #kwList == 0 or type(text) ~= "string" then return false end
+    local lower = text:lower()
+    for _, word in ipairs(kwList) do
+        if lower:find(word, 1, true) then return true end
+    end
+    return false
+end
 
 function C:OnEvent(event, ...)
     local text, sender = ...
@@ -116,7 +137,9 @@ function C:OnEvent(event, ...)
     local outgoing = guid and guid == UnitGUID("player") or false
     local from = Ambiguate and Ambiguate(sender or "?", "short") or sender
     if event == "CHAT_MSG_RAID_WARNING" then text = "[Raid Warning] " .. text end
-    TG:AddMessage(key, { kind = "CHANNEL" }, outgoing, text, { from = from, cls = TG:ClassFromGUID(guid) })
+    TG:AddMessage(key, { kind = "CHANNEL" }, outgoing, text, {
+        from = from, cls = TG:ClassFromGUID(guid), alert = (not outgoing) and C.MatchKeyword(text) or nil,
+    })
 end
 
 function C:Send(th, text)
@@ -152,8 +175,9 @@ end
 function C:InstallChatFilter(add)
     local function filter(_, event, ...)
         if not (TG.db and TG.db.settings.hideChannels) then return false end
-        local msg = ...
-        if TG.isSecret(msg) then return false end
+        -- Only hide what OnEvent can read and store.
+        local msg, sender = ...
+        if TG.isSecret(msg) or TG.isSecret(sender) or TG.isSecret((select(12, ...))) then return false end
         local key
         if event == "CHAT_MSG_CHANNEL" then
             local base = select(9, ...)
@@ -173,6 +197,10 @@ function C:OpenMenu(key, anchor)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
     MenuUtil.CreateContextMenu(anchor, function(_, root)
         root:CreateTitle(th.name)
+        root:CreateCheckbox("Pop-up notifications",
+            function() return th.notify and true or false end,
+            function() th.notify = not th.notify end)
+        root:CreateButton("Clear history", function() TG:ConfirmClearHistory(key) end)
         root:CreateButton("Unfollow channel", function() C:Unfollow(key) end)
         root:CreateButton("Choose channels...", function() C:OpenPanel() end)
     end)
@@ -183,6 +211,20 @@ end
 ---------------------------------------------------------------------------
 
 local ROW = 22
+local NOTIFY_X_LEFT, NOTIFY_X_RIGHT = 122, 410
+
+local function setNotify(key, on)
+    local th = TG.db.threads[key]
+    if th then th.notify = on and true or false end
+end
+
+local function notifyCheck(parent, x, y)
+    local c = S.Check(parent, "")
+    c:SetPoint("TOPLEFT", x, y)
+    S.Tooltip(c, "Pop-up notifications",
+        "Tick to get the on-screen notifier for this channel. Leave it off to only read it in the chat window.")
+    return c
+end
 
 function C:CreatePanel()
     if self.panel then return end
@@ -210,55 +252,71 @@ function C:CreatePanel()
     intro:SetPoint("TOPLEFT", 14, -42)
     intro:SetPoint("RIGHT", -14, 0)
     intro:SetJustifyH("LEFT")
-    intro:SetText("Tick the chats you want in Telegnome. You can read and reply to them in this tab.")
+    intro:SetText("Tick a chat to follow it in this tab. Also tick Pop-up to get the notifier for it; otherwise it stays quiet.")
 
-    local h1 = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    h1:SetPoint("TOPLEFT", 14, -68)
-    h1:SetText("Chat types")
+    local function header(text, x, popX)
+        local h = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        h:SetPoint("TOPLEFT", x, -68)
+        h:SetText(text)
+        local p = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        p:SetPoint("TOP", f, "TOPLEFT", popX + 12, -70)
+        p:SetText("Pop-up")
+    end
+    header("Chat types", 14, NOTIFY_X_LEFT)
+    header("Your channels", 230, NOTIFY_X_RIGHT)
+
     for i, b in ipairs(BUILTIN) do
+        local y = -86 - (i - 1) * ROW
         local c = S.Check(f, b.name)
-        c:SetPoint("TOPLEFT", 12, -86 - (i - 1) * ROW)
+        c:SetPoint("TOPLEFT", 12, y)
         c.ctype = b.id
         c:SetScript("OnClick", function(s)
             local key = C.KeyForType(b.id)
             if s:GetChecked() then C:Follow(b.id) else C:Unfollow(key) end
+            C:RefreshPanel()
         end)
         self.builtinChecks[i] = c
+
+        local n = notifyCheck(f, NOTIFY_X_LEFT, y)
+        n:SetScript("OnClick", function(s) setNotify(C.KeyForType(b.id), s:GetChecked()) end)
+        self.builtinNotify[i] = n
     end
 
-    local h2 = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    h2:SetPoint("TOPLEFT", 230, -68)
-    h2:SetText("Your channels")
     local none = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     none:SetPoint("TOPLEFT", 232, -90)
     none:SetText("You're not in any channels.")
     self.noneText = none
 
-    local optY = -86 - #BUILTIN * ROW - 10
+    -- Pinned to the bottom so a long "Your channels" column can't run into it.
     local h3 = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    h3:SetPoint("TOPLEFT", 14, optY)
+    h3:SetPoint("BOTTOMLEFT", 14, 66)
     h3:SetText("Options")
     local hide = S.Check(f, "Hide followed channels from the main chat")
-    hide:SetPoint("TOPLEFT", 12, optY - 18)
+    hide:SetPoint("BOTTOMLEFT", 12, 38)
     hide:SetScript("OnClick", function(s) TG.db.settings.hideChannels = s:GetChecked() and true or false end)
-    S.Tooltip(hide, "Hide from main chat", "Messages in followed channels only show up in Telegnome.")
-    self.hideCheck = hide
-    local notify = S.Check(f, "Pop up for followed channel messages")
-    notify:SetPoint("TOPLEFT", 12, optY - 18 - ROW)
-    notify:SetScript("OnClick", function(s) TG.db.settings.notifyChannels = s:GetChecked() and true or false end)
-    S.Tooltip(notify, "Pop-ups", "Off by default - busy channels like Trade can get noisy. "
+    S.Tooltip(hide, "Hide from main chat", "Messages in followed channels only show up in Telegnome. "
         .. "Followed channels never count towards the missed-messages counter.")
-    self.notifyCheck = notify
+    self.hideCheck = hide
 
     local done = S.Button(f, "Close", 80, 24)
     done:SetPoint("BOTTOMRIGHT", -10, 10)
     done:SetScript("OnClick", function() C:ClosePanel() end)
 end
 
+local function setNotifyState(n, followed, key)
+    local th = followed and TG.db.threads[key]
+    n:SetChecked(th and th.notify and true or false)
+    n:SetEnabled(followed and true or false)
+    n:SetAlpha(followed and 1 or 0.4)
+end
+
 function C:RefreshPanel()
     if not self.panel then return end
-    for _, c in ipairs(self.builtinChecks) do
-        c:SetChecked(self:IsFollowedKey(C.KeyForType(c.ctype)))
+    for i, c in ipairs(self.builtinChecks) do
+        local key = C.KeyForType(c.ctype)
+        local followed = self:IsFollowedKey(key)
+        c:SetChecked(followed)
+        setNotifyState(self.builtinNotify[i], followed, key)
     end
 
     -- Joined numbered channels (General, Trade, custom...), excluding Telegnome group channels.
@@ -266,7 +324,7 @@ function C:RefreshPanel()
     local names = {}
     for i = 1, #list, 3 do
         local name = list[i + 1]
-        if type(name) == "string" and not name:lower():find("^tgn") then
+        if type(name) == "string" and not TG.Groups.IsTelegnomeChannel(name) then
             names[#names + 1] = baseName(name)
         end
     end
@@ -283,23 +341,38 @@ function C:RefreshPanel()
     for i, name in ipairs(names) do
         local c = self.channelChecks[i]
         if not c then
+            local y = -86 - (i - 1) * ROW
             c = S.Check(self.panel, "")
-            c:SetPoint("TOPLEFT", 228, -86 - (i - 1) * ROW)
+            c:SetPoint("TOPLEFT", 228, y)
+            c.label:SetWidth(150)
+            c.label:SetJustifyH("LEFT")
+            c.label:SetWordWrap(false)
             c:SetScript("OnClick", function(s)
                 if s:GetChecked() then C:Follow("CHANNEL", s.cname) else C:Unfollow(C.KeyForChannel(s.cname)) end
+                C:RefreshPanel()
             end)
             self.channelChecks[i] = c
+
+            local n = notifyCheck(self.panel, NOTIFY_X_RIGHT, y)
+            n:SetScript("OnClick", function(s) setNotify(C.KeyForChannel(c.cname), s:GetChecked()) end)
+            self.channelNotify[i] = n
         end
         c.cname = name
         c.label:SetText(name)
-        c:SetChecked(self:IsFollowedKey(C.KeyForChannel(name)))
+        local key = C.KeyForChannel(name)
+        local followed = self:IsFollowedKey(key)
+        c:SetChecked(followed)
         c:Show()
+        setNotifyState(self.channelNotify[i], followed, key)
+        self.channelNotify[i]:Show()
     end
-    for i = #names + 1, #self.channelChecks do self.channelChecks[i]:Hide() end
+    for i = #names + 1, #self.channelChecks do
+        self.channelChecks[i]:Hide()
+        self.channelNotify[i]:Hide()
+    end
     self.noneText:SetShown(#names == 0)
 
     self.hideCheck:SetChecked(TG.db.settings.hideChannels)
-    self.notifyCheck:SetChecked(TG.db.settings.notifyChannels)
 end
 
 function C:IsPanelShown()
@@ -313,6 +386,7 @@ function C:OpenPanel()
     TG.Settings:Close()
     TG.Picker:Close()
     TG.Groups:ClosePanel()
+    TG.ChannelList:Close()
     self:RefreshPanel()
     self.panel:Show()
     UI.newBtn:SetText("Cancel")

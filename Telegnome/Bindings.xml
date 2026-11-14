@@ -1,0 +1,8 @@
+<Bindings>
+	<Binding name="TELEGNOME_TOGGLE" header="TELEGNOME" category="ADDONS">
+		Telegnome_ToggleBinding()
+	</Binding>
+	<Binding name="TELEGNOME_UNREAD" category="ADDONS">
+		Telegnome_OpenUnreadBinding()
+	</Binding>
+</Bindings>

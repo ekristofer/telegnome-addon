@@ -141,8 +141,20 @@ function P:GetRow(i)
     row.right:ClearAllPoints()
     row.right:SetPoint("RIGHT", -6, 0)
     row.right:SetFontObject("GameFontDisableSmall")
-    row:SetScript("OnClick", function(s)
-        if s.entry then P:Choose(s.entry) end
+    row:SetScript("OnClick", function(s, button)
+        local e = s.entry
+        if not e then return end
+        -- Right-click someone you've talked to: take them off this list.
+        if button == "RightButton" then
+            if TG.db.contacts[e.key] and MenuUtil and MenuUtil.CreateContextMenu then
+                MenuUtil.CreateContextMenu(s, function(_, root)
+                    root:CreateTitle(e.name)
+                    root:CreateButton("Forget contact", function() TG:ForgetContact(e.key) end)
+                end)
+            end
+            return
+        end
+        P:Choose(e)
     end)
     self.rows[i] = row
     return row
@@ -201,6 +213,7 @@ function P:Open()
     TG.Settings:Close()
     TG.Groups:ClosePanel()
     TG.Channels:ClosePanel()
+    TG.ChannelList:Close()
     self.offset = 0
     self.frame:Show()
     self.search:SetText("")

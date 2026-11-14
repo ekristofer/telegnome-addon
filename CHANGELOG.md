@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.6.0
+- Direct messages are grouped into Favorites, Friends and Others. Star a conversation to pin it to Favorites; Friends are Battle.net friends, your friends list and guild members; Others can be folded away or closed all at once.
+- Delivery feedback: "player offline / not found", away, busy and ignored replies now show in the conversation.
+- Forget contact: right-click someone in New message (or a conversation) to remove them.
+- Shift-click items, quests and other links into Telegnome's message box.
+- Key bindings (Options > Keybindings > AddOns): open/close Telegnome, open the newest unread message.
+- Group chats: an Online button lists who is in the group right now, and grey lines show who joins and leaves.
+- Alert words for followed channels: a message containing one pops up even without the Pop-up tick.
+- A see-through window turns solid under the mouse or while typing (optional).
+- Enter puts the cursor in Telegnome while its window is open on a conversation; Enter again on the empty box opens the game's chat (optional).
+- Settings > Your data explains what is saved and where, shows how much is saved, and can delete all messages.
+- Whispers to people on your own realm are addressed by their bare name, with one automatic retry as Name-Realm if the game can't find them.
+- Rename group chats (right-click the group, or the Rename button).
+- Group codes are shared as `Telegnome code: ...`. When someone sends one in any chat (whisper, party, guild...), Telegnome remembers it and fills it in when you click + New group.
+- New invite codes are seeded from the date and time and end in a 3-digit number. Old codes keep working.
+- Do not disturb: no pop-ups or sounds, optional auto-reply with your own message. Toggle with `/tg dnd` or Ctrl-click the notifier or minimap button.
+- Clearer Settings button (labelled, with a wrench icon).
+- Per-channel Pop-up checkbox for followed channels (replaces the single global setting).
+- Clear history for a single conversation without closing it.
+- Settings panel scrolls.
+- Window opacity slider (Settings > Window, or `/tg opacity 30-100`) to make the main window see-through. Default is fully opaque.
+- "Only in Telegnome": one setting (or `/tg only`) keeps whispers, Battle.net whispers and followed channels out of the main chat. Group chats always stay in Telegnome.
+- Sound reworked: works whether or not whispers are hidden, plays even with game sound effects off, choice of Chime / Whisper / Ping with a Test button, also for group chats and followed channels with Pop-up on. Off by default (also switched off once when upgrading).
+- Your chat channels: a list of every channel the character is in (Blizzard, custom, Telegnome groups) with how many of the 10 slots are used and Leave buttons. Open it from Settings, the Group chats panel or `/tg mychannels`.
+- Telegnome group channels without a matching group (e.g. made on another computer) show up under Group chats as "Unknown group" so they can be renamed, given their code, or left.
+
 ## 0.5.0
 - Followed channels tab: mirror Guild, Officer, Party, Raid, Instance, Say, Yell and joined channels (General, Trade, custom), with replies.
 - Option to hide followed channels from the main chat; separate pop-up setting (off by default).

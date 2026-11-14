@@ -38,6 +38,7 @@ function M:Create()
     icon:SetTexture(S.ICON)
     icon:SetPoint("TOPLEFT", 5, -4)
     self.spin = S.Spin(icon, 1.2, -144)
+    self.icon = icon
 
     local border = b:CreateTexture(nil, "OVERLAY")
     border:SetSize(53, 53)
@@ -64,7 +65,9 @@ function M:Create()
     self.badge = badge
 
     b:SetScript("OnClick", function(_, button)
-        if button == "RightButton" then
+        if IsControlKeyDown() then
+            TG:SetDND(not TG.db.settings.dnd)
+        elseif button == "RightButton" then
             TG.UI:Show()
             TG.Picker:Open()
         elseif IsShiftKeyDown() then
@@ -89,6 +92,7 @@ function M:Create()
         M.spin:Play()
         GameTooltip:SetOwner(s, "ANCHOR_LEFT")
         GameTooltip:AddLine("Telegnome")
+        if TG.db.settings.dnd then GameTooltip:AddLine("Do not disturb is on", 1, 0.55, 0.3) end
         local n = TG:TotalUnread()
         if n > 0 then
             GameTooltip:AddLine(n .. " unread message" .. (n == 1 and "" or "s"), 1, 0.4, 0.4)
@@ -96,6 +100,7 @@ function M:Create()
         GameTooltip:AddLine("Left-click: open / close", 1, 1, 1)
         GameTooltip:AddLine("Right-click: new message", 1, 1, 1)
         GameTooltip:AddLine("Shift-click: settings", 1, 1, 1)
+        GameTooltip:AddLine("Ctrl-click: do not disturb on / off", 1, 1, 1)
         GameTooltip:AddLine("Drag: move", 1, 1, 1)
         GameTooltip:Show()
     end)
@@ -108,6 +113,9 @@ end
 function M:Update()
     if not self.button then return end
     self.button:SetShown(not TG.db.minimap.hide)
+    if self.icon then
+        if TG.db.settings.dnd then self.icon:SetVertexColor(1, 0.45, 0.4) else self.icon:SetVertexColor(1, 1, 1) end
+    end
     local n = TG:TotalUnread()
     if n > 0 then
         self.badge.count:SetText(n > 9 and "9+" or tostring(n))

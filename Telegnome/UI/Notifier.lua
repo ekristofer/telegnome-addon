@@ -99,6 +99,10 @@ function T:Create()
     self.full = full
 
     f:SetScript("OnClick", function(_, button)
+        if IsControlKeyDown() then
+            TG:SetDND(not TG.db.settings.dnd)
+            return
+        end
         if button == "RightButton" then
             TG:MarkAllRead()
             T:Collapse()
@@ -108,9 +112,11 @@ function T:Create()
         T:Collapse()
         if key then
             UI:Show()
+            TG.Picker:Close()
             TG.Settings:Close()
             TG.Groups:ClosePanel()
             TG.Channels:ClosePanel()
+            TG.ChannelList:Close()
             UI:Select(key)
             UI.input:SetFocus()
         else
@@ -135,6 +141,7 @@ function T:ShowTooltip()
     local f = self.frame
     GameTooltip:SetOwner(f, "ANCHOR_BOTTOM")
     GameTooltip:AddLine("Telegnome")
+    if TG.db.settings.dnd then GameTooltip:AddLine("Do not disturb is on", 1, 0.55, 0.3) end
     local unread = {}
     for key, th in pairs(TG.db.threads) do
         if (th.unread or 0) > 0 and th.kind ~= "CHANNEL" then unread[#unread + 1] = { key = key, th = th } end
@@ -151,6 +158,7 @@ function T:ShowTooltip()
     GameTooltip:AddLine(" ")
     GameTooltip:AddLine("Click: open", 1, 1, 1)
     GameTooltip:AddLine("Right-click: mark all as read", 1, 1, 1)
+    GameTooltip:AddLine("Ctrl-click: do not disturb on / off", 1, 1, 1)
     GameTooltip:AddLine("Shift-drag: move", 1, 1, 1)
     GameTooltip:Show()
 end
@@ -243,6 +251,11 @@ function T:Update()
         pill.count:SetTextColor(0.5, 0.5, 0.5)
         pill.cog:SetDesaturated(true)
     end
+    if TG.db.settings.dnd then -- red cog = do not disturb
+        pill.cog:SetVertexColor(0.95, 0.4, 0.3)
+    else
+        pill.cog:SetVertexColor(S.BRASS[1], S.BRASS[2], S.BRASS[3])
+    end
     if not self.expanded and not self.animating then
         if self:ShouldShowPill() then
             self.frame:SetSize(PILL_W, PILL_H)
@@ -261,9 +274,10 @@ function T:Show(titleText, bodyText)
     self:Expand()
 end
 
-function T:OnIncoming(key, text, from)
+-- force: an alert word matched, so it pops up even for a channel without the Pop-up tick.
+function T:OnIncoming(key, text, from, force)
     local s = TG.db.settings
-    if not s.notify or not TG:PassesNotifyFilter(key) then return end
+    if s.dnd or not s.notify or not (force or TG:PassesNotifyFilter(key)) then return end
     if from then text = from .. ": " .. (text or "") end
     self.count = (self.expanded and self.count or 0) + 1
     self.key = key
