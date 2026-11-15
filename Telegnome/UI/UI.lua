@@ -81,7 +81,7 @@ function UI:Create()
     if self.frame then return end
 
     local f = CreateFrame("Frame", "TelegnomeFrame", UIParent, "BackdropTemplate")
-    f:SetSize(700, 510)
+    f:SetSize(740, 510)
     f:SetPoint("CENTER")
     f:SetFrameStrata("MEDIUM")
     f:SetToplevel(true)
@@ -89,7 +89,7 @@ function UI:Create()
     f:SetMovable(true)
     f:SetResizable(true)
     if f.SetDontSavePosition then f:SetDontSavePosition(true) end
-    if f.SetResizeBounds then f:SetResizeBounds(640, 490, 1400, 1000) end
+    if f.SetResizeBounds then f:SetResizeBounds(680, 490, 1400, 1000) end
     f:EnableMouse(true)
     S.Outer(f)
     f:Hide()
@@ -128,8 +128,11 @@ function UI:Create()
     close:SetScript("OnClick", function() f:Hide() end)
 
     -- Labelled button with a wrench, so it can't be mistaken for the decorative cogs.
-    local settingsBtn = S.Button(bar, "Settings", 92, 22)
+    local settingsBtn = S.Button(bar, "Settings", 100, 22)
     settingsBtn:SetPoint("RIGHT", -34, 0)
+    -- The label moves right a little so the wrench and the text sit centred together, clear of the edge.
+    settingsBtn.fs:ClearAllPoints()
+    settingsBtn.fs:SetPoint("CENTER", 9, 0)
     local wrench = settingsBtn:CreateTexture(nil, "OVERLAY")
     wrench:SetSize(15, 15)
     wrench:SetPoint("RIGHT", settingsBtn.fs, "LEFT", -4, 0)
@@ -160,7 +163,8 @@ function UI:Create()
             tab:SetPoint("TOPLEFT", 16, -52)
         end
         tab.id, tab.baseText = def[1], def[2]
-        tab:SetScript("OnClick", function() UI:SetTab(def[1]) end)
+        -- Clicking a tab always leaves Settings and the other panels, also when it's the tab you're on.
+        tab:SetScript("OnClick", function() UI:CloseOverlays(); UI:SetTab(def[1]) end)
         self.tabs[def[1]] = tab
         prevTab = tab
     end
@@ -433,7 +437,7 @@ function UI:RestorePos()
     local f = self.frame
     f:ClearAllPoints()
     f:SetPoint(p.point, UIParent, p.relPoint, p.x, p.y)
-    if p.w and p.h then f:SetSize(math.max(p.w, 640), math.max(p.h, 490)) end
+    if p.w and p.h then f:SetSize(math.max(p.w, 680), math.max(p.h, 490)) end
 end
 
 ---------------------------------------------------------------------------

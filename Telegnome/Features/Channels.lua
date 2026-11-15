@@ -214,7 +214,8 @@ end
 ---------------------------------------------------------------------------
 
 local ROW = 22
-local NOTIFY_X_LEFT, NOTIFY_X_RIGHT = 122, 410
+local NOTIFY_X_LEFT = 122
+local NOTIFY_INSET_RIGHT = 16 -- the right-hand Pop-up column hugs the panel's edge, whatever the window's width
 
 local function setNotify(key, on)
     local th = TG.db.threads[key]
@@ -262,11 +263,15 @@ function C:CreatePanel()
         h:SetPoint("TOPLEFT", x, -68)
         h:SetText(text)
         local p = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        p:SetPoint("TOP", f, "TOPLEFT", popX + 12, -70)
+        if popX then
+            p:SetPoint("TOP", f, "TOPLEFT", popX + 12, -70)
+        else
+            p:SetPoint("TOP", f, "TOPRIGHT", -(NOTIFY_INSET_RIGHT + 12), -70)
+        end
         p:SetText("Pop-up")
     end
     header("Chat types", 14, NOTIFY_X_LEFT)
-    header("Your channels", 230, NOTIFY_X_RIGHT)
+    header("Your channels", 230)
 
     for i, b in ipairs(BUILTIN) do
         local y = -86 - (i - 1) * ROW
@@ -347,7 +352,6 @@ function C:RefreshPanel()
             local y = -86 - (i - 1) * ROW
             c = S.Check(self.panel, "")
             c:SetPoint("TOPLEFT", 228, y)
-            c.label:SetWidth(150)
             c.label:SetJustifyH("LEFT")
             c.label:SetWordWrap(false)
             c:SetScript("OnClick", function(s)
@@ -356,7 +360,10 @@ function C:RefreshPanel()
             end)
             self.channelChecks[i] = c
 
-            local n = notifyCheck(self.panel, NOTIFY_X_RIGHT, y)
+            local n = notifyCheck(self.panel, 0, y)
+            n:ClearAllPoints()
+            n:SetPoint("TOPRIGHT", -NOTIFY_INSET_RIGHT, y)
+            c.label:SetPoint("RIGHT", n, "LEFT", -8, 0) -- long channel names are cut off before the Pop-up tick
             n:SetScript("OnClick", function(s) setNotify(C.KeyForChannel(c.cname), s:GetChecked()) end)
             self.channelNotify[i] = n
         end

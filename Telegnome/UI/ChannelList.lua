@@ -133,13 +133,13 @@ local function createRow(parent, i)
 
     row.name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     row.name:SetPoint("LEFT", 34, 0)
-    row.name:SetWidth(190)
     row.name:SetJustifyH("LEFT")
     row.name:SetWordWrap(false)
 
     row.kind = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row.kind:SetPoint("LEFT", 230, 0)
+    row.kind:SetWidth(108)
     row.kind:SetJustifyH("LEFT")
+    row.kind:SetWordWrap(false)
 
     row.leave = S.Button(row, "Leave", 64, 20)
     row.leave:SetPoint("RIGHT", -6, 0)
@@ -153,6 +153,10 @@ local function createRow(parent, i)
             UI:Select(row.entry.key)
         end
     end)
+
+    -- The kind sits just left of the buttons and the name takes the rest, so nothing overlaps at any width.
+    row.kind:SetPoint("RIGHT", row.open, "LEFT", -10, 0)
+    row.name:SetPoint("RIGHT", row.kind, "LEFT", -8, 0)
     return row
 end
 

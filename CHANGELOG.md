@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.1
+- Followed channels: the Pop-up ticks for "Your channels" no longer stick out past the window's edge; that column now follows the window's width.
+- The main window is a little wider by default (and its smallest size is a little wider too).
+- Your chat channels: the "Telegnome group" label is no longer covered by the Open button.
+- Clicking a tab closes Settings (and any other open panel) and shows that tab.
+- The Settings title uses the same cog as the other panels.
+
 ## 0.7.0
 
 Requests tab
