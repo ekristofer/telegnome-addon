@@ -1,13 +1,25 @@
 # Changelog
 
 ## 0.7.0
-- Requests tab: while you or your group are listed in the group finder, whispers from people who aren't friends, guild members or favorites are collected in their own tab instead of under Direct messages.
-- Each request shows the player's class, level and latest message, with Invite, look-up and dismiss buttons. Click a request to open the conversation.
-- Level comes from the whisper ("70 mage", "lvl 45"), from their group finder application, or from the Check button (a /who look-up), which stays available to re-check a level and counts down until the game will answer again.
-- Requests: Decline all sends your decline message to everyone still on the list and takes them off it; people you invited or who are in your group stay.
-- Star a request to keep the person (they move to Direct messages); Clear all removes the rest.
-- The Requests tab appears while you're listed alone or as the group's leader. "Collect whispers here" in that view is ticked by default; untick it to pause. `/tg recruit` collects at any time, listed or not.
+
+Requests tab
+- While you're listed in the group finder (alone, or as your group's leader), whispers from people who aren't friends, guild members or favorites are collected in a new Requests tab instead of piling up under Direct messages. A pop-up tells you when it starts.
+- Each request shows the player's name, level, class and latest message. People who applied through the group finder also show their role and item level.
+- Invite invites them to your group, x dismisses the request, and clicking the row opens the conversation.
+- Reply offers one-click answers, and Decline sends your decline message and dismisses the request. Edit the texts in Settings > Requests.
+- The level is read from the whisper ("70 mage", "lvl 45") or from their group finder application. Check looks the player up, also when a level looks wrong, and counts down until the game will answer again.
+- Decline all sends your decline message to everyone still waiting and takes them off the list. People you invited or who are in your group stay.
+- Star a request to keep the person (they move to Direct messages). Clear all removes the rest.
+- "Collect whispers" in the Requests view is ticked by default; untick it to pause. `/tg recruit` collects at any time, listed or not.
+
+Also new
 - Colour themes: Brass (the original), Orange, Horde red, Alliance blue, Arcane, Fel green and Steel. Choose in Settings > Window or with `/tg theme <name>`.
+- Mute a conversation, group or followed channel (right-click): no pop-ups or sound, messages still arrive.
+- Message text size: small, normal or large (Settings > Window).
+
+Fixes
+- The unread count on the Others header is no longer hidden behind the Close all button.
+- Section headers use plain + and - signs instead of red buttons.
 
 ## 0.6.0
 - Direct messages are grouped into Favorites, Friends and Others. Star a conversation to pin it to Favorites; Friends are Battle.net friends, your friends list and guild members; Others can be folded away or closed all at once.

@@ -403,7 +403,7 @@ end
 function R:CheckGroup()
     local changed = false
     for _, th in pairs(TG.db.threads) do
-        if th.req and th.kind == "WHISPER" then
+        if th.req and th.kind == "WHISPER" and not th.demo then
             local short = Ambiguate and Ambiguate(th.name, "short") or th.name
             local target = TG.WhisperTarget(th.name)
             local inGroup = (UnitInParty and (UnitInParty(target) or UnitInParty(short)))
@@ -609,7 +609,7 @@ function R:Refresh()
     if not self:IsPanelShown() then return end
 
     local s = TG.db.settings
-    local hosting = self:IsHosting()
+    local hosting = self:IsHosting() or (TG.Demo and TG.Demo.on) or false -- the samples look like a real listing
     if s.recruiting then
         self.status:SetText("|cff66dd66Collecting (/tg recruit).|r Whispers from people you don't know land here.")
     elseif hosting and s.requestsCollect ~= false then

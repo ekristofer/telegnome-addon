@@ -1,6 +1,7 @@
 -- Telegnome: sample conversations for screenshots.
 --   /tg demo        show them (your real conversations are put aside, untouched)
 --   /tg demo msg    a sample friend writes, so the notifier pops up
+--   /tg demo requests   the Requests tab with sample requests, and the "Requests are on" pop-up
 --   /tg demo off    back to your real conversations (also happens on logout or /reload)
 -- Nothing typed in demo mode is sent to anyone. Not listed in /tg help.
 
@@ -71,6 +72,11 @@ local REQUESTS = {
       msgs = { { 6, false, "room for a tank?" }, { 5, true, "Yes - what level are you?" } } },
     { key = "W:zapgrin-gnomeregan", name = "Zapgrin-Gnomeregan", class = "SHAMAN", level = 70, invited = true,
       msgs = { { 8, false, "lvl 70 ele shaman, 3k score" }, { 7, true, "Inviting you now" } } },
+    { key = "W:boltwick-gnomeregan", name = "Boltwick-Gnomeregan", class = "HUNTER", level = 69,
+      msgs = { { 3, false, "69 hunter, can come right now" } }, unread = 1 },
+    { key = "W:shieldara-gnomeregan", name = "Shieldara-Gnomeregan", class = "WARRIOR", level = 70, applied = true,
+      role = "TANK", ilvl = 484, joined = true,
+      msgs = { { 12, false, "Prot warrior, done this many times" }, { 11, true, "Inviting you now." } } },
 }
 
 local GROUPS = {
@@ -142,7 +148,7 @@ local function build()
     end
     for _, r in ipairs(REQUESTS) do
         add(r.key, { kind = "WHISPER", name = r.name, class = r.class, level = r.level, req = true,
-            applied = r.applied, role = r.role, ilvl = r.ilvl, invited = r.invited and now or nil, demoSec = "others", unread = r.unread }, r.msgs)
+            applied = r.applied, role = r.role, ilvl = r.ilvl, invited = r.invited and now or nil, joined = r.joined, demoSec = "others", unread = r.unread }, r.msgs)
         contacts[r.key] = { kind = "WHISPER", name = r.name, class = r.class, last = now, demo = true }
     end
     for _, g in ipairs(GROUPS) do
@@ -214,9 +220,21 @@ function D:Ping()
     end
 end
 
+-- The Requests tab, with the pop-up you get when your listing starts.
+function D:Requests()
+    if not self.on then self:Start() end
+    TG.Requests:OpenPanel()
+    if TG.Toast then
+        TG.Toast:Notice("|cffffd100Requests are on|r", "Whispers from strangers go to Requests. Click to open.",
+            function() TG.Requests:OpenPanel() end)
+    end
+end
+
 function D:Command(arg)
     if arg == "msg" or arg == "message" or arg == "ping" then
         self:Ping()
+    elseif arg == "requests" or arg == "request" or arg == "req" then
+        self:Requests()
     elseif arg == "off" or arg == "stop" then
         self:Stop()
     elseif arg == "on" or arg == "start" then
