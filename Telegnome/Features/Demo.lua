@@ -25,8 +25,15 @@ local PEOPLE = {
       } },
     { key = "W:tinkspark-gnomeregan", kind = "WHISPER", name = "Tinkspark-Gnomeregan", class = "MAGE", fav = true,
       sec = "friends", msgs = {
+        { 1630, false, "Did you see the new engineering recipes?" },
+        { 1628, true, "Yes! The pocket repair bot is mine." },
+        { 1627, false, "Race you to the trainer" },
+        { 1500, true, "Beat you by a whole minute." },
+        { 1499, false, "Only because my rocket boots exploded" },
         { 300, false, "The portal to Gnomeregan is on cooldown again..." },
         { 298, true, "Classic. I'll take the tram." },
+        { 240, false, "Tram's stuck. Send help. Or snacks." },
+        { 238, true, "Snacks are on the way." },
         { 55, false, "Can you craft me that goggles upgrade later?" },
         { 54, true, "Sure, send me the mats." },
       } },
@@ -83,8 +90,15 @@ local GROUPS = {
 
 local CHANNELS = {
     { key = "C:GUILD", name = "Guild", ctype = "GUILD", msgs = {
+        { 320, false, "Morning all", "Elowen", "DRUID" },
+        { 318, false, "Morning! Anyone up for the weekly?", "Tinkspark", "MAGE" },
+        { 317, true, "I'm in, give me ten minutes" },
+        { 200, false, "Grats on the mount, Sprocketta!", "Mirelle", "PRIEST" },
+        { 199, false, "Took 143 tries...", "Sprocketta", "ROGUE" },
+        { 198, false, "Worth it", "Brakk", "WARRIOR" },
         { 70, false, "Guild bank has free flasks for raiders", "Mirelle", "PRIEST" },
         { 65, false, "ty!", "Brakk", "WARRIOR" },
+        { 40, true, "Raid invites at 20:00 tonight" },
         { 8, false, "LFM for a +12, need a healer", "Sprocketta", "ROGUE" },
       }, unread = 1 },
     { key = "C:PARTY", name = "Party", ctype = "PARTY", msgs = {
