@@ -345,7 +345,7 @@ function O:Create()
         function() return s().requestsTab end, function(v) s().requestsTab = v end,
         "Requests", "While you or your group are listed in the group finder, whispers from people who aren't "
         .. "friends, guild members or favorites go to a Requests tab that shows their class and level and has an "
-        .. "Invite button. To collect at other times: /tg recruit")
+        .. "Invite button. In a group, only the leader gets the tab. To collect at other times: /tg recruit")
     check("Enter types in Telegnome while its window is open", 0,
         function() return s().enterToTelegnome end, function(v) s().enterToTelegnome = v end,
         "Enter key", "With a conversation open, pressing Enter puts the cursor in Telegnome's message box "

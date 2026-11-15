@@ -85,7 +85,7 @@ List yourself or your group in the group finder and a **Requests** tab appears. 
 - Click the star in a request's conversation to keep that person - they move to Direct messages.
 - When you're done, **Clear all** removes the remaining requests and the tab disappears.
 
-Recruiting somewhere else, for example in a chat channel? `/tg recruit` (or the tick at the bottom of the Requests view) collects whispers there until you switch it off.
+The tab appears while you're listed alone, or listed in a group you lead. **Collect whispers here** at the bottom of the Requests view is ticked by default; untick it to pause. Recruiting somewhere else, for example in a chat channel? `/tg recruit` collects whispers there at any time until you switch it off.
 
 ### Group chats
 

@@ -9,7 +9,7 @@ local UI = TG.UI
 local R = { rows = {}, offset = 0 }
 TG.Requests = R
 
-local ROW_H = 48
+local ROW_H = 54
 
 ---------------------------------------------------------------------------
 -- When is it collecting?
@@ -22,10 +22,17 @@ function R:IsListed()
     return ok and listed and true or false
 end
 
--- Collecting: listed (if that option is on), or the manual switch.
+-- Your listing to look after: listed, and alone or leading the group.
+function R:IsHosting()
+    if not TG.db.settings.requestsTab or not self:IsListed() then return false end
+    if IsInGroup and IsInGroup() and UnitIsGroupLeader and not UnitIsGroupLeader("player") then return false end
+    return true
+end
+
+-- Collecting: hosting with the tick in the Requests view on (the default), or /tg recruit.
 function R:IsActive()
     local s = TG.db.settings
-    return s.recruiting or (s.requestsTab and self:IsListed()) or false
+    return s.recruiting or (s.requestsCollect ~= false and self:IsHosting()) or false
 end
 
 function R:Keys()
@@ -39,7 +46,7 @@ end
 
 function R:TabVisible()
     if not TG.db then return false end
-    if self:IsActive() then return true end
+    if self:IsActive() or self:IsHosting() then return true end
     for _, th in pairs(TG.db.threads) do
         if th.req then return true end
     end
@@ -343,6 +350,24 @@ function R.Describe(th)
     return text
 end
 
+-- The same for the list, with the level in gold and the class in its own colour.
+function R.DescribeColored(th)
+    local class = th.class and ((LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[th.class]) or th.class)
+    local text = th.level and ("|cffffd100Level %d|r"):format(th.level) or "|cff999999Level ?|r"
+    if class then
+        local c = RAID_CLASS_COLORS and RAID_CLASS_COLORS[th.class]
+        local hex = c and ("%02x%02x%02x"):format(math.floor((c.r or 1) * 255 + 0.5), math.floor((c.g or 1) * 255 + 0.5),
+            math.floor((c.b or 1) * 255 + 0.5)) or "ffffff"
+        text = text .. " |cff" .. hex .. class .. "|r"
+    end
+    local extra = {}
+    if ROLE_NAMES[th.role] then extra[#extra + 1] = ROLE_NAMES[th.role] end
+    if th.ilvl then extra[#extra + 1] = ("item level %d"):format(th.ilvl) end
+    if #extra > 0 then text = text .. "  |cffdddddd" .. table.concat(extra, ", ") .. "|r" end
+    if th.applied then text = text .. "  |cff88aaff(applied)|r" end
+    return text
+end
+
 local function lastIncoming(th)
     for i = #th.msgs, 1, -1 do
         local m = th.msgs[i]
@@ -365,7 +390,7 @@ local function createRow(parent, i)
     S.Paint(hl, "hi", 0.08)
 
     row.dismiss = S.Button(row, "x", 22, 22)
-    row.dismiss:SetPoint("RIGHT", -6, 0)
+    row.dismiss:SetPoint("BOTTOMRIGHT", -6, 5) -- buttons sit on the message line; the top line is name, level, class
     row.dismiss:SetScript("OnClick", function() if row.key then R:Dismiss(row.key) end end)
     S.Tooltip(row.dismiss, "Dismiss", "Closes this request and forgets the contact.")
 
@@ -386,17 +411,17 @@ local function createRow(parent, i)
         .. "dismiss the request. Edit them in Settings.")
 
     row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    row.name:SetPoint("TOPLEFT", 10, -7)
+    row.name:SetPoint("TOPLEFT", 10, -6)
     row.name:SetJustifyH("LEFT")
 
-    row.info = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.info = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     row.info:SetPoint("LEFT", row.name, "RIGHT", 10, 0)
-    row.info:SetPoint("RIGHT", row.reply, "LEFT", -8, 0)
+    row.info:SetPoint("RIGHT", row, "RIGHT", -8, 0)
     row.info:SetJustifyH("LEFT")
     row.info:SetWordWrap(false)
 
     row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row.text:SetPoint("TOPLEFT", 10, -27)
+    row.text:SetPoint("BOTTOMLEFT", 10, 10)
     row.text:SetPoint("RIGHT", row.reply, "LEFT", -8, 0)
     row.text:SetJustifyH("LEFT")
     row.text:SetWordWrap(false)
@@ -463,15 +488,16 @@ function R:Create()
     S.Tooltip(clear, "Clear all", "Closes every request and forgets those contacts. Star someone first to keep them.")
     self.clearBtn = clear
 
-    local manual = S.Check(f, "Collect whispers here now")
+    local manual = S.Check(f, "Collect whispers here")
     manual:SetPoint("LEFT", clear, "RIGHT", 12, 0)
     manual:SetScript("OnClick", function(s)
-        TG.db.settings.recruiting = s:GetChecked() and true or false
+        TG.db.settings.requestsCollect = s:GetChecked() and true or false
         TG:RefreshUnread()
+        R:Refresh()
     end)
-    S.Tooltip(manual, "Manual switch", "Telegnome collects whispers here by itself while you're listed in the group "
-        .. "finder. Tick this to collect them at any other time (for example when recruiting in a chat channel). "
-        .. "Also: /tg recruit")
+    S.Tooltip(manual, "Collect whispers here", "While you're listed in the group finder (alone, or as the group's "
+        .. "leader), whispers from people who aren't friends, guild members or favorites land here. Untick to "
+        .. "pause that and get them under Direct messages.")
     self.manual = manual
 
     local done = S.Button(f, "Close", 80, 24)
@@ -492,15 +518,17 @@ function R:Refresh()
     if not self:IsPanelShown() then return end
 
     local s = TG.db.settings
-    local listed = self:IsListed()
-    if listed and s.requestsTab then
+    local hosting = self:IsHosting()
+    if s.recruiting then
+        self.status:SetText("|cff66dd66Collecting (/tg recruit).|r Whispers from people you don't know land here.")
+    elseif hosting and s.requestsCollect ~= false then
         self.status:SetText("|cff66dd66You're listed in the group finder.|r Whispers from people you don't know land here.")
-    elseif s.recruiting then
-        self.status:SetText("|cff66dd66Collecting (manual switch).|r Whispers from people you don't know land here.")
+    elseif hosting then
+        self.status:SetText("|cffffaa33Paused.|r Tick the box below to collect whispers here again.")
     else
         self.status:SetText("|cffaaaaaaNot collecting right now.|r It starts by itself when you list in the group finder.")
     end
-    self.manual:SetChecked(s.recruiting and true or false)
+    self.manual:SetChecked(s.requestsCollect ~= false)
 
     local keys = self:Keys()
     local visible = math.max(1, math.floor((self.list:GetHeight() or 0) / ROW_H))
@@ -515,9 +543,7 @@ function R:Refresh()
             local name, color = TG:ThreadDisplay(key)
             row.name:SetText(name)
             row.name:SetTextColor(color[1], color[2], color[3])
-            local info = R.Describe(th)
-            if th.applied then info = info .. "  |cff88aaff(applied)|r" end
-            row.info:SetText(info)
+            row.info:SetText(R.DescribeColored(th))
             local m = lastIncoming(th)
             local unread = (th.unread or 0) > 0 and ("|cffff5555(" .. th.unread .. ")|r ") or ""
             row.text:SetText(unread .. (m and m.text or ""))
@@ -592,13 +618,32 @@ function R:TogglePanel()
     if self:IsPanelShown() then self:ClosePanel() else self:OpenPanel() end
 end
 
+-- Tells you once when your listing starts (or you become the leader of a listed group).
+function R:CheckHosting()
+    local hosting = self:IsHosting()
+    if hosting and not self.wasHosting and self:IsActive() then
+        TG:Print("You're listed in the group finder. Whispers from people you don't know go to Requests.")
+        if TG.Toast then
+            TG.Toast:Notice("|cffffd100Requests are on|r", "Whispers from strangers go to Requests. Click to open.",
+                function() R:OpenPanel() end)
+        end
+    end
+    local changed = hosting ~= (self.wasHosting or false)
+    self.wasHosting = hosting
+    if changed or not self.checkedOnce then
+        self.checkedOnce = true
+        self:Refresh()
+        if changed then TG:RefreshUnread() end
+    end
+end
+
 ---------------------------------------------------------------------------
 -- Events
 ---------------------------------------------------------------------------
 
 local f = CreateFrame("Frame")
 for _, ev in ipairs({ "LFG_LIST_ACTIVE_ENTRY_UPDATE", "LFG_LIST_APPLICANT_UPDATED", "LFG_LIST_APPLICANT_LIST_UPDATED",
-    "GROUP_ROSTER_UPDATE", "WHO_LIST_UPDATE", "PLAYER_ENTERING_WORLD" }) do
+    "GROUP_ROSTER_UPDATE", "PARTY_LEADER_CHANGED", "WHO_LIST_UPDATE", "PLAYER_ENTERING_WORLD" }) do
     pcall(f.RegisterEvent, f, ev)
 end
 f:SetScript("OnEvent", function(_, event)
@@ -607,6 +652,7 @@ f:SetScript("OnEvent", function(_, event)
         R:OnWhoList()
     elseif event == "GROUP_ROSTER_UPDATE" then
         R:CheckGroup()
+        R:CheckHosting() -- joining a group, or being made leader, changes whose listing it is
     elseif event == "LFG_LIST_APPLICANT_UPDATED" or event == "LFG_LIST_APPLICANT_LIST_UPDATED" then
         -- these can arrive in bursts: look once, a moment later
         if not R.scanQueued then
@@ -617,18 +663,6 @@ f:SetScript("OnEvent", function(_, event)
             end)
         end
     else
-        local listed = R:IsListed()
-        if listed and not R.wasListed and TG.db.settings.requestsTab then
-            TG:Print("You're listed in the group finder: whispers from people you don't know are collected under "
-                .. "Requests in Telegnome.")
-            if TG.Toast then
-                TG.Toast:Notice("|cffffd100Requests are on|r",
-                    "You're listed in the group finder. Whispers from people you don't know are collected under "
-                    .. "Requests. Click to open it.",
-                    function() R:OpenPanel() end)
-            end
-        end
-        R.wasListed = listed
-        R:Refresh()
+        R:CheckHosting()
     end
 end)

@@ -40,7 +40,8 @@ local DEFAULTS = {
         quickReplies = { "Inviting you now.", "What level and role are you?", "One moment, checking the group." },
         declineReply = "Sorry, the group is full.",
         requestsTab = true,   -- collect strangers' whispers under Requests while listed in the group finder
-        recruiting = false,   -- manual switch for the same (/tg recruit)
+        requestsCollect = true, -- the tick in the Requests view: untick to pause collecting while listed
+        recruiting = false,   -- collect at any time, listed or not (/tg recruit)
     },
     collapsed = {}, -- folded sections of the Direct messages list
     minimap = { hide = false, angle = 200 },
@@ -136,6 +137,11 @@ local function migrate(db)
     if not db.soundReset060 then
         db.settings.sound = false
         db.soundReset060 = true
+    end
+    -- 0.7.0: the tick in the Requests view no longer means "collect at any time" - that is /tg recruit only.
+    if not db.requestsTick070 then
+        db.settings.recruiting = false
+        db.requestsTick070 = true
     end
     local moves = {}
     for key in pairs(db.threads) do
@@ -947,7 +953,7 @@ SlashCmdList.TELEGNOME = function(input)
         end
     elseif cmd == "recruit" or cmd == "requests" then
         s.recruiting = not s.recruiting
-        TG:Print("Collecting whispers under Requests (manual switch): " .. onOff(s.recruiting))
+        TG:Print("Collecting whispers under Requests at any time, listed or not: " .. onOff(s.recruiting))
         TG:RefreshUnread()
         if s.recruiting then TG.Requests:OpenPanel() end
     elseif cmd == "dnd" then
@@ -1011,7 +1017,7 @@ SlashCmdList.TELEGNOME = function(input)
         print("  /tg opacity <30-100> - main window opacity (" .. (s.opacity or 100) .. "%)")
         print("  /tg dnd - do not disturb (" .. onOff(s.dnd) .. ")")
         print("  /tg theme <name> - colour theme (" .. TG.Style.theme.label .. ")")
-        print("  /tg recruit - collect strangers' whispers under Requests (" .. onOff(s.recruiting) .. ")")
+        print("  /tg recruit - collect strangers' whispers under Requests even when not listed (" .. onOff(s.recruiting) .. ")")
         print("  /tg config - settings")
         print("  /tg counter - on-screen missed-messages counter (" .. onOff(s.counter) .. ")")
         print("  /tg hide - hide whispers from the main chat (" .. onOff(s.hideFromChat) .. ")")
