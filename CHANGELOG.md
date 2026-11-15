@@ -3,7 +3,8 @@
 ## 0.7.0
 - Requests tab: while you or your group are listed in the group finder, whispers from people who aren't friends, guild members or favorites are collected in their own tab instead of under Direct messages.
 - Each request shows the player's class, level and latest message, with Invite, look-up and dismiss buttons. Click a request to open the conversation.
-- Level comes from the whisper ("70 mage", "lvl 45"), from their group finder application, or from the Level? button (a /who look-up).
+- Level comes from the whisper ("70 mage", "lvl 45"), from their group finder application, or from the Check button (a /who look-up), which stays available to re-check a level and counts down until the game will answer again.
+- Requests: Decline all sends your decline message to everyone still on the list and takes them off it; people you invited or who are in your group stay.
 - Star a request to keep the person (they move to Direct messages); Clear all removes the rest.
 - The Requests tab appears while you're listed alone or as the group's leader. "Collect whispers here" in that view is ticked by default; untick it to pause. `/tg recruit` collects at any time, listed or not.
 - Colour themes: Brass (the original), Orange, Horde red, Alliance blue, Arcane, Fel green and Steel. Choose in Settings > Window or with `/tg theme <name>`.

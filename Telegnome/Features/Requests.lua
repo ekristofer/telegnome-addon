@@ -89,9 +89,10 @@ function R.ParseLevel(text)
     end
     for pos, num, after in lower:gmatch("()(%d+)()") do
         local prev, nxt = lower:sub(pos - 1, pos - 1), lower:sub(after, after)
-        if not prev:find("[%d%.%+,/:]") and not nxt:find("[%d%.k%%/:]") then
-            local before = lower:sub(1, pos - 1):match("(%a+)%s*$")
-            local behind = lower:sub(after):match("^%s*(%a+)")
+        local decimal = nxt == "." and lower:sub(after + 1, after + 1):find("%d")
+        if not prev:find("[%d%.%+,/:]") and not nxt:find("[%dk%%/:]") and not decimal then
+            local before = lower:sub(1, pos - 1):match("(%a+)[%s,:%-%(]*$")
+            local behind = lower:sub(after):match("^[%s,%)]*(%a+)")
             if not (behind and NOT_LEVEL[behind]) and ((before and HINTS[before]) or (behind and HINTS[behind])) then
                 local n = valid(num)
                 if n then return n end
@@ -151,11 +152,51 @@ function R:DoScanApplicants()
     if changed then self:Refresh() end
 end
 
+-- The game only answers /who every few seconds. It doesn't say exactly how long, so this is a safe wait.
+local WHO_COOLDOWN = 5
+
+-- The Check buttons count down until the next look-up is possible.
+function R:UpdateLookupButtons()
+    local left = (self.whoReady or 0) - GetTime()
+    for _, row in ipairs(self.rows) do
+        if row.key then
+            if left > 0 then
+                row.lookup:SetText(math.ceil(left) .. "s")
+                row.lookup:SetEnabled(false)
+            else
+                row.lookup:SetText("Check")
+                row.lookup:SetEnabled(true)
+            end
+        end
+    end
+    if left <= 0 and self.panel and self.cooling then
+        self.cooling = false
+        self.panel:SetScript("OnUpdate", nil)
+    end
+end
+
+function R:StartCooldown()
+    self.whoReady = GetTime() + WHO_COOLDOWN
+    if self.panel then
+        self.cooling = true
+        local acc = 0
+        self.panel:SetScript("OnUpdate", function(_, elapsed)
+            acc = acc + (elapsed or 0)
+            if acc >= 0.2 then
+                acc = 0
+                R:UpdateLookupButtons()
+            end
+        end)
+    end
+    self:UpdateLookupButtons()
+end
+
 -- /who for one person (needs a click; the game limits how often it answers).
 function R:LookUp(key)
     local th = TG.db.threads[key]
     if not th or th.kind ~= "WHISPER" then return end
     if TG.Demo and TG.Demo.on then return end
+    if GetTime() < (self.whoReady or 0) then return end
     if not (C_FriendList and C_FriendList.SendWho) then
         TG:Print("This version of the game can't look players up.")
         return
@@ -167,10 +208,11 @@ function R:LookUp(key)
     if C_FriendList.SetWhoToUi then pcall(C_FriendList.SetWhoToUi, true) end
     if FriendsFrame and FriendsFrame.UnregisterEvent then FriendsFrame:UnregisterEvent("WHO_LIST_UPDATE") end
     pcall(C_FriendList.SendWho, 'n-"' .. short .. '"')
-    C_Timer.After(5, function()
+    self:StartCooldown()
+    C_Timer.After(WHO_COOLDOWN, function()
         if R.who == pending then
             R:EndWho()
-            TG:Print(("Couldn't look up %s - the game only answers this every few seconds. Try again shortly."):format(short))
+            TG:Print(("Couldn't look up %s - the game didn't answer. Try again."):format(short))
         end
     end)
 end
@@ -288,6 +330,47 @@ function R:OpenReplyMenu(key, anchor)
     end)
 end
 
+-- Requests still waiting for an answer: not invited, not in your group.
+function R:OpenKeys()
+    local out = {}
+    for _, key in ipairs(self:Keys()) do
+        local th = TG.db.threads[key]
+        if not th.invited and not th.joined then out[#out + 1] = key end
+    end
+    return out
+end
+
+-- Sends the decline message to everyone still waiting and dismisses them, a few a second.
+function R:DeclineAll()
+    for i, key in ipairs(self:OpenKeys()) do
+        C_Timer.After((i - 1) * 0.4, function()
+            local th = TG.db.threads[key]
+            if th and th.req and not th.invited and not th.joined then R:Decline(key) end
+        end)
+    end
+end
+
+function R:ConfirmDeclineAll()
+    local n = #self:OpenKeys()
+    if n == 0 then return end
+    local text = TG.db.settings.declineReply
+    if type(text) ~= "string" or not text:match("%S") then
+        TG:Print("There's no decline message. Write one in Settings > Requests first.")
+        return
+    end
+    if not StaticPopupDialogs.TELEGNOME_DECLINE_ALL then
+        StaticPopupDialogs.TELEGNOME_DECLINE_ALL = {
+            text = "Decline %s requests?\n\nEach of them is sent \"%s\" and taken off the list. "
+                .. "People you invited or who are in your group stay.",
+            button1 = "Decline all",
+            button2 = CANCEL or "Cancel",
+            OnAccept = function() R:DeclineAll() end,
+            timeout = 0, whileDead = true, hideOnEscape = true,
+        }
+    end
+    StaticPopup_Show("TELEGNOME_DECLINE_ALL", n, text)
+end
+
 -- Declined: the conversation and the remembered contact go.
 function R:Dismiss(key)
     TG:ForgetContact(key)
@@ -398,11 +481,12 @@ local function createRow(parent, i)
     row.invite:SetPoint("RIGHT", row.dismiss, "LEFT", -6, 0)
     row.invite:SetScript("OnClick", function() if row.key then R:Invite(row.key) end end)
 
-    row.lookup = S.Button(row, "Level?", 60, 22)
+    row.lookup = S.Button(row, "Check", 56, 22)
     row.lookup:SetPoint("RIGHT", row.invite, "LEFT", -6, 0)
     row.lookup:SetScript("OnClick", function() if row.key then R:LookUp(row.key) end end)
-    S.Tooltip(row.lookup, "Look up level", "Asks the game for this player's level and class (like /who). "
-        .. "The game only answers every few seconds.")
+    S.Tooltip(row.lookup, "Check level", "Asks the game for this player's level and class (like /who). Use it when "
+        .. "the level is missing or looks wrong. The game only answers every few seconds: the button counts "
+        .. "down until you can ask again.")
 
     row.reply = S.Button(row, "Reply", 56, 22)
     row.reply:SetPoint("RIGHT", row.lookup, "LEFT", -6, 0)
@@ -482,20 +566,27 @@ function R:Create()
     empty:SetJustifyH("LEFT")
     self.empty = empty
 
-    local clear = S.Button(f, "Clear all", 84, 24)
+    local clear = S.Button(f, "Clear all", 74, 24)
     clear:SetPoint("BOTTOMLEFT", 10, 10)
     clear:SetScript("OnClick", function() R:ConfirmClearAll() end)
     S.Tooltip(clear, "Clear all", "Closes every request and forgets those contacts. Star someone first to keep them.")
     self.clearBtn = clear
 
-    local manual = S.Check(f, "Collect whispers here")
-    manual:SetPoint("LEFT", clear, "RIGHT", 12, 0)
+    local decline = S.Button(f, "Decline all", 86, 24)
+    decline:SetPoint("LEFT", clear, "RIGHT", 6, 0)
+    decline:SetScript("OnClick", function() R:ConfirmDeclineAll() end)
+    S.Tooltip(decline, "Decline all", "Sends your decline message to everyone still on the list and takes them off "
+        .. "it. People you invited or who are in your group stay. The message is in Settings > Requests.")
+    self.declineBtn = decline
+
+    local manual = S.Check(f, "Collect whispers")
+    manual:SetPoint("LEFT", decline, "RIGHT", 10, 0)
     manual:SetScript("OnClick", function(s)
         TG.db.settings.requestsCollect = s:GetChecked() and true or false
         TG:RefreshUnread()
         R:Refresh()
     end)
-    S.Tooltip(manual, "Collect whispers here", "While you're listed in the group finder (alone, or as the group's "
+    S.Tooltip(manual, "Collect whispers", "While you're listed in the group finder (alone, or as the group's "
         .. "leader), whispers from people who aren't friends, guild members or favorites land here. Untick to "
         .. "pause that and get them under Direct messages.")
     self.manual = manual
@@ -547,14 +638,6 @@ function R:Refresh()
             local m = lastIncoming(th)
             local unread = (th.unread or 0) > 0 and ("|cffff5555(" .. th.unread .. ")|r ") or ""
             row.text:SetText(unread .. (m and m.text or ""))
-            -- the Level? button gives up its place to Reply when the level is known
-            row.lookup:SetShown(not th.level)
-            row.reply:ClearAllPoints()
-            if th.level then
-                row.reply:SetPoint("RIGHT", row.invite, "LEFT", -6, 0)
-            else
-                row.reply:SetPoint("RIGHT", row.lookup, "LEFT", -6, 0)
-            end
             if th.joined then
                 row.invite:SetText("In group")
                 row.invite:SetEnabled(false)
@@ -575,6 +658,8 @@ function R:Refresh()
         self.rows[i].key = nil
         self.rows[i]:Hide()
     end
+    self:UpdateLookupButtons()
+    self.declineBtn:SetEnabled(#self:OpenKeys() > 0)
     self.empty:SetShown(#keys == 0)
     self.empty:SetText(self:IsActive() and "No requests yet. Whispers from people who aren't friends, guild members "
         .. "or favorites will show up here with their class and level."
