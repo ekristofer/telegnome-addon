@@ -621,8 +621,9 @@ local SECTIONS = {
     { id = "friends", label = "Friends" },
     { id = "others", label = "Others" },
 }
-local PLUS = "|TInterface\\Buttons\\UI-PlusButton-Up:14:14|t "
-local MINUS = "|TInterface\\Buttons\\UI-MinusButton-Up:14:14|t "
+-- Plain signs in the header's own colour (the game's red plus/minus buttons looked like "delete").
+local PLUS = "+ "
+local MINUS = "- "
 
 -- What the list shows, top to bottom: { key = ... } rows and, on the Direct messages tab,
 -- { header = id, ... } rows for Favorites / Friends / Others (newest first inside each).
@@ -680,8 +681,14 @@ function UI:RefreshList()
         if e and e.header then
             row.key = nil
             row.dot:Hide()
-            row.name:SetText(("%s%s |cff8a7a5c(%d)|r%s"):format(e.collapsed and PLUS or MINUS, e.label, e.count,
-                e.unread > 0 and ("  |cffff5555" .. e.unread .. "|r") or ""))
+            if e.header == "others" then
+                -- The unread count goes before the number of chats so the "Close all" button can't cover it.
+                row.name:SetText(("%s%s%s |cff8a7a5c(%d)|r"):format(e.collapsed and PLUS or MINUS, e.label,
+                    e.unread > 0 and (" |cffff5555" .. e.unread .. "|r") or "", e.count))
+            else
+                row.name:SetText(("%s%s |cff8a7a5c(%d)|r%s"):format(e.collapsed and PLUS or MINUS, e.label, e.count,
+                    e.unread > 0 and ("  |cffff5555" .. e.unread .. "|r") or ""))
+            end
             row.name:SetTextColor(0.85, 0.7, 0.4)
             row.right:SetText("")
             row:SetSelected(false)
