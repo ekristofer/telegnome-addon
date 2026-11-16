@@ -120,6 +120,43 @@ function C.MatchKeyword(text)
     return false
 end
 
+-- Joining a new group: followed Party, Raid and Instance chat get a divider line, or are emptied (setting).
+C.NEW_GROUP_LINE = "- New group -"
+local GROUP_TYPES = { "PARTY", "RAID", "INSTANCE_CHAT" }
+
+function C:OnNewGroup()
+    local now = GetTime()
+    if self.newGroupAt and now - self.newGroupAt < 3 then return end -- two events for one join
+    self.newGroupAt = now
+    for _, ctype in ipairs(GROUP_TYPES) do
+        local key = C.KeyForType(ctype)
+        local th = self:IsFollowedKey(key) and TG.db.threads[key]
+        if th and #th.msgs > 0 then
+            if TG.db.settings.clearGroupChat then
+                TG:ClearHistory(key)
+            elseif th.msgs[#th.msgs].text ~= C.NEW_GROUP_LINE then
+                TG:AddSystemLine(key, C.NEW_GROUP_LINE)
+            end
+        end
+    end
+end
+
+do
+    local watch = CreateFrame("Frame")
+    local wasInGroup
+    for _, ev in ipairs({ "GROUP_JOINED", "GROUP_ROSTER_UPDATE", "PLAYER_ENTERING_WORLD" }) do
+        pcall(watch.RegisterEvent, watch, ev)
+    end
+    watch:SetScript("OnEvent", function(_, event)
+        if not TG.db then return end
+        local inGroup = IsInGroup and IsInGroup() and true or false
+        if event == "GROUP_JOINED" or (event == "GROUP_ROSTER_UPDATE" and wasInGroup == false and inGroup) then
+            C:OnNewGroup()
+        end
+        wasInGroup = inGroup
+    end)
+end
+
 function C:OnEvent(event, ...)
     local text, sender = ...
     local guid = select(12, ...)
@@ -297,10 +334,16 @@ function C:CreatePanel()
 
     -- Pinned to the bottom so a long "Your channels" column can't run into it.
     local h3 = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    h3:SetPoint("BOTTOMLEFT", 14, 66)
+    h3:SetPoint("BOTTOMLEFT", 14, 90)
     h3:SetText("Options")
+    local clear = S.Check(f, "Clear Party, Raid and Instance chat when I join a new group")
+    clear:SetPoint("BOTTOMLEFT", 12, 38)
+    clear:SetScript("OnClick", function(s) TG.db.settings.clearGroupChat = s:GetChecked() and true or false end)
+    S.Tooltip(clear, "New group, clean chat", "Off: joining a new group adds a \"New group\" line to followed Party, "
+        .. "Raid and Instance chat, and the older messages stay. On: those conversations are emptied instead.")
+    self.clearCheck = clear
     local hide = S.Check(f, "Hide followed channels from the main chat")
-    hide:SetPoint("BOTTOMLEFT", 12, 38)
+    hide:SetPoint("BOTTOMLEFT", 12, 62)
     hide:SetScript("OnClick", function(s) TG.db.settings.hideChannels = s:GetChecked() and true or false end)
     S.Tooltip(hide, "Hide from main chat", "Messages in followed channels only show up in Telegnome. "
         .. "Followed channels never count towards the missed-messages counter.")
@@ -383,6 +426,7 @@ function C:RefreshPanel()
     self.noneText:SetShown(#names == 0)
 
     self.hideCheck:SetChecked(TG.db.settings.hideChannels)
+    self.clearCheck:SetChecked(TG.db.settings.clearGroupChat and true or false)
 end
 
 function C:IsPanelShown()

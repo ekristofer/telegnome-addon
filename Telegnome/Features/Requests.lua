@@ -169,9 +169,13 @@ function R:UpdateLookupButtons()
             end
         end
     end
-    if left <= 0 and self.panel and self.cooling then
+    if left > 0 then
+        self:UpdateStatus()
+    elseif self.panel and self.cooling then
         self.cooling = false
+        self.checkNote = nil
         self.panel:SetScript("OnUpdate", nil)
+        self:UpdateStatus()
     end
 end
 
@@ -208,10 +212,12 @@ function R:LookUp(key)
     if C_FriendList.SetWhoToUi then pcall(C_FriendList.SetWhoToUi, true) end
     if FriendsFrame and FriendsFrame.UnregisterEvent then FriendsFrame:UnregisterEvent("WHO_LIST_UPDATE") end
     pcall(C_FriendList.SendWho, 'n-"' .. short .. '"')
+    self.checkNote = ("Checking %s..."):format(short)
     self:StartCooldown()
     C_Timer.After(WHO_COOLDOWN, function()
         if R.who == pending then
             R:EndWho()
+            R.checkNote = nil
             TG:Print(("Couldn't look up %s - the game didn't answer. Try again."):format(short))
         end
     end)
@@ -236,12 +242,15 @@ function R:OnWhoList()
             if type(info.level) == "number" and info.level > 0 then th.level = info.level end
             if type(info.filename) == "string" and info.filename ~= "" then th.class = info.filename end
             found = true
+            self.checkNote = ("%s: %s."):format(Ambiguate and Ambiguate(th.name, "short") or th.name, R.Describe(th))
             break
         end
     end
     self:EndWho()
     if th and not found then
-        TG:Print(("%s wasn't found - probably offline."):format(Ambiguate and Ambiguate(th.name, "short") or th.name))
+        local short = Ambiguate and Ambiguate(th.name, "short") or th.name
+        self.checkNote = ("%s wasn't found - probably offline."):format(short)
+        TG:Print(self.checkNote)
     end
     self:Refresh()
     if UI.frame and UI.frame:IsShown() then UI:RefreshList() end
@@ -608,7 +617,21 @@ function R:Refresh()
     end
     if not self:IsPanelShown() then return end
 
+    self:UpdateStatus()
+    self.manual:SetChecked(TG.db.settings.requestsCollect ~= false)
+    self:FillRows()
+end
+
+-- The line under the title: what is being collected - or, right after a Check, its result and the wait.
+function R:UpdateStatus()
+    if not self.status then return end
     local s = TG.db.settings
+    local left = (self.whoReady or 0) - GetTime()
+    if left > 0 then
+        self.status:SetText(("|cffffd100%s|r  Next check in %d s (the game limits look-ups).")
+            :format(self.checkNote or "", math.ceil(left)))
+        return
+    end
     local hosting = self:IsHosting() or (TG.Demo and TG.Demo.on) or false -- the samples look like a real listing
     if s.recruiting then
         self.status:SetText("|cff66dd66Collecting (/tg recruit).|r Whispers from people you don't know land here.")
@@ -619,8 +642,9 @@ function R:Refresh()
     else
         self.status:SetText("|cffaaaaaaNot collecting right now.|r It starts by itself when you list in the group finder.")
     end
-    self.manual:SetChecked(s.requestsCollect ~= false)
+end
 
+function R:FillRows()
     local keys = self:Keys()
     local visible = math.max(1, math.floor((self.list:GetHeight() or 0) / ROW_H))
     self.offset = math.min(self.offset or 0, math.max(0, #keys - visible))

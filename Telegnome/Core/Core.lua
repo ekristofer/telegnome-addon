@@ -25,6 +25,7 @@ local DEFAULTS = {
         dndMessage = "I'm busy right now and will get back to you soon.",
         detectInvites = true, -- pick up "Telegnome code: ..." from incoming chat
         hideChannels = false, -- hide followed channels from the main chat
+        clearGroupChat = false, -- empty followed Party / Raid / Instance chat when you join a new group
         -- group chats are always kept out of the main chat
         toastGrow = "right",  -- notifier grows "right" or "left"
         maxPerThread = 200,   -- messages kept per conversation

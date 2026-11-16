@@ -1,11 +1,16 @@
 # Changelog
 
+## 0.7.2
+- Followed Party, Raid and Instance chat: joining a new group adds a "New group" line, so you can see where the current group starts. A new option in the Followed channels panel empties those conversations instead.
+- Requests: after a Check, the line under the title shows the result and how long until the next check is possible.
+
 ## 0.7.1
 - Followed channels: the Pop-up ticks for "Your channels" no longer stick out past the window's edge; that column now follows the window's width.
 - The main window is a little wider by default (and its smallest size is a little wider too).
 - Your chat channels: the "Telegnome group" label is no longer covered by the Open button.
 - Clicking a tab closes Settings (and any other open panel) and shows that tab.
 - The Settings title uses the same cog as the other panels.
+- The wrench on the Settings button has more room from the button's edge.
 
 ## 0.7.0
 
