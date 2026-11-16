@@ -37,6 +37,7 @@ local DEFAULTS = {
         slay = false,         -- /tg slaay-mode
         theme = "brass",      -- colour theme (see Style.THEMES)
         textSize = "normal",  -- message text: small / normal / large
+        compactChat = false,  -- one line per message ("12:30 Name: text") instead of bubbles
         -- one-click answers for requests (Settings > Requests)
         quickReplies = { "Inviting you now.", "What level and role are you?", "One moment, checking the group." },
         declineReply = "Sorry, the group is full.",

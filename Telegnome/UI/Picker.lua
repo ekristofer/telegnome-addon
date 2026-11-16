@@ -3,6 +3,7 @@
 
 local _, ns = ...
 local TG = ns.TG
+local S = TG.Style
 local UI = TG.UI
 local P = { rows = {}, offset = 0, results = {} }
 TG.Picker = P

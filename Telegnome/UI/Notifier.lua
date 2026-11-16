@@ -50,12 +50,7 @@ function T:Create()
     if f.SetClipsChildren then f:SetClipsChildren(true) end
     f:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     f:RegisterForDrag("LeftButton")
-    f:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 14,
-        insets = { left = 3, right = 3, top = 3, bottom = 3 },
-    })
+    S.Flat(f)
     S.Paint(f, "toast")
     f:Hide()
     self.frame = f

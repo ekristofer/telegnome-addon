@@ -1,4 +1,4 @@
--- Telegnome: shared classic-style widgets (dark panels, bronze borders, gold text, brass cogs).
+-- Telegnome: shared widgets (flat dark panels, thin borders in the theme colour, gold text, brass cogs).
 
 local _, ns = ...
 local TG = ns.TG
@@ -11,6 +11,16 @@ S.COG = S.MEDIA .. "Cog"
 S.BUBBLE = S.MEDIA .. "Bubble"
 S.WRENCH = S.MEDIA .. "Wrench"
 S.STAR = S.MEDIA .. "Star"
+S.ROUND = S.MEDIA .. "Round"         -- a filled circle: dots, badge ends, rounded corners
+S.CLOSE = S.MEDIA .. "Close"
+S.CHEV_DOWN = S.MEDIA .. "ChevDown"
+S.CHEV_RIGHT = S.MEDIA .. "ChevRight"
+S.DOTS = S.MEDIA .. "Dots"
+S.TEXT = { 0.94, 0.90, 0.82 }      -- message and body text
+S.DIM = { 0.66, 0.59, 0.48 }       -- secondary text: times, previews, captions
+S.BADGE = { 0.70, 0.15, 0.12 }     -- unread badges
+S.ONLINE = { 0.31, 0.77, 0.42 }
+S.OFFLINE = { 0.44, 0.39, 0.32 }
 S.GOLD = { 1, 0.82, 0 }            -- text; the same in every theme
 S.BRONZE = { 0.62, 0.47, 0.24 }    -- borders and lines   (follows the theme)
 S.BRASS = { 0.95, 0.74, 0.38 }     -- cogs                (follows the theme)
@@ -18,15 +28,12 @@ S.HI = { 1, 0.82, 0 }              -- selection highlight (follows the theme)
 S.PANEL = { 0.11, 0.08, 0.05 }     -- panel background    (follows the theme)
 
 local WHITE = "Interface\\Buttons\\WHITE8x8"
-local TOOLTIP_EDGE = "Interface\\Tooltips\\UI-Tooltip-Border"
 
 ---------------------------------------------------------------------------
 -- Colour themes (Settings > Window, or /tg theme <name>)
 ---------------------------------------------------------------------------
 
 -- edge: borders, cog: cogs, panel: backgrounds, hi: selection.
--- frame: tint for the classic gold dialog border; themes without it use a plain border in the edge colour,
--- because the gold artwork turns muddy when tinted blue, green or purple.
 S.THEMES = {
     { id = "brass", label = "Brass", edge = { 0.62, 0.47, 0.24 }, cog = { 0.95, 0.74, 0.38 },
       panel = { 0.11, 0.08, 0.05 }, hi = { 1, 0.82, 0 }, frame = { 1, 1, 1 } },
@@ -61,29 +68,24 @@ local function shade(f)
     return p[1] * f, p[2] * f, p[3] * f
 end
 
+-- How strongly each kind of frame shows its border, and how light its background is against the panel colour.
+local FRAME_KINDS = {
+    outer = { 0.82, 0.97, 1 },    -- { background shade, background alpha, border alpha }
+    inset = { 1, 0.95, 0.35 },
+    plain = { 0.64, 1, 0 },       -- the list column: a darker strip, no border
+    dark = { 0.45, 0.96, 0.5 },   -- text boxes
+    solid = { 1, 1, 0.35 },
+    button = { 1.3, 1, 0.6 },
+    card = { 1.25, 1, 0.25 },     -- rows that stand on their own, like requests
+    toast = { 0.82, 0.95, 0.9 },
+    cover = { 0.82, 1, 0 },       -- a view that takes over the whole body: the window's own colour, no border
+}
+
 local function paint(e)
     local o, kind, x = e[1], e[2], e[3]
     local edge = S.BRONZE
-    if kind == "outer" then
-        local frame = S.theme.frame
-        if frame then
-            o:SetBackdrop({
-                bgFile = WHITE, edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", edgeSize = 32,
-                insets = { left = 11, right = 12, top = 12, bottom = 11 },
-            })
-            o:SetBackdropBorderColor(frame[1], frame[2], frame[3], 1)
-        else
-            o:SetBackdrop({
-                bgFile = WHITE, edgeFile = TOOLTIP_EDGE, edgeSize = 16,
-                insets = { left = 4, right = 4, top = 4, bottom = 4 },
-            })
-            o:SetBackdropBorderColor(edge[1], edge[2], edge[3], 1)
-        end
-        local r, g, b = shade(0.64)
-        o:SetBackdropColor(r, g, b, 0.97)
-        return
-    elseif kind == "line" then
-        o:SetColorTexture(edge[1], edge[2], edge[3], 0.6)
+    if kind == "line" then
+        o:SetColorTexture(edge[1], edge[2], edge[3], x or 0.35)
         return
     elseif kind == "edgetex" then
         o:SetColorTexture(edge[1], edge[2], edge[3], x or 1)
@@ -94,22 +96,29 @@ local function paint(e)
     elseif kind == "hi" then
         o:SetColorTexture(S.HI[1], S.HI[2], S.HI[3], x or 0.12)
         return
+    elseif kind == "hivertex" then -- a white texture (icon, rounded shape) in the highlight colour
+        o:SetVertexColor(S.HI[1], S.HI[2], S.HI[3], x or 1)
+        return
     elseif kind == "paneltex" then
         o:SetColorTexture(S.PANEL[1], S.PANEL[2], S.PANEL[3], 1)
         return
+    elseif kind == "shadetex" then -- a white texture tinted with a shade of the panel colour
+        local r, g, b = shade(x or 1)
+        o:SetVertexColor(r, g, b, 1)
+        return
+    elseif kind == "primary" then  -- the one button that matters in a row
+        o:SetBackdropColor(edge[1] * 0.55, edge[2] * 0.55, edge[3] * 0.55, 1)
+        o:SetBackdropBorderColor(edge[1], edge[2], edge[3], 1)
+        return
     end
-    -- backdrop frames with the thin border
-    local f, a = 1, 0.95
-    if kind == "dark" then f, a = 0.32, 0.96
-    elseif kind == "solid" then f, a = 1, 1
-    elseif kind == "button" then f, a = 1.36, 1
-    elseif kind == "toast" then f, a = 0.82, 0.95 end
-    local r, g, b = shade(f)
-    o:SetBackdropColor(r, g, b, a)
-    o:SetBackdropBorderColor(edge[1], edge[2], edge[3], 1)
+    local k = FRAME_KINDS[kind] or FRAME_KINDS.inset
+    local r, g, b = shade(k[1])
+    o:SetBackdropColor(r, g, b, k[2])
+    o:SetBackdropBorderColor(edge[1], edge[2], edge[3], k[3])
 end
 
--- kind: outer, inset, dark, solid, button, toast (frames); line, edgetex, cog, hi, paneltex (textures)
+-- kind: outer, inset, plain, dark, solid, button, primary, card, toast, cover (frames);
+--       line, edgetex, cog, hi, hivertex, paneltex, shadetex (textures)
 function S.Paint(obj, kind, extra)
     local e = { obj, kind, extra }
     painted[#painted + 1] = e
@@ -148,19 +157,21 @@ function S.SetTheme(id)
     return t
 end
 
--- Main window: classic dialog border over a dark background.
+-- One-pixel square border, the same on every frame.
+local function flat(f, edgeSize)
+    f:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = edgeSize or 1 })
+end
+S.Flat = flat
+
+-- Main window: a plain border in the theme colour over a dark background.
 function S.Outer(f)
+    flat(f, 2)
     S.Paint(f, "outer")
 end
 
 -- Inner panels: thin edge in the theme colour.
 function S.Inset(f, dark)
-    f:SetBackdrop({
-        bgFile = WHITE,
-        edgeFile = TOOLTIP_EDGE,
-        edgeSize = 12,
-        insets = { left = 3, right = 3, top = 3, bottom = 3 },
-    })
+    flat(f)
     S.Paint(f, dark and "dark" or "inset")
 end
 
@@ -173,6 +184,125 @@ function S.Panel(parent, dark)
     local f = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     S.Inset(f, dark)
     return f
+end
+
+-- A darker strip without a border (the list column).
+function S.Strip(parent)
+    local f = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    flat(f)
+    S.Paint(f, "plain")
+    return f
+end
+
+---------------------------------------------------------------------------
+-- Round things: dots, badges, rounded backgrounds
+---------------------------------------------------------------------------
+
+local function num(v, default)
+    return type(v) == "number" and v or default
+end
+S.Num = num
+
+function S.Dot(parent, size, layer)
+    local t = parent:CreateTexture(nil, layer or "ARTWORK")
+    t:SetSize(size, size)
+    t:SetTexture(S.ROUND)
+    return t
+end
+
+-- A white icon from the Media folder, tinted.
+function S.Icon(parent, tex, size, layer)
+    local t = parent:CreateTexture(nil, layer or "ARTWORK")
+    t:SetSize(size, size)
+    t:SetTexture(tex)
+    return t
+end
+
+-- Unread badge: a rounded pill with a number. Hidden when there is nothing to count.
+function S.Pill(parent, height)
+    local h = height or 16
+    local p = CreateFrame("Frame", nil, parent)
+    p:SetSize(h, h)
+    local c = S.BADGE
+    local left = p:CreateTexture(nil, "ARTWORK")
+    left:SetTexture(S.ROUND)
+    left:SetTexCoord(0, 0.5, 0, 1)
+    left:SetSize(h / 2, h)
+    left:SetPoint("LEFT")
+    local right = p:CreateTexture(nil, "ARTWORK")
+    right:SetTexture(S.ROUND)
+    right:SetTexCoord(0.5, 1, 0, 1)
+    right:SetSize(h / 2, h)
+    right:SetPoint("RIGHT")
+    local mid = p:CreateTexture(nil, "ARTWORK")
+    mid:SetPoint("TOPLEFT", left, "TOPRIGHT")
+    mid:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT")
+    mid:SetColorTexture(1, 1, 1, 1)
+    p.parts = { left, right, mid }
+    function p:SetColor(r, g, b, a)
+        for _, t in ipairs(self.parts) do t:SetVertexColor(r, g, b, a or 1) end
+    end
+    p:SetColor(c[1], c[2], c[3])
+    local fs = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    fs:SetPoint("CENTER", 0, 0)
+    fs:SetTextColor(1, 1, 1)
+    p.fs = fs
+    function p:SetLabel(text)
+        self.fs:SetText(text or "")
+        self:SetWidth(math.max(h, num(self.fs:GetStringWidth(), 6) + 10))
+        self:SetShown(text ~= nil and text ~= "")
+    end
+    function p:SetCount(n)
+        n = num(n, 0)
+        self:SetLabel(n > 0 and (n > 99 and "99+" or tostring(n)) or nil)
+    end
+    p:Hide()
+    return p
+end
+
+-- A rounded background behind everything else in `frame`. Returns it; :SetColor(r, g, b, a) paints it.
+function S.Rounded(frame, radius, layer)
+    layer = layer or "BACKGROUND"
+    local r = radius or 6
+    local bg = { parts = {} }
+    local function corner(point, l, rt, t, b)
+        local tex = frame:CreateTexture(nil, layer)
+        tex:SetTexture(S.ROUND)
+        tex:SetTexCoord(l, rt, t, b)
+        tex:SetSize(r, r)
+        tex:SetPoint(point)
+        bg.parts[#bg.parts + 1] = tex
+        return tex
+    end
+    local tl = corner("TOPLEFT", 0, 0.5, 0, 0.5)
+    local tr = corner("TOPRIGHT", 0.5, 1, 0, 0.5)
+    local bl = corner("BOTTOMLEFT", 0, 0.5, 0.5, 1)
+    local br = corner("BOTTOMRIGHT", 0.5, 1, 0.5, 1)
+    local function fill(p1, rel1, rp1, p2, rel2, rp2)
+        local tex = frame:CreateTexture(nil, layer)
+        tex:SetColorTexture(1, 1, 1, 1)
+        tex:SetPoint(p1, rel1, rp1)
+        tex:SetPoint(p2, rel2, rp2)
+        bg.parts[#bg.parts + 1] = tex
+    end
+    fill("TOPLEFT", tl, "TOPRIGHT", "BOTTOMRIGHT", tr, "BOTTOMLEFT")   -- top edge
+    fill("TOPLEFT", bl, "TOPRIGHT", "BOTTOMRIGHT", br, "BOTTOMLEFT")   -- bottom edge
+    fill("TOPLEFT", tl, "BOTTOMLEFT", "BOTTOMRIGHT", br, "TOPRIGHT")   -- middle
+    function bg:SetColor(cr, cg, cb, ca)
+        for _, t in ipairs(self.parts) do t:SetVertexColor(cr, cg, cb, ca or 1) end
+    end
+    function bg:SetShown(v)
+        for _, t in ipairs(self.parts) do t:SetShown(v) end
+    end
+    return bg
+end
+
+-- Small, dim, upper-case label above a group of things.
+function S.Caption(parent, text)
+    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    fs:SetText((text or ""):upper())
+    fs:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
+    return fs
 end
 
 function S.Line(parent)
@@ -200,17 +330,12 @@ function S.Spin(tex, seconds, degrees, loop)
     return ag
 end
 
--- Dark button with bronze edge and gold text (like the Dungeon Journal buttons).
-function S.Button(parent, text, w, h)
+-- Flat dark button with a thin edge and gold text. primary = true fills it: the one that matters in a row.
+function S.Button(parent, text, w, h, primary)
     local b = CreateFrame("Button", nil, parent, "BackdropTemplate")
     b:SetSize(w, h)
-    b:SetBackdrop({
-        bgFile = WHITE,
-        edgeFile = TOOLTIP_EDGE,
-        edgeSize = 12,
-        insets = { left = 3, right = 3, top = 3, bottom = 3 },
-    })
-    S.Paint(b, "button")
+    flat(b)
+    S.Paint(b, primary and "primary" or "button")
 
     local fs = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     fs:SetPoint("CENTER")
@@ -219,14 +344,57 @@ function S.Button(parent, text, w, h)
     b.fs = fs
 
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetPoint("TOPLEFT", 3, -3)
-    hl:SetPoint("BOTTOMRIGHT", -3, 3)
+    hl:SetPoint("TOPLEFT", 1, -1)
+    hl:SetPoint("BOTTOMRIGHT", -1, 1)
     S.Paint(hl, "hi", 0.12)
 
     b:SetScript("OnMouseDown", function(s) if s:IsEnabled() then s.fs:SetPoint("CENTER", 1, -1) end end)
     b:SetScript("OnMouseUp", function(s) s.fs:SetPoint("CENTER", 0, 0) end)
     b:HookScript("OnDisable", function(s) s.fs:SetTextColor(0.5, 0.5, 0.5) end)
     b:HookScript("OnEnable", function(s) s.fs:SetTextColor(S.GOLD[1], S.GOLD[2], S.GOLD[3]) end)
+    return b
+end
+
+-- Square button with a white icon from the Media folder (settings, close, more).
+function S.IconButton(parent, tex, size, iconSize)
+    local b = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    b:SetSize(size, size)
+    flat(b)
+    S.Paint(b, "button")
+    local icon = S.Icon(b, tex, iconSize or math.floor(size * 0.55))
+    icon:SetPoint("CENTER")
+    icon:SetVertexColor(0.85, 0.71, 0.42)
+    b.icon = icon
+    local hl = b:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetPoint("TOPLEFT", 1, -1)
+    hl:SetPoint("BOTTOMRIGHT", -1, 1)
+    S.Paint(hl, "hi", 0.14)
+    -- lit = true: the panel this button opens is showing
+    function b:SetLit(lit)
+        if lit then
+            self.icon:SetVertexColor(1, 0.91, 0.69)
+            self:SetBackdropBorderColor(S.HI[1], S.HI[2], S.HI[3], 1)
+        else
+            self.icon:SetVertexColor(0.85, 0.71, 0.42)
+            self:SetBackdropBorderColor(S.BRONZE[1], S.BRONZE[2], S.BRONZE[3], 0.6)
+        end
+    end
+    return b
+end
+
+-- Text that acts as a button ("Close all", "Clear all").
+function S.Link(parent, text, font)
+    local b = CreateFrame("Button", nil, parent)
+    local fs = b:CreateFontString(nil, "OVERLAY", font or "GameFontNormalSmall")
+    fs:SetPoint("CENTER")
+    fs:SetText(text)
+    fs:SetTextColor(0.85, 0.71, 0.42)
+    b.fs = fs
+    b:SetSize(S.Num(fs:GetStringWidth(), 40) + 6, 16)
+    b:SetScript("OnEnter", function(s) if s:IsEnabled() then s.fs:SetTextColor(1, 0.91, 0.69) end end)
+    b:SetScript("OnLeave", function(s) if s:IsEnabled() then s.fs:SetTextColor(0.85, 0.71, 0.42) end end)
+    b:HookScript("OnDisable", function(s) s.fs:SetTextColor(0.45, 0.42, 0.36) end)
+    b:HookScript("OnEnable", function(s) s.fs:SetTextColor(0.85, 0.71, 0.42) end)
     return b
 end
 

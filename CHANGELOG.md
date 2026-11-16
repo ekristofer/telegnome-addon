@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.8.0
+
+A new look
+- Unread messages show as small badges on the tabs, the sections and each conversation, instead of red numbers. The count is no longer repeated in the window's title.
+- Simpler header: one cog and the name on the left, Settings and Close as icon buttons on the right. The tagline is in the cog's tooltip.
+- Tabs are plain labels with a line under the one you're on.
+- The list shows two lines per conversation: the name with the time of the newest message, and a preview of it with the unread badge. Online dots are round and every name lines up.
+- Favorites, Friends and Others have quieter headers with an arrow to fold them. "Close all" appears when you point at the Others header.
+- The conversation shows the name large with the realm (and level and class when known) small underneath. The star stays; Clear history moved into the new ... menu next to it, which also has mute and close.
+- Messages from one person in a row are grouped under one name, in a bubble: yours on the right in a warmer colour, theirs on the left, times are dimmed and days are separated by a centred line.
+- The message box says who you're writing to while it's empty.
+- Requests uses the whole window: each request is a card with the level in a badge, the class in its colour and Invite as the one highlighted button. Clear all and Decline all are at the bottom, and a thin bar on the right shows when there are more requests than fit.
+- Compact chat (Settings > Window): one line per message, without bubbles, for those who prefer the old look.
+- Settings has its categories on the left (Notifications, Do not disturb, Window, Chat, Requests, Your data) and shows one at a time.
+- Flat panels and buttons with thin borders in the theme colour everywhere, including the notifier.
+- The window is a little larger by default (smallest size 700 x 490).
+
+Fixes
+- With a see-through window, the conversation and the list no longer show through Settings, Requests and the other panels.
+- + New message could fail to open since 0.7.0 (an error the game hides by default). It opens again.
+
+
 ## 0.7.2
 - Followed Party, Raid and Instance chat: joining a new group adds a "New group" line, so you can see where the current group starts. A new option in the Followed channels panel empties those conversations instead.
 - Requests: after a Check, the line under the title shows the result and how long until the next check is possible.

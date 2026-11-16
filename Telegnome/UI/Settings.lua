@@ -1,11 +1,15 @@
--- Telegnome: settings panel (opens over the conversation pane). Scrolls when it doesn't fit.
+-- Telegnome: settings (covers the list and the conversation). Categories on the left, one page at a time.
 
 local _, ns = ...
 local TG = ns.TG
 local S = TG.Style
 local UI = TG.UI
-local O = { checks = {}, radios = {} }
+local O = { checks = {}, radios = {}, pages = {}, catButtons = {} }
 TG.Settings = O
+
+-- The order of the categories on the left.
+local CATEGORIES = { "notify", "dnd", "window", "chat", "requests", "data" }
+local LIST_W = 216
 
 local NOTIFY_FROM = {
     { "all", "Everyone" },
@@ -23,37 +27,45 @@ function O:Create()
     UI:Create()
 
     local f = CreateFrame("Frame", nil, UI.right, "BackdropTemplate")
-    f:SetAllPoints(UI.right)
+    f:SetAllPoints(UI.body)
     f:SetFrameLevel(UI.right:GetFrameLevel() + 30)
-    S.Inset(f)
-    S.Solid(f)
+    S.Flat(f)
+    S.Paint(f, "cover")
     f:EnableMouse(true)
     f:Hide()
     self.frame = f
 
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 14, -10)
+    -- Left: the categories
+    local side = S.Strip(f)
+    side:SetPoint("TOPLEFT", 0, 0)
+    side:SetPoint("BOTTOMLEFT", 0, 0)
+    side:SetWidth(LIST_W)
+    self.side = side
+    local vline = f:CreateTexture(nil, "ARTWORK")
+    S.Paint(vline, "line")
+    vline:SetWidth(1)
+    vline:SetPoint("TOPLEFT", side, "TOPRIGHT", 0, 0)
+    vline:SetPoint("BOTTOMLEFT", side, "BOTTOMRIGHT", 0, 0)
+    local title = side:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", 16, -14)
     title:SetText("Settings")
-    local cog = S.Cog(f, 18) -- the same cog as the other panels' titles
-    cog:SetPoint("LEFT", title, "RIGHT", 6, 0)
-    local line = S.Line(f)
-    line:SetPoint("TOPLEFT", 8, -34)
-    line:SetPoint("TOPRIGHT", -8, -34)
+    local ver = side:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    ver:SetPoint("BOTTOMLEFT", 16, 12)
+    ver:SetText("Telegnome v" .. TG.version)
 
-    -- Scrolling body (mouse wheel), with a thin scroll indicator.
+    -- Right: the chosen page. It scrolls (mouse wheel) when it doesn't fit, with a thin scroll indicator.
     local clip = CreateFrame("ScrollFrame", nil, f)
-    clip:SetPoint("TOPLEFT", 4, -38)
-    clip:SetPoint("BOTTOMRIGHT", -14, 40)
+    clip:SetPoint("TOPLEFT", LIST_W + 10, -8)
+    clip:SetPoint("BOTTOMRIGHT", -14, 44)
     clip:EnableMouseWheel(true)
-    local content = CreateFrame("Frame", nil, clip)
-    content:SetSize(440, 400)
-    clip:SetScrollChild(content)
-    clip:SetScript("OnSizeChanged", function(_, w) content:SetWidth(w) end)
+    clip:SetScript("OnSizeChanged", function(_, w)
+        for _, pg in ipairs(O.pages) do pg.frame:SetWidth(w) end
+    end)
     self.clip = clip
 
     local track = CreateFrame("Frame", nil, f)
-    track:SetPoint("TOPRIGHT", -5, -40)
-    track:SetPoint("BOTTOMRIGHT", -5, 42)
+    track:SetPoint("TOPRIGHT", -5, -10)
+    track:SetPoint("BOTTOMRIGHT", -5, 46)
     track:SetWidth(5)
     local trackBg = track:CreateTexture(nil, "BACKGROUND")
     trackBg:SetAllPoints()
@@ -82,12 +94,25 @@ function O:Create()
         s:SetVerticalScroll(math.max(0, math.min(range, s:GetVerticalScroll() - delta * 36)))
     end)
 
+    -- Everything below is built onto `content`, which is the page being filled; page() starts the next one.
+    local content
     local y = -8
-    local function section(text)
-        local fs = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local function page(id, label, blurb)
+        if content then content:SetHeight(-y + 8) end
+        content = CreateFrame("Frame", nil, clip)
+        content:SetSize(440, 400)
+        content:Hide()
+        self.pages[#self.pages + 1] = { id = id, label = label, frame = content }
+        y = -10
+        local fs = content:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         fs:SetPoint("TOPLEFT", 14, y)
-        fs:SetText(text)
-        y = y - 22
+        fs:SetText(label)
+        y = y - 24
+        local sub = content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        sub:SetPoint("TOPLEFT", 14, y)
+        sub:SetText(blurb or "")
+        sub:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
+        y = y - 26
     end
     local function gap(n) y = y - n end
     local function check(label, indent, get, set, tipTitle, tip)
@@ -107,7 +132,7 @@ function O:Create()
     local s = function() return TG.db.settings end
 
     ---------------------------------------------------------------- Do not disturb
-    section("Do not disturb")
+    page("dnd", "Do not disturb", "Quiet when you need it: no pop-ups, no sounds.")
     self.dnd = check("Do not disturb", 0,
         function() return s().dnd end, function(v) TG:SetDND(v, true) end,
         "Do not disturb",
@@ -134,7 +159,7 @@ function O:Create()
     y = y - 36
 
     ---------------------------------------------------------------- Notifications
-    section("Notifications")
+    page("notify", "Notifications", "How Telegnome tells you about new messages.")
     self.notify = check("Show a pop-up for new messages", 0,
         function() return s().notify end, function(v) s().notify = v end,
         "Pop-up", "The notifier grows to show who wrote and the start of the message, then shrinks back.")
@@ -146,7 +171,7 @@ function O:Create()
     local prev = from
     for _, opt in ipairs(NOTIFY_FROM) do
         local r = S.Radio(content, opt[2])
-        r:SetPoint("LEFT", prev, "RIGHT", prev == from and 8 or 12, 0)
+        r:SetPoint("LEFT", prev, "RIGHT", prev == from and 8 or 12, prev == from and 0 or -1)
         r.value = opt[1]
         r:SetScript("OnClick", function()
             TG.db.settings.notifyFrom = opt[1]
@@ -196,7 +221,7 @@ function O:Create()
     self.growRadios = {}
     for _, opt in ipairs({ { "right", "Right" }, { "left", "Left" } }) do
         local r = S.Radio(content, opt[2])
-        r:SetPoint("LEFT", prevG, "RIGHT", prevG == grow and 8 or 12, 0)
+        r:SetPoint("LEFT", prevG, "RIGHT", prevG == grow and 8 or 12, prevG == grow and 0 or -1)
         r.value = opt[1]
         r:SetScript("OnClick", function()
             TG.db.settings.toastGrow = opt[1]
@@ -222,7 +247,7 @@ function O:Create()
     self.soundRadios = {}
     for _, snd in ipairs(TG.SOUNDS) do
         local r = S.Radio(content, snd.label)
-        r:SetPoint("LEFT", prevS, "RIGHT", prevS == sndLabel and 8 or 12, 0)
+        r:SetPoint("LEFT", prevS, "RIGHT", prevS == sndLabel and 8 or 12, prevS == sndLabel and 0 or -1)
         r.value = snd.id
         r:SetScript("OnClick", function()
             TG.db.settings.soundChoice = snd.id
@@ -249,7 +274,7 @@ function O:Create()
     y = y - 34
 
     ---------------------------------------------------------------- Window
-    section("Window")
+    page("window", "Window", "How the Telegnome window looks.")
     local thLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     thLabel:SetPoint("TOPLEFT", 18, y - 4)
     thLabel:SetText("Theme")
@@ -283,7 +308,7 @@ function O:Create()
     local prevT = tsLabel
     for _, opt in ipairs({ { "small", "Small" }, { "normal", "Normal" }, { "large", "Large" } }) do
         local r = S.Radio(content, opt[2])
-        r:SetPoint("LEFT", prevT, "RIGHT", prevT == tsLabel and 14 or 12, 0)
+        r:SetPoint("LEFT", prevT, "RIGHT", prevT == tsLabel and 14 or 12, prevT == tsLabel and 0 or -1)
         r.value = opt[1]
         r:SetScript("OnClick", function()
             TG.db.settings.textSize = opt[1]
@@ -294,6 +319,11 @@ function O:Create()
         self.sizeRadios[#self.sizeRadios + 1] = r
     end
     y = y - 28
+    check("Compact chat: one line per message, no bubbles", 0,
+        function() return s().compactChat end, function(v) s().compactChat = v; UI:ApplyChatStyle() end,
+        "Compact chat", "Shows every message as one line - time, name, text - like the game's own chat. "
+        .. "More messages fit on screen. Off: messages are grouped in bubbles, yours on the right.")
+    gap(4)
 
     local opLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     opLabel:SetPoint("TOPLEFT", 18, y - 2)
@@ -325,7 +355,7 @@ function O:Create()
     gap(6)
 
     ---------------------------------------------------------------- Chat
-    section("Chat")
+    page("chat", "Chat", "What shows up in Telegnome and what stays in the game's own chat.")
     self.only = check("Only in Telegnome (keep it all out of the main chat)", 0,
         TG.IsTelegnomeOnly and function() return TG:IsTelegnomeOnly() end, function(v) TG:SetTelegnomeOnly(v) end,
         "Only in Telegnome", "Whispers, Battle.net whispers, followed channels and group chats only show up in "
@@ -339,11 +369,6 @@ function O:Create()
     self.groupsHidden = check("Group chats (always)", 30,
         function() return true end, function() end,
         "Group chats", "Group chats are hidden channels, so they always stay in Telegnome.")
-    check("Collect strangers' whispers under Requests while I'm listed in the group finder", 0,
-        function() return s().requestsTab end, function(v) s().requestsTab = v end,
-        "Requests", "While you or your group are listed in the group finder, whispers from people who aren't "
-        .. "friends, guild members or favorites go to a Requests tab that shows their class and level and has an "
-        .. "Invite button. In a group, only the leader gets the tab. To collect at other times: /tg recruit")
     check("Enter types in Telegnome while its window is open", 0,
         function() return s().enterToTelegnome end, function(v) s().enterToTelegnome = v end,
         "Enter key", "With a conversation open, pressing Enter puts the cursor in Telegnome's message box "
@@ -366,7 +391,13 @@ function O:Create()
 
     ---------------------------------------------------------------- Requests
     gap(4)
-    section("Requests")
+    page("requests", "Requests", "For when you list a group and strangers start whispering.")
+    check("Collect strangers' whispers under Requests while I'm listed", 0,
+        function() return s().requestsTab end, function(v) s().requestsTab = v end,
+        "Requests", "While you or your group are listed in the group finder, whispers from people who aren't "
+        .. "friends, guild members or favorites go to a Requests tab that shows their class and level and has an "
+        .. "Invite button. In a group, only the leader gets the tab. To collect at other times: /tg recruit")
+    gap(8)
     local qrHint = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     qrHint:SetPoint("TOPLEFT", 18, y)
     qrHint:SetText("Quick replies (the Reply button on a request):")
@@ -401,7 +432,7 @@ function O:Create()
 
     ---------------------------------------------------------------- Your data
     gap(4)
-    section("Your data")
+    page("data", "Your data", "What is saved, and where.")
     local info = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     info:SetPoint("TOPLEFT", 18, y)
     info:SetPoint("RIGHT", content, "RIGHT", -14, 0)
@@ -429,12 +460,61 @@ function O:Create()
     content:SetHeight(-y + 8)
 
     local done = S.Button(f, "Done", 80, 24)
-    done:SetPoint("BOTTOMRIGHT", -10, 10)
+    done:SetPoint("BOTTOMRIGHT", -30, 10) -- clear of the window's resize corner
     done:SetScript("OnClick", function() O:Close() end)
 
-    local ver = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    ver:SetPoint("BOTTOMLEFT", 14, 16)
-    ver:SetText("Telegnome v" .. TG.version)
+    -- The category buttons, in their own order (the pages above are built in the order of the code).
+    local byId = {}
+    for _, pg in ipairs(self.pages) do byId[pg.id] = pg end
+    local n = 0
+    for _, id in ipairs(CATEGORIES) do
+        local pg = byId[id]
+        if pg then
+            n = n + 1
+            local b = CreateFrame("Button", nil, side)
+            b:SetHeight(30)
+            b:SetPoint("TOPLEFT", 6, -44 - (n - 1) * 32)
+            b:SetPoint("RIGHT", -6, 0)
+            local sel = S.Rounded(b, 5)
+            for _, t in ipairs(sel.parts) do S.Paint(t, "hivertex", 0.13) end
+            local bar = b:CreateTexture(nil, "ARTWORK")
+            bar:SetPoint("TOPLEFT", 0, -4)
+            bar:SetPoint("BOTTOMLEFT", 0, 4)
+            bar:SetWidth(3)
+            S.Paint(bar, "hi", 0.95)
+            local hl = b:CreateTexture(nil, "HIGHLIGHT")
+            hl:SetAllPoints()
+            hl:SetColorTexture(1, 1, 1, 0.05)
+            local fs = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            fs:SetPoint("LEFT", 14, 0)
+            fs:SetText(pg.label)
+            b.id, b.fs = id, fs
+            function b:SetSelected(v)
+                sel:SetShown(v)
+                bar:SetShown(v)
+                if v then self.fs:SetTextColor(1, 0.82, 0) else self.fs:SetTextColor(0.81, 0.76, 0.66) end
+            end
+            b:SetScript("OnClick", function() O:ShowPage(id) end)
+            self.catButtons[n] = b
+        end
+    end
+    self:ShowPage(self.page or CATEGORIES[1])
+end
+
+-- One page at a time on the right.
+function O:ShowPage(id)
+    local shown
+    for _, pg in ipairs(self.pages) do
+        if pg.id == id then shown = pg end
+    end
+    shown = shown or self.pages[1]
+    if not shown then return end
+    self.page = shown.id
+    for _, pg in ipairs(self.pages) do pg.frame:SetShown(pg == shown) end
+    self.clip:SetScrollChild(shown.frame)
+    shown.frame:SetWidth(S.Num(self.clip:GetWidth(), 440))
+    self.clip:SetVerticalScroll(0)
+    for _, b in ipairs(self.catButtons) do b:SetSelected(b.id == shown.id) end
 end
 
 function O:Refresh()
@@ -505,7 +585,7 @@ function O:Open()
     TG.Requests:ClosePanel()
     self:Refresh()
     self.frame:Show()
-    self.clip:SetVerticalScroll(0)
+    self:ShowPage(self.page)
 end
 
 function O:Close()

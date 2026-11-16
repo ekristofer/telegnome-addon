@@ -1,32 +1,32 @@
--- Telegnome: messenger window (contact list + conversation + input), classic style.
+-- Telegnome: messenger window (conversation list + conversation + message box).
 
 local _, ns = ...
 local TG = ns.TG
 local S = TG.Style
+local num = S.Num
 local UI = { rows = {}, offset = 0, tab = "dm", selectedByTab = {} }
 TG.UI = UI
 
-local LIST_W = 180
-local ROW_H = 26
-UI.ROW_H = ROW_H
+local LIST_W = 216
+local ROW_H = 40      -- a conversation in the list: name and time, preview and unread badge
+local HEAD_H = 24     -- Favorites / Friends / Others
+local NAME_X = 22     -- every name starts here, with or without an online dot
+local TOP = 74        -- where the list and the conversation start, below the header and the tabs
+UI.ROW_H = 26         -- the one-line rows of the New message picker
+UI.MIN_W, UI.MIN_H = 700, 490
 
 local function hex(c)
     return ("%02x%02x%02x"):format(math.floor(c[1] * 255), math.floor(c[2] * 255), math.floor(c[3] * 255))
 end
 UI.hex = hex
 
-local function chatColor(chatType)
-    local info = ChatTypeInfo and ChatTypeInfo[chatType]
-    if info then return info.r, info.g, info.b end
-    return 1, 1, 1
-end
-
--- Shared row look for the contact list and the New message picker.
+-- Shared row look for the New message picker.
 function UI:MakeRow(parent, top, i)
+    local h = UI.ROW_H
     local row = CreateFrame("Button", nil, parent)
-    row:SetHeight(ROW_H)
-    row:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, top - (i - 1) * ROW_H)
-    row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, top - (i - 1) * ROW_H)
+    row:SetHeight(h)
+    row:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, top - (i - 1) * h)
+    row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, top - (i - 1) * h)
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
     local sel = row:CreateTexture(nil, "BACKGROUND")
@@ -35,7 +35,7 @@ function UI:MakeRow(parent, top, i)
     local bar = row:CreateTexture(nil, "ARTWORK")
     bar:SetPoint("TOPLEFT")
     bar:SetPoint("BOTTOMLEFT")
-    bar:SetWidth(2)
+    bar:SetWidth(3)
     S.Paint(bar, "hi", 0.9)
     function row:SetSelected(v)
         sel:SetShown(v)
@@ -47,29 +47,30 @@ function UI:MakeRow(parent, top, i)
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.06)
 
-    row.dot = row:CreateTexture(nil, "ARTWORK")
-    row.dot:SetSize(7, 7)
+    row.dot = S.Dot(row, 8)
     row.dot:SetPoint("LEFT", 8, 0)
 
     row.right = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     row.right:SetPoint("RIGHT", -22, 0)
 
     row.name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    row.name:SetPoint("LEFT", row.dot, "RIGHT", 6, 0)
+    row.name:SetPoint("LEFT", NAME_X, 0)
     row.name:SetPoint("RIGHT", row.right, "LEFT", -4, 0)
     row.name:SetJustifyH("LEFT")
     row.name:SetWordWrap(false)
     return row
 end
 
+-- online: true / false, or nil when the game doesn't say (then there is no dot, and the name stays in line).
 function UI.SetRowContact(row, name, color, online)
     row.name:SetText(name)
     row.name:SetTextColor(color[1], color[2], color[3])
     if online == nil then
         row.dot:Hide()
     else
+        local c = online and S.ONLINE or S.OFFLINE
         row.dot:Show()
-        if online then row.dot:SetColorTexture(0.3, 0.9, 0.3) else row.dot:SetColorTexture(0.4, 0.4, 0.4) end
+        row.dot:SetVertexColor(c[1], c[2], c[3])
     end
 end
 
@@ -77,11 +78,40 @@ end
 -- Frame construction
 ---------------------------------------------------------------------------
 
+local TABS = { { "dm", "Direct messages" }, { "groups", "Group chats" }, { "channels", "Followed channels" },
+    { "requests", "Requests" } }
+
+local function makeTab(parent, id, label)
+    local tab = CreateFrame("Button", nil, parent)
+    tab:SetHeight(28)
+    tab.id, tab.baseText = id, label
+    local fs = tab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fs:SetPoint("LEFT", 2, 1)
+    fs:SetText(label)
+    tab.fs = fs
+    tab.pill = S.Pill(tab, 16)
+    tab.pill:SetPoint("LEFT", fs, "RIGHT", 6, 0)
+    -- the line under the tab you're on
+    local under = tab:CreateTexture(nil, "ARTWORK")
+    under:SetPoint("BOTTOMLEFT", 0, 0)
+    under:SetPoint("BOTTOMRIGHT", 0, 0)
+    under:SetHeight(2)
+    S.Paint(under, "hi", 1)
+    tab.under = under
+    tab:SetScript("OnEnter", function(s)
+        if s.id ~= UI.tab or TG.Settings:IsShown() then s.fs:SetTextColor(0.95, 0.88, 0.72) end
+    end)
+    tab:SetScript("OnLeave", function() UI:UpdateTabs() end)
+    -- Clicking a tab always leaves Settings and the other panels, also when it's the tab you're on.
+    tab:SetScript("OnClick", function() UI:CloseOverlays(); UI:SetTab(id) end)
+    return tab
+end
+
 function UI:Create()
     if self.frame then return end
 
     local f = CreateFrame("Frame", "TelegnomeFrame", UIParent, "BackdropTemplate")
-    f:SetSize(740, 510)
+    f:SetSize(760, 520)
     f:SetPoint("CENTER")
     f:SetFrameStrata("MEDIUM")
     f:SetToplevel(true)
@@ -89,7 +119,7 @@ function UI:Create()
     f:SetMovable(true)
     f:SetResizable(true)
     if f.SetDontSavePosition then f:SetDontSavePosition(true) end
-    if f.SetResizeBounds then f:SetResizeBounds(680, 490, 1400, 1000) end
+    if f.SetResizeBounds then f:SetResizeBounds(UI.MIN_W, UI.MIN_H, 1400, 1000) end
     f:EnableMouse(true)
     S.Outer(f)
     f:Hide()
@@ -97,92 +127,96 @@ function UI:Create()
     self.frame = f
     self:ApplyOpacity()
 
-    -- Title bar (drag handle)
+    -- Header (drag handle): one cog as the logo, the name, and two icon buttons on the right.
     local bar = CreateFrame("Frame", nil, f)
-    bar:SetPoint("TOPLEFT", 12, -12)
-    bar:SetPoint("TOPRIGHT", -12, -12)
+    bar:SetPoint("TOPLEFT", 10, -8)
+    bar:SetPoint("TOPRIGHT", -10, -8)
     bar:SetHeight(32)
     bar:EnableMouse(true)
     bar:RegisterForDrag("LeftButton")
     bar:SetScript("OnDragStart", function() f:StartMoving() end)
     bar:SetScript("OnDragStop", function() f:StopMovingOrSizing(); UI:SavePos() end)
+    self.bar = bar
+
+    local cog = S.Cog(bar, 24)
+    cog:SetPoint("LEFT", 6, 0)
+    self.cogs = { cog }
+    self.cogSpins = { S.Spin(cog, 1.2, 144) }
 
     local title = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("CENTER", 0, 0)
+    title:SetPoint("LEFT", cog, "RIGHT", 8, 0)
     self.title = title
 
-    local cogL = S.Cog(bar, 22)
-    cogL:SetPoint("RIGHT", title, "LEFT", -8, 0)
-    local cogR = S.Cog(bar, 22)
-    cogR:SetPoint("LEFT", title, "RIGHT", 8, 0)
-    self.cogs = { cogL, cogR }
-    self.bar = bar
-    self.cogSpins = { S.Spin(cogL, 1.2, 144), S.Spin(cogR, 1.2, -144) }
+    -- the tagline lives in a tooltip on the logo
+    local logo = CreateFrame("Frame", nil, bar)
+    logo:SetPoint("TOPLEFT", cog, "TOPLEFT", -2, 2)
+    logo:SetPoint("BOTTOMRIGHT", cog, "BOTTOMRIGHT", 2, -2)
+    logo:SetScript("OnEnter", function(s)
+        GameTooltip:SetOwner(s, "ANCHOR_BOTTOMRIGHT")
+        GameTooltip:SetText("Telegnome")
+        GameTooltip:AddLine("Gnomish Universal Messenger", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    logo:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    local tagline = bar:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    tagline:SetPoint("LEFT", 6, 0)
-    tagline:SetText("Gnomish Universal Messenger")
-
-    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", -5, -5)
+    -- Children of the drag handle, so they sit above it and get their own clicks.
+    local close = S.IconButton(bar, S.CLOSE, 26, 12)
+    close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -12, -11)
     close:SetScript("OnClick", function() f:Hide() end)
+    S.Tooltip(close, "Close", "Escape closes the window too.")
 
-    -- Labelled button with a wrench, so it can't be mistaken for the decorative cogs.
-    local settingsBtn = S.Button(bar, "Settings", 100, 22)
-    settingsBtn:SetPoint("RIGHT", -34, 0)
-    -- The label moves right a little so the wrench and the text sit centred together, clear of the edge.
-    settingsBtn.fs:ClearAllPoints()
-    settingsBtn.fs:SetPoint("CENTER", 9, 0)
-    local wrench = settingsBtn:CreateTexture(nil, "OVERLAY")
-    wrench:SetSize(15, 15)
-    wrench:SetPoint("RIGHT", settingsBtn.fs, "LEFT", -4, 0)
-    wrench:SetTexture(S.WRENCH)
+    local settingsBtn = S.IconButton(bar, S.WRENCH, 26, 15)
+    settingsBtn:SetPoint("RIGHT", close, "LEFT", -6, 0)
     settingsBtn:HookScript("OnEnter", function(s)
         GameTooltip:SetOwner(s, "ANCHOR_BOTTOM")
         GameTooltip:SetText("Settings")
-        GameTooltip:AddLine("Notifications, Do not disturb, chat options.", 1, 1, 1, true)
+        GameTooltip:AddLine("Notifications, Do not disturb, window, chat options.", 1, 1, 1, true)
         GameTooltip:AddLine("Shift-click the minimap button also opens this.", 0.7, 0.7, 0.7, true)
         GameTooltip:Show()
     end)
     settingsBtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
     settingsBtn:SetScript("OnClick", function() TG.Settings:Toggle() end)
+    self.settingsBtn = settingsBtn
 
-    local sep = S.Line(f)
-    sep:SetPoint("TOPLEFT", 16, -46)
-    sep:SetPoint("TOPRIGHT", -16, -46)
-
-    -- Tabs
+    -- Tabs: plain labels, an unread badge, and a line under the one you're on.
     self.tabs = {}
-    local prevTab
-    for _, def in ipairs({ { "dm", "Direct messages", 150 }, { "groups", "Group chats", 130 },
-        { "channels", "Followed channels", 160 }, { "requests", "Requests", 120 } }) do
-        local tab = S.Button(f, def[2], def[3], 26)
-        if prevTab then
-            tab:SetPoint("LEFT", prevTab, "RIGHT", 4, 0)
-        else
-            tab:SetPoint("TOPLEFT", 16, -52)
-        end
-        tab.id, tab.baseText = def[1], def[2]
-        -- Clicking a tab always leaves Settings and the other panels, also when it's the tab you're on.
-        tab:SetScript("OnClick", function() UI:CloseOverlays(); UI:SetTab(def[1]) end)
+    self.tabOrder = {}
+    for i, def in ipairs(TABS) do
+        local tab = makeTab(f, def[1], def[2])
         self.tabs[def[1]] = tab
-        prevTab = tab
+        self.tabOrder[i] = tab
     end
+    local sep = S.Line(f)
+    sep:SetPoint("TOPLEFT", 2, -(TOP - 1))
+    sep:SetPoint("TOPRIGHT", -2, -(TOP - 1))
 
-    -- Left panel: New message + contacts
-    local left = S.Panel(f)
-    left:SetPoint("TOPLEFT", 14, -82)
-    left:SetPoint("BOTTOMLEFT", 14, 14)
+    -- Everything below the tabs. Requests and Settings cover all of it.
+    local body = CreateFrame("Frame", nil, f)
+    body:SetPoint("TOPLEFT", 2, -TOP)
+    body:SetPoint("BOTTOMRIGHT", -2, 2)
+    self.body = body
+
+    -- Left: New message + the list
+    local left = S.Strip(f)
+    left:SetPoint("TOPLEFT", 2, -TOP)
+    left:SetPoint("BOTTOMLEFT", 2, 2)
     left:SetWidth(LIST_W)
     if left.SetClipsChildren then left:SetClipsChildren(true) end
     self.left = left
 
+    local vline = f:CreateTexture(nil, "ARTWORK")
+    S.Paint(vline, "line")
+    vline:SetWidth(1)
+    vline:SetPoint("TOPLEFT", left, "TOPRIGHT", 0, 0)
+    vline:SetPoint("BOTTOMLEFT", left, "BOTTOMRIGHT", 0, 0)
+    self.vline = vline
+
     local watermark = S.Cog(left, 160, "BACKGROUND")
     watermark:SetPoint("BOTTOMRIGHT", 50, -50)
-    watermark:SetAlpha(0.07)
+    watermark:SetAlpha(0.05)
 
-    local newBtn = S.Button(left, "+ New message", LIST_W - 12, 24)
-    newBtn:SetPoint("TOP", 0, -6)
+    local newBtn = S.Button(left, "+ New message", LIST_W - 20, 26)
+    newBtn:SetPoint("TOP", 0, -10)
     newBtn:SetScript("OnClick", function()
         if UI.tab == "requests" then
             TG.Requests:TogglePanel()
@@ -197,8 +231,8 @@ function UI:Create()
     self.newBtn = newBtn
 
     local list = CreateFrame("Frame", nil, left)
-    list:SetPoint("TOPLEFT", 4, -36)
-    list:SetPoint("BOTTOMRIGHT", -4, 4)
+    list:SetPoint("TOPLEFT", 6, -44)
+    list:SetPoint("BOTTOMRIGHT", -6, 6)
     list:EnableMouseWheel(true)
     list:SetScript("OnMouseWheel", function(_, delta)
         UI.offset = math.max(0, (UI.offset or 0) - delta)
@@ -213,48 +247,32 @@ function UI:Create()
     empty:SetText("No conversations yet.\nWhispers will show up here.")
     self.emptyText = empty
 
-    -- Right panel: conversation
-    local right = S.Panel(f)
-    right:SetPoint("TOPLEFT", 14 + LIST_W + 6, -82)
-    right:SetPoint("BOTTOMRIGHT", -14, 14)
+    -- Right: the conversation
+    local right = CreateFrame("Frame", nil, f)
+    right:SetPoint("TOPLEFT", 2 + LIST_W + 1, -TOP)
+    right:SetPoint("BOTTOMRIGHT", -2, 2)
     self.right = right
 
-    local clearBtn = S.Button(right, "Clear history", 104, 22)
-    clearBtn:SetPoint("TOPRIGHT", -8, -7)
-    clearBtn:SetScript("OnClick", function()
-        if UI.selected then TG:ConfirmClearHistory(UI.selected) end
-    end)
-    S.Tooltip(clearBtn, "Clear history", "Removes the saved messages in this conversation. The conversation and contact stay.")
-    clearBtn:Hide()
-    self.clearBtn = clearBtn
+    -- The conversation itself sits in its own frame, so it can be hidden while a panel covers it:
+    -- with a see-through window it would otherwise show through the panel.
+    local conv = CreateFrame("Frame", nil, right)
+    conv:SetAllPoints(right)
+    self.conv = conv
 
-    local renameBtn = S.Button(right, "Rename", 70, 22)
-    renameBtn:SetPoint("RIGHT", clearBtn, "LEFT", -4, 0)
-    renameBtn:SetScript("OnClick", function()
-        if UI.selected then TG.Groups:AskRename(UI.selected) end
+    -- More: the conversation's menu (mute, clear history, close...)
+    local moreBtn = S.IconButton(conv, S.DOTS, 24, 16)
+    moreBtn:SetPoint("TOPRIGHT", -12, -11)
+    moreBtn:SetScript("OnClick", function(s)
+        if UI.selected then UI:OpenContactMenu(UI.selected, s) end
     end)
-    S.Tooltip(renameBtn, "Rename group", "Changes the name on your side only.")
-    renameBtn:Hide()
-    self.renameBtn = renameBtn
-
-    -- Groups: who's in the channel right now
-    local whoBtn = S.Button(right, "Online", 64, 22)
-    whoBtn:SetPoint("RIGHT", renameBtn, "LEFT", -4, 0)
-    whoBtn:SetScript("OnClick", function()
-        if UI.selected then TG.Groups:RequestMembers(UI.selected) end
-    end)
-    S.Tooltip(whoBtn, "Who's online", "Lists the members who are in this group chat right now.")
-    whoBtn:Hide()
-    self.whoBtn = whoBtn
+    S.Tooltip(moreBtn, "More", "Mute, clear history, close the conversation and more.")
+    moreBtn:Hide()
+    self.moreBtn = moreBtn
 
     -- Direct messages: favorite star (favorites stay in their own section at the top)
-    local favBtn = CreateFrame("Button", nil, right)
-    favBtn:SetSize(22, 22)
-    favBtn:SetPoint("RIGHT", clearBtn, "LEFT", -6, 0)
-    local star = favBtn:CreateTexture(nil, "ARTWORK")
-    star:SetAllPoints()
-    star:SetTexture(S.STAR)
-    favBtn.star = star
+    local favBtn = S.IconButton(conv, S.STAR, 24, 15)
+    favBtn:SetPoint("RIGHT", moreBtn, "LEFT", -6, 0)
+    favBtn.star = favBtn.icon
     favBtn:SetScript("OnClick", function()
         local th = UI.selected and TG.db.threads[UI.selected]
         if th then TG:SetFavorite(UI.selected, not th.fav) end
@@ -272,7 +290,7 @@ function UI:Create()
     self.favBtn = favBtn
 
     -- Requests: invite to your group
-    local inviteBtn = S.Button(right, "Invite", 64, 22)
+    local inviteBtn = S.Button(conv, "Invite", 64, 24, true)
     inviteBtn:SetPoint("RIGHT", favBtn, "LEFT", -6, 0)
     inviteBtn:SetScript("OnClick", function()
         if UI.selected then TG.Requests:Invite(UI.selected) end
@@ -281,59 +299,72 @@ function UI:Create()
     inviteBtn:Hide()
     self.inviteBtn = inviteBtn
 
-    local headerBtn = CreateFrame("Button", nil, right)
-    headerBtn:SetPoint("TOPLEFT", 10, -6)
-    headerBtn:SetPoint("TOPRIGHT", -200, -6)
-    self.headerBtn = headerBtn
-    headerBtn:SetHeight(24)
+    local renameBtn = S.Button(conv, "Rename", 70, 24)
+    renameBtn:SetPoint("RIGHT", moreBtn, "LEFT", -6, 0)
+    renameBtn:SetScript("OnClick", function()
+        if UI.selected then TG.Groups:AskRename(UI.selected) end
+    end)
+    S.Tooltip(renameBtn, "Rename group", "Changes the name on your side only.")
+    renameBtn:Hide()
+    self.renameBtn = renameBtn
+
+    -- Groups: who's in the channel right now
+    local whoBtn = S.Button(conv, "Online", 64, 24)
+    whoBtn:SetPoint("RIGHT", renameBtn, "LEFT", -6, 0)
+    whoBtn:SetScript("OnClick", function()
+        if UI.selected then TG.Groups:RequestMembers(UI.selected) end
+    end)
+    S.Tooltip(whoBtn, "Who's online", "Lists the members who are in this group chat right now.")
+    whoBtn:Hide()
+    self.whoBtn = whoBtn
+
+    -- Name on top, the details (realm, level, class, invite code) small underneath. Click for the menu.
+    local headerBtn = CreateFrame("Button", nil, conv)
+    headerBtn:SetPoint("TOPLEFT", 14, -6)
+    headerBtn:SetPoint("TOPRIGHT", -120, -6)
+    headerBtn:SetHeight(38)
     headerBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     headerBtn:SetScript("OnClick", function(s)
         if UI.selected then UI:OpenContactMenu(UI.selected, s) end
     end)
-    local header = headerBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-    header:SetPoint("LEFT")
+    self.headerBtn = headerBtn
+    local header = headerBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    header:SetPoint("TOPLEFT", 0, -2)
     header:SetPoint("RIGHT")
     header:SetJustifyH("LEFT")
     header:SetWordWrap(false)
     self.header = header
+    local sub = headerBtn:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    sub:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -3)
+    sub:SetPoint("RIGHT")
+    sub:SetJustifyH("LEFT")
+    sub:SetWordWrap(false)
+    sub:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
+    self.subHeader = sub
 
-    local hsep = S.Line(right)
-    hsep:SetPoint("TOPLEFT", 8, -32)
-    hsep:SetPoint("TOPRIGHT", -8, -32)
+    local hsep = S.Line(conv)
+    hsep:SetPoint("TOPLEFT", 12, -48)
+    hsep:SetPoint("TOPRIGHT", -12, -48)
 
-    local msgs = CreateFrame("ScrollingMessageFrame", nil, right)
-    msgs:SetPoint("TOPLEFT", 10, -38)
-    msgs:SetPoint("BOTTOMRIGHT", -10, 42)
-    msgs:SetFontObject(ChatFontNormal)
-    self.msgs = msgs
-    self:ApplyTextSize()
-    msgs:SetJustifyH("LEFT")
-    msgs:SetFading(false)
-    msgs:SetMaxLines(1000)
-    if msgs.SetIndentedWordWrap then msgs:SetIndentedWordWrap(true) end
-    msgs:SetHyperlinksEnabled(true)
-    msgs:SetScript("OnHyperlinkClick", function(_, link, text, button)
+    local msgs = TG.MessageView.New(conv)
+    msgs.frame:SetPoint("TOPLEFT", 12, -56)
+    msgs.frame:SetPoint("BOTTOMRIGHT", -12, 52)
+    msgs.compact = TG.db.settings.compactChat and true or false
+    msgs.onLink = function(link, text, button)
         local code, name = link:match("^telegnome:join:([^:]+):(.*)$")
         if code then
             TG.Groups:Join(code, name)
         elseif SetItemRef then
             SetItemRef(link, text, button)
         end
-    end)
-    msgs:EnableMouseWheel(true)
-    msgs:SetScript("OnMouseWheel", function(s, delta)
-        if delta > 0 then
-            if IsShiftKeyDown() then s:ScrollToTop() else s:ScrollUp() end
-        else
-            if IsShiftKeyDown() then s:ScrollToBottom() else s:ScrollDown() end
-        end
-    end)
+    end
     self.msgs = msgs
+    self:ApplyTextSize()
 
-    local input = S.EditBox(right)
-    input:SetPoint("BOTTOMLEFT", 8, 8)
-    input:SetPoint("BOTTOMRIGHT", -8, 8)
-    input:SetHeight(26)
+    local input = S.EditBox(conv)
+    input:SetPoint("BOTTOMLEFT", 12, 12)
+    input:SetPoint("BOTTOMRIGHT", -12, 12)
+    input:SetHeight(30)
     input:SetMaxLetters(255)
     if input.SetMaxBytes then input:SetMaxBytes(255) end -- the game's limit is in bytes; a, o with dots take two
     input:SetScript("OnEnterPressed", function(s)
@@ -351,6 +382,19 @@ function UI:Create()
         end
     end)
     self.input = input
+
+    -- Grey hint in the empty message box: who you're writing to, and how to send.
+    local placeholder = input:CreateFontString(nil, "ARTWORK", "GameFontDisable")
+    placeholder:SetPoint("LEFT", 9, 0)
+    placeholder:SetJustifyH("LEFT")
+    self.placeholder = placeholder
+    local sendHint = input:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    sendHint:SetPoint("RIGHT", -9, 0)
+    sendHint:SetText("Enter to send")
+    self.sendHint = sendHint
+    placeholder:SetPoint("RIGHT", sendHint, "LEFT", -8, 0)
+    placeholder:SetWordWrap(false)
+    input:HookScript("OnTextChanged", function() UI:UpdatePlaceholder() end)
 
     -- While the window is open on a conversation, Enter (the "open chat" key) puts the
     -- cursor in Telegnome's message box instead of the game's chat box.
@@ -393,8 +437,8 @@ function UI:Create()
     -- Resize grip
     local grip = CreateFrame("Button", nil, f)
     grip:SetSize(16, 16)
-    grip:SetPoint("BOTTOMRIGHT", -6, 6)
-    grip:SetFrameLevel(right:GetFrameLevel() + 10)
+    grip:SetPoint("BOTTOMRIGHT", -3, 3)
+    grip:SetFrameLevel(right:GetFrameLevel() + 40)
     grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
     grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
     grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
@@ -404,7 +448,10 @@ function UI:Create()
     end)
 
     f:SetScript("OnSizeChanged", function() UI:RefreshList(); TG.Picker:Refresh() end)
-    f:SetScript("OnUpdate", function(_, elapsed) UI:UpdateAlpha(elapsed) end)
+    f:SetScript("OnUpdate", function(_, elapsed)
+        UI:UpdateAlpha(elapsed)
+        UI:UpdateCovered()
+    end)
     f:SetScript("OnShow", function() UI:OnShow() end)
     f:SetScript("OnHide", function()
         TG.Picker:Close(); TG.Settings:Close(); TG.Groups:ClosePanel(); TG.Channels:ClosePanel(); TG.ChannelList:Close(); TG.Requests:ClosePanel()
@@ -412,6 +459,34 @@ function UI:Create()
 
     self:RestorePos()
     self:UpdateTitle()
+end
+
+-- Hides whatever a panel is covering, and shows where you are: while Settings is open its button is lit
+-- and no tab is marked.
+function UI:UpdateCovered()
+    local settings = TG.Settings:IsShown() and true or false
+    local whole = settings or TG.Requests:IsPanelShown() or false          -- these cover the list too
+    local convCovered = whole or TG.Groups:IsPanelShown() or TG.Channels:IsPanelShown()
+        or TG.ChannelList:IsShown() or false
+    local picker = TG.Picker.frame and TG.Picker.frame:IsShown() or false  -- this one covers just the list
+    local state = (settings and 1 or 0) + (whole and 2 or 0) + (convCovered and 4 or 0) + (picker and 8 or 0)
+    if state == self.coveredState then return end
+    self.coveredState = state
+    self.left:SetShown(not whole)
+    self.vline:SetShown(not whole)
+    self.conv:SetShown(not convCovered)
+    self.list:SetShown(not picker)
+    self.settingsBtn:SetLit(settings)
+    self:UpdateTabs()
+end
+
+function UI:UpdatePlaceholder()
+    if not self.placeholder then return end
+    local empty = (self.input:GetText() or "") == ""
+    local th = self.selected and TG.db.threads[self.selected]
+    self.placeholder:SetText(th and ("Message " .. (TG:ThreadDisplay(self.selected)) .. "...") or "")
+    self.placeholder:SetShown(empty)
+    self.sendHint:SetShown(empty and th ~= nil)
 end
 
 function UI:PulseCogs()
@@ -437,7 +512,7 @@ function UI:RestorePos()
     local f = self.frame
     f:ClearAllPoints()
     f:SetPoint(p.point, UIParent, p.relPoint, p.x, p.y)
-    if p.w and p.h then f:SetSize(math.max(p.w, 680), math.max(p.h, 490)) end
+    if p.w and p.h then f:SetSize(math.max(p.w, UI.MIN_W), math.max(p.h, UI.MIN_H)) end
 end
 
 ---------------------------------------------------------------------------
@@ -525,23 +600,86 @@ if Menu and Menu.ModifyMenu then
 end
 
 ---------------------------------------------------------------------------
--- Contact list
+-- Conversation list
 ---------------------------------------------------------------------------
+
+-- One line of the newest message, for under the name.
+function UI.PreviewOf(th)
+    local m = th.msgs and th.msgs[#th.msgs]
+    if not m or type(m.text) ~= "string" then return "" end
+    local text = (m.text:gsub("[\r\n]+", " "))
+    if m.sys then return text end
+    if m.out then return "You: " .. text end
+    if (th.kind == "GROUP" or th.kind == "CHANNEL") and m.from then return m.from .. ": " .. text end
+    return text
+end
+
+-- 09:52 today, a weekday within the last week, a date before that.
+function UI.ShortTime(t)
+    if type(t) ~= "number" then return "" end
+    local now = time()
+    if date("%Y-%m-%d", t) == date("%Y-%m-%d", now) then return date("%H:%M", t) end
+    if now - t < 6 * 86400 then return date("%a", t) end
+    return date("%d %b", t)
+end
 
 function UI:GetRow(i)
     local row = self.rows[i]
     if row then return row end
 
-    row = self:MakeRow(self.list, 0, i)
+    row = CreateFrame("Button", nil, self.list)
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
-    -- Close (x) shown on the selected row
+    -- selected: a rounded tint with a bar in the theme colour on the left
+    local sel = S.Rounded(row, 5)
+    for _, t in ipairs(sel.parts) do S.Paint(t, "hivertex", 0.13) end
+    local bar = row:CreateTexture(nil, "ARTWORK")
+    bar:SetPoint("TOPLEFT", 0, -4)
+    bar:SetPoint("BOTTOMLEFT", 0, 4)
+    bar:SetWidth(3)
+    S.Paint(bar, "hi", 0.95)
+    function row:SetSelected(v)
+        sel:SetShown(v)
+        bar:SetShown(v)
+    end
+    row:SetSelected(false)
+
+    local hl = row:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.05)
+
+    -- a conversation: [dot] name ........ time
+    --                       preview ..... (badge)
+    row.dot = S.Dot(row, 8)
+    row.dot:SetPoint("TOPLEFT", 8, -10)
+
+    row.time = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    row.time:SetPoint("TOPRIGHT", -8, -8)
+    row.time:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
+
+    row.name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    row.name:SetPoint("TOPLEFT", NAME_X, -6)
+    row.name:SetJustifyH("LEFT")
+    row.name:SetWordWrap(false)
+
+    row.preview = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    row.preview:SetPoint("BOTTOMLEFT", NAME_X, 7)
+    row.preview:SetJustifyH("LEFT")
+    row.preview:SetWordWrap(false)
+    row.preview:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
+
+    row.pill = S.Pill(row, 16)
+    row.pill:SetPoint("BOTTOMRIGHT", -8, 5)
+
+    -- Close (x) on the selected row, where the time is on the others
     local x = CreateFrame("Button", nil, row)
-    x:SetSize(14, 14)
-    x:SetPoint("RIGHT", -5, 0)
-    x:SetNormalTexture("Interface\\FriendsFrame\\ClearBroadcastIcon")
-    x:SetAlpha(0.6)
+    x:SetSize(16, 16)
+    x:SetPoint("TOPRIGHT", -6, -5)
+    local xi = S.Icon(x, S.CLOSE, 10)
+    xi:SetPoint("CENTER")
+    xi:SetVertexColor(S.DIM[1], S.DIM[2], S.DIM[3])
     x:SetScript("OnEnter", function(s)
-        s:SetAlpha(1)
+        xi:SetVertexColor(1, 0.91, 0.69)
         GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
         if UI.tab == "groups" then
             GameTooltip:SetText("Leave group")
@@ -550,11 +688,14 @@ function UI:GetRow(i)
         else
             GameTooltip:SetText("Close conversation")
             GameTooltip:AddLine("Closing removes the saved history; the contact stays in New message. "
-                .. "Use Clear history to keep the conversation open.", 0.8, 0.8, 0.8, true)
+                .. "Clear history (in the ... menu) keeps the conversation open.", 0.8, 0.8, 0.8, true)
         end
         GameTooltip:Show()
     end)
-    x:SetScript("OnLeave", function(s) s:SetAlpha(0.6); GameTooltip:Hide() end)
+    x:SetScript("OnLeave", function()
+        xi:SetVertexColor(S.DIM[1], S.DIM[2], S.DIM[3])
+        GameTooltip:Hide()
+    end)
     x:SetScript("OnClick", function()
         local th = row.key and TG.db.threads[row.key]
         if not th then return end
@@ -568,15 +709,39 @@ function UI:GetRow(i)
     end)
     row.close = x
 
-    -- "Close all" on the Others header
-    local closeAll = S.Button(row, "Close all", 62, 18)
-    closeAll:SetPoint("RIGHT", -3, 0)
-    closeAll.fs:SetFontObject("GameFontNormalSmall")
+    -- a section header: [v] FAVORITES 2 ------------- (badge)
+    row.chevDown = S.Icon(row, S.CHEV_DOWN, 10)
+    row.chevDown:SetPoint("LEFT", 5, 0)
+    row.chevDown:SetVertexColor(S.DIM[1], S.DIM[2], S.DIM[3])
+    row.chevRight = S.Icon(row, S.CHEV_RIGHT, 10)
+    row.chevRight:SetPoint("LEFT", 5, 0)
+    row.chevRight:SetVertexColor(S.DIM[1], S.DIM[2], S.DIM[3])
+    row.caption = S.Caption(row, "")
+    row.caption:SetPoint("LEFT", NAME_X - 2, 0)
+    row.rule = row:CreateTexture(nil, "ARTWORK")
+    row.rule:SetHeight(1)
+    S.Paint(row.rule, "line")
+    row.headPill = S.Pill(row, 16)
+    row.headPill:SetPoint("RIGHT", -6, 0)
+
+    -- "Close all" on the Others header, while the mouse is over it
+    local closeAll = S.Link(row, "Close all")
+    closeAll:SetPoint("RIGHT", -6, 0)
     closeAll:SetScript("OnClick", function() TG:ConfirmCloseOthers() end)
     S.Tooltip(closeAll, "Close all", "Closes every conversation under Others and forgets those contacts. "
         .. "Favorites and friends are not touched.")
     closeAll:Hide()
     row.closeAll = closeAll
+    local function hover()
+        if row.header ~= "others" then return end
+        local over = row:IsMouseOver() and true or false
+        closeAll:SetShown(over)
+        row.headPill:SetShown(not over and (row.headUnread or 0) > 0)
+        UI:LayoutHeaderRule(row)
+    end
+    row:HookScript("OnEnter", hover)
+    row:HookScript("OnLeave", hover)
+    closeAll:HookScript("OnLeave", hover)
 
     row:SetScript("OnClick", function(s, button)
         if s.header then
@@ -588,11 +753,7 @@ function UI:GetRow(i)
         if button == "RightButton" then
             UI:OpenContactMenu(s.key, s)
         else
-            TG.Settings:Close()
-            TG.Groups:ClosePanel()
-            TG.Channels:ClosePanel()
-            TG.ChannelList:Close()
-            TG.Requests:ClosePanel()
+            UI:CloseOverlays()
             UI:Select(s.key)
             UI.input:SetFocus()
         end
@@ -600,6 +761,58 @@ function UI:GetRow(i)
 
     self.rows[i] = row
     return row
+end
+
+-- The thin line of a section header runs from the label to whatever sits on the right.
+function UI:LayoutHeaderRule(row)
+    local reserve = 6
+    if row.closeAll:IsShown() then
+        reserve = reserve + num(row.closeAll:GetWidth(), 50) + 6
+    elseif row.headPill:IsShown() then
+        reserve = reserve + num(row.headPill:GetWidth(), 16) + 6
+    end
+    row.rule:ClearAllPoints()
+    row.rule:SetPoint("LEFT", row.caption, "RIGHT", 8, 0)
+    row.rule:SetPoint("RIGHT", row, "RIGHT", -reserve, 0)
+end
+
+local function showHeader(row, e)
+    row.key = nil
+    row.headUnread = e.unread
+    row.dot:Hide(); row.name:Hide(); row.time:Hide(); row.preview:Hide(); row.pill:Hide(); row.close:Hide()
+    row:SetSelected(false)
+    row.chevDown:SetShown(not e.collapsed)
+    row.chevRight:SetShown(e.collapsed)
+    row.caption:Show()
+    row.caption:SetText(("%s  |cff8a7a5c%d|r"):format(e.label:upper(), e.count))
+    row.rule:Show()
+    local over = e.header == "others" and row:IsMouseOver() and true or false
+    row.closeAll:SetShown(over)
+    row.headPill:SetCount(over and 0 or e.unread)
+    UI:LayoutHeaderRule(row)
+end
+
+local function showChat(row, key, selected, width)
+    local th = TG.db.threads[key]
+    row.key, row.headUnread = key, nil
+    row.chevDown:Hide(); row.chevRight:Hide(); row.caption:Hide(); row.rule:Hide(); row.headPill:Hide(); row.closeAll:Hide()
+    local name, color, online = TG:ThreadDisplay(key)
+    UI.SetRowContact(row, name, color, online)
+    if th.muted then row.name:SetText(name .. " |cff888888(muted)|r") end
+    row.name:Show()
+
+    local last = th.msgs[#th.msgs]
+    row.time:SetText(last and UI.ShortTime(last.t) or "")
+    row.time:SetShown(not selected)
+    row.close:SetShown(selected)
+    row.name:SetWidth(math.max(40, width - NAME_X - 8 - (selected and 18 or num(row.time:GetStringWidth(), 30) + 6)))
+
+    local unread = th.unread or 0
+    row.pill:SetCount(selected and 0 or unread)
+    row.preview:SetText(UI.PreviewOf(th))
+    row.preview:Show()
+    row.preview:SetWidth(math.max(40, width - NAME_X - 8 - (row.pill:IsShown() and num(row.pill:GetWidth(), 16) + 6 or 0)))
+    row:SetSelected(selected)
 end
 
 function UI.TabOf(th)
@@ -625,9 +838,6 @@ local SECTIONS = {
     { id = "friends", label = "Friends" },
     { id = "others", label = "Others" },
 }
--- Plain signs in the header's own colour (the game's red plus/minus buttons looked like "delete").
-local PLUS = "+ "
-local MINUS = "- "
 
 -- What the list shows, top to bottom: { key = ... } rows and, on the Direct messages tab,
 -- { header = id, ... } rows for Favorites / Friends / Others (newest first inside each).
@@ -665,56 +875,49 @@ end
 
 function UI:RefreshList()
     if not self.frame or not self.frame:IsShown() then return end
-    local keys = self:BuildEntries()
-    local visible = math.max(1, math.floor((self.list:GetHeight() or 0) / ROW_H))
-    self.offset = math.min(self.offset or 0, math.max(0, #keys - visible))
+    local entries = self:BuildEntries()
+    local listH = math.max(ROW_H, num(self.list:GetHeight(), 300))
+    local width = math.max(120, num(self.list:GetWidth(), LIST_W - 12))
+    local function heightOf(e) return e.header and HEAD_H or ROW_H end
+
+    -- don't scroll past the point where the last entries fill the list
+    local fit, maxOffset = 0, #entries
+    for i = #entries, 1, -1 do
+        fit = fit + heightOf(entries[i])
+        if fit > listH then break end
+        maxOffset = i - 1
+    end
+    self.offset = math.max(0, math.min(self.offset or 0, maxOffset))
+
     local empties = {
         dm = "No conversations yet.\nWhispers will show up here.",
         groups = "No group chats yet.\nClick + New group to create\none or join with a code.",
         channels = "No followed channels yet.\nClick + Follow channel to\npick guild, party, Trade...",
     }
     self.emptyText:SetText(empties[self.tab] or "")
-    self.emptyText:SetShown(#keys == 0)
+    self.emptyText:SetShown(#entries == 0)
 
-    for i = 1, visible do
-        local row = self:GetRow(i)
-        local e = keys[i + self.offset]
-        local key = e and e.key
-        row.header = e and e.header or nil
-        row.closeAll:SetShown(e ~= nil and e.header == "others")
-        if e and e.header then
-            row.key = nil
-            row.dot:Hide()
-            if e.header == "others" then
-                -- The unread count goes before the number of chats so the "Close all" button can't cover it.
-                row.name:SetText(("%s%s%s |cff8a7a5c(%d)|r"):format(e.collapsed and PLUS or MINUS, e.label,
-                    e.unread > 0 and (" |cffff5555" .. e.unread .. "|r") or "", e.count))
-            else
-                row.name:SetText(("%s%s |cff8a7a5c(%d)|r%s"):format(e.collapsed and PLUS or MINUS, e.label, e.count,
-                    e.unread > 0 and ("  |cffff5555" .. e.unread .. "|r") or ""))
-            end
-            row.name:SetTextColor(0.85, 0.7, 0.4)
-            row.right:SetText("")
-            row:SetSelected(false)
-            row.close:Hide()
-            row:Show()
-        elseif key then
-            local th = TG.db.threads[key]
-            UI.SetRowContact(row, TG:ThreadDisplay(key))
-            if th.muted then row.name:SetText((TG:ThreadDisplay(key)) .. " |cff888888(muted)|r") end
-            row.key = key
-            local selected = key == self.selected
-            local unread = th.unread or 0
-            row.right:SetText((unread > 0 and not selected) and ("|cffff5555" .. unread .. "|r") or "")
-            row:SetSelected(selected)
-            row.close:SetShown(selected)
-            row:Show()
+    local y, used = 0, 0
+    for idx = self.offset + 1, #entries do
+        local e = entries[idx]
+        local h = heightOf(e)
+        if y + h > listH then break end
+        used = used + 1
+        local row = self:GetRow(used)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", self.list, "TOPLEFT", 0, -y)
+        row:SetPoint("TOPRIGHT", self.list, "TOPRIGHT", 0, -y)
+        row:SetHeight(h)
+        row.header = e.header or nil
+        if e.header then
+            showHeader(row, e)
         else
-            row.key = nil
-            row:Hide()
+            showChat(row, e.key, e.key == self.selected, width)
         end
+        row:Show()
+        y = y + h
     end
-    for i = visible + 1, #self.rows do
+    for i = used + 1, #self.rows do
         self.rows[i].key = nil
         self.rows[i].header = nil
         self.rows[i]:Hide()
@@ -729,13 +932,13 @@ end
 
 -- Buttons to the right of the conversation's name.
 function UI:UpdateHeaderButtons(th)
-    local isGroup = th and th.kind == "GROUP"
-    local isDM = th and (th.kind == "WHISPER" or th.kind == "BN")
-    self.clearBtn:SetShown(th ~= nil)
-    self.renameBtn:SetShown(isGroup or false)
-    self.whoBtn:SetShown(isGroup or false)
-    self.favBtn:SetShown(isDM or false)
+    local isGroup = th and th.kind == "GROUP" or false
+    local isDM = th and (th.kind == "WHISPER" or th.kind == "BN") or false
     local isReq = th and th.req and true or false
+    self.moreBtn:SetShown(th ~= nil)
+    self.renameBtn:SetShown(isGroup)
+    self.whoBtn:SetShown(isGroup)
+    self.favBtn:SetShown(isDM)
     self.inviteBtn:SetShown(isReq)
     if isDM then
         if th.fav then
@@ -743,10 +946,11 @@ function UI:UpdateHeaderButtons(th)
             self.favBtn.star:SetAlpha(1)
         else
             self.favBtn.star:SetVertexColor(0.6, 0.6, 0.6)
-            self.favBtn.star:SetAlpha(0.45)
+            self.favBtn.star:SetAlpha(0.55)
         end
     end
-    self.headerBtn:SetPoint("TOPRIGHT", -(isGroup and 262 or isReq and 218 or isDM and 148 or 120), -6)
+    -- the name gets whatever the buttons leave
+    self.headerBtn:SetPoint("TOPRIGHT", -(isGroup and 196 or isReq and 148 or isDM and 78 or 48), -6)
 end
 
 -- Closes whatever panel is open over the conversation.
@@ -762,7 +966,7 @@ end
 -- A passing note in the open conversation (not saved), e.g. who is online in a group.
 function UI:ShowNote(key, text)
     if not self.frame or not self.frame:IsShown() or self.selected ~= key then return false end
-    self.msgs:AddMessage(text, 0.55, 0.75, 0.55)
+    self.msgs:AddNote(text, 0.55, 0.75, 0.55)
     return true
 end
 
@@ -781,17 +985,21 @@ function UI:UpdateTabs()
         self:SetTab("dm")
         return
     end
-    for id, tab in pairs(self.tabs) do
-        local n = counts[id]
-        tab:SetText(n > 0 and ("%s |cffff5555(%d)|r"):format(tab.baseText, n) or tab.baseText)
-        local r, g, b, border = S.TabColors(id == self.tab)
-        tab:SetBackdropColor(r, g, b, 1)
-        tab:SetBackdropBorderColor(border[1], border[2], border[3], 1)
-        if id == self.tab then
-            tab.fs:SetTextColor(1, 0.82, 0)
+    local prev
+    for _, tab in ipairs(self.tabOrder or {}) do
+        local on = tab.id == self.tab and not (TG.Settings and TG.Settings:IsShown())
+        tab.pill:SetCount(counts[tab.id])
+        tab.under:SetShown(on)
+        if on then tab.fs:SetTextColor(1, 0.82, 0) else tab.fs:SetTextColor(0.72, 0.66, 0.53) end
+        tab:SetWidth(num(tab.fs:GetStringWidth(), 90) + 4
+            + (tab.pill:IsShown() and num(tab.pill:GetWidth(), 16) + 6 or 0))
+        tab:ClearAllPoints()
+        if prev then
+            tab:SetPoint("LEFT", prev, "RIGHT", 22, 0)
         else
-            tab.fs:SetTextColor(0.65, 0.6, 0.5)
+            tab:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 18, -(TOP - 29))
         end
+        prev = tab
     end
 end
 
@@ -829,13 +1037,12 @@ function UI:SetTab(tab)
     if tab == "requests" then TG.Requests:OpenPanel(true) end -- start on the overview
 end
 
+-- The window's name. Unread counts are on the tabs, so there is none here.
 function UI:UpdateTitle()
     self:UpdateTabs()
     if not self.title then return end
     local text = TG.Slay and TG.Slay:IsOn() and TG.Slay.Text("Telegnome") or "Telegnome"
-    local n = TG:TotalUnread()
-    if n > 0 then text = text .. (" |cffff5555(%d)|r"):format(n) end
-    if TG.db.settings.dnd then text = text .. " |cffff9944DND|r" end
+    if TG.db.settings.dnd then text = text .. "  |cffff9944Do not disturb|r" end
     self.title:SetText(text)
 end
 
@@ -847,41 +1054,61 @@ function UI.YouColor()
     return TG.Slay and TG.Slay:IsOn() and "|cffff69b4" or "|cffaaaaaa"
 end
 
+local YOU = { 0.96, 0.82, 0.48 }
+local YOU_SLAY = { 1, 0.41, 0.71 }
+local OTHER = { 0.9, 0.9, 0.9 }
+
 function UI:RenderMessage(th, m, name, color)
+    local view = self.msgs
     local day = date("%Y-%m-%d", m.t)
     if day ~= self.lastDay then
         self.lastDay = day
-        self.msgs:AddMessage(date("- %A %d %B -", m.t), 0.55, 0.47, 0.32)
+        view:AddDivider(date("%A %d %B", m.t))
     end
-    local ts = date("%H:%M", m.t)
     if m.sys then
-        self.msgs:AddMessage(("|cff777777%s|r %s"):format(ts, m.text), 0.55, 0.47, 0.32)
+        view:AddNote(("%s  %s"):format(date("%H:%M", m.t), m.text), nil, nil, nil, true)
+        return
+    end
+    if m.out then
+        view:AddMessage({ sender = "\1me", who = "You", out = true, t = m.t, text = m.text,
+            color = TG.Slay and TG.Slay:IsOn() and YOU_SLAY or YOU })
         return
     end
     if th.kind == "GROUP" or th.kind == "CHANNEL" then
-        local r, g, b = chatColor(th.kind == "GROUP" and "CHANNEL" or TG.Channels.ColorKey(th))
-        if m.out then
-            self.msgs:AddMessage(("|cff777777%s|r %sYou:|r %s"):format(ts, UI.YouColor(), m.text), r, g, b)
-        else
-            local c = m.cls and RAID_CLASS_COLORS and RAID_CLASS_COLORS[m.cls]
-            local who = c and { c.r, c.g, c.b } or { 0.9, 0.9, 0.9 }
-            self.msgs:AddMessage(("|cff777777%s|r %s|cff%s%s:|r %s"):format(ts, m.hl and "|cffffd100>>|r " or "",
-                hex(who), m.from or "?", m.text), r, g, b)
-        end
+        local c = m.cls and RAID_CLASS_COLORS and RAID_CLASS_COLORS[m.cls]
+        view:AddMessage({ sender = m.from or "?", who = m.from or "?", t = m.t,
+            color = c and { c.r, c.g, c.b } or OTHER,
+            text = (m.hl and "|cffffd100>>|r " or "") .. m.text })
         return
     end
-    local isBN = th.kind == "BN"
-    if m.out then
-        local r, g, b = chatColor(isBN and "BN_WHISPER_INFORM" or "WHISPER_INFORM")
-        self.msgs:AddMessage(("|cff777777%s|r %sYou:|r %s"):format(ts, UI.YouColor(), m.text), r, g, b)
-    else
-        local r, g, b = chatColor(isBN and "BN_WHISPER" or "WHISPER")
-        self.msgs:AddMessage(("|cff777777%s|r |cff%s%s:|r %s"):format(ts, hex(color), name, m.text), r, g, b)
-        local code, gname = TG.Groups.ParseInvite(m.text)
-        if code then
-            self.msgs:AddMessage(("      |Htelegnome:join:%s:%s|h|cffffd100[Join %s]|r|h"):format(code, gname or "", gname or "group"))
+    local text = m.text
+    local code, gname = TG.Groups.ParseInvite(m.text)
+    if code then
+        text = text .. ("\n|Htelegnome:join:%s:%s|h|cffffd100[Join %s]|r|h"):format(code, gname or "", gname or "group")
+    end
+    view:AddMessage({ sender = "\1them", who = name, color = color, t = m.t, text = text })
+end
+
+-- The small line under the name.
+local function subLine(th)
+    local parts = {}
+    if th.kind == "GROUP" then
+        parts[1] = th.code and ("Code: " .. th.code) or "Invite code unknown"
+    elseif th.kind == "CHANNEL" then
+        parts[1] = "Followed channel"
+    elseif th.kind == "BN" then
+        parts[1] = th.battleTag or "Battle.net"
+    elseif th.kind == "WHISPER" then
+        local realm = type(th.name) == "string" and th.name:match("%-(.+)$")
+        if realm then parts[#parts + 1] = realm end
+        if th.level or th.class then
+            local class = th.class and ((LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[th.class]) or th.class)
+            parts[#parts + 1] = (th.level and ("Level " .. th.level) or "") .. (th.level and class and " " or "")
+                .. (class or "")
         end
     end
+    if th.muted then parts[#parts + 1] = "Muted" end
+    return table.concat(parts, "  \194\183  ")
 end
 
 function UI:Select(key)
@@ -898,32 +1125,31 @@ function UI:Select(key)
     th.unread = 0
 
     local name, color = TG:ThreadDisplay(key)
-    local sub = ""
-    if th.kind == "GROUP" then
-        sub = th.code and ("  |cff777777code: " .. th.code .. "|r") or "  |cff777777invite code unknown|r"
-    elseif th.kind == "BN" and th.battleTag then
-        sub = "  |cff777777" .. th.battleTag .. "|r"
-    elseif th.kind == "WHISPER" and th.name and th.name:find("-", 1, true) then
-        sub = "  |cff777777" .. th.name .. "|r"
-    end
-    self.header:SetText(("|cff%s%s|r%s"):format(hex(color), name, sub))
+    self.header:SetText(name)
+    self.header:SetTextColor(color[1], color[2], color[3])
+    self.subHeader:SetText(subLine(th))
     self:UpdateHeaderButtons(th)
 
-    self.msgs:Clear()
+    local view = self.msgs
+    view:Clear()
     self.lastDay = nil
+    view:Begin()
     if #th.msgs == 0 then
-        self.msgs:AddMessage("New conversation - type below and press Enter.", 0.55, 0.47, 0.32)
+        view:AddNote("New conversation - type below and press Enter.", nil, nil, nil, true)
     end
     for _, m in ipairs(th.msgs) do self:RenderMessage(th, m, name, color) end
-    self.msgs:ScrollToBottom()
+    view:End()
 
+    self:UpdatePlaceholder()
     self:RefreshList()
     TG:RefreshUnread()
 end
 
 function UI:ShowEmpty()
     self.selected = nil
-    self.header:SetText("|cff777777No conversation selected|r")
+    self.header:SetText("No conversation selected")
+    self.header:SetTextColor(0.47, 0.47, 0.47)
+    self.subHeader:SetText("")
     self:UpdateHeaderButtons(nil)
     self.msgs:Clear()
     self.lastDay = nil
@@ -932,7 +1158,8 @@ function UI:ShowEmpty()
         groups = "Click + New group to create a group chat or join one with an invite code.",
         channels = "Click + Follow channel to bring guild, party or other channels into Telegnome.",
     }
-    self.msgs:AddMessage(hints[self.tab] or "", 0.55, 0.47, 0.32)
+    self.msgs:AddNote(hints[self.tab] or "", nil, nil, nil, true)
+    self:UpdatePlaceholder()
 end
 
 ---------------------------------------------------------------------------
@@ -991,6 +1218,13 @@ end
 -- Public
 ---------------------------------------------------------------------------
 
+-- Bubbles or compact lines (Settings > Window).
+function UI:ApplyChatStyle()
+    if not self.msgs then return end
+    self.msgs.compact = TG.db.settings.compactChat and true or false
+    if self.selected and TG.db.threads[self.selected] then self:Select(self.selected) end
+end
+
 -- Message text size (Settings > Window): the chat font, two points smaller or larger.
 local TEXT_SIZES = { small = -2, normal = 0, large = 2 }
 
@@ -999,7 +1233,7 @@ function UI:ApplyTextSize()
     local path, size, flags = ChatFontNormal:GetFont()
     if type(path) ~= "string" or type(size) ~= "number" then return end
     local delta = TEXT_SIZES[TG.db and TG.db.settings.textSize or "normal"] or 0
-    self.msgs:SetFont(path, math.max(8, math.floor(size + 0.5) + delta), flags or "")
+    self.msgs:SetBodyFont(path, math.max(8, math.floor(size + 0.5) + delta), flags or "")
 end
 
 -- Main window opacity (Settings > Window). The notifier and minimap button aren't affected.

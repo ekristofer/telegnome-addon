@@ -115,7 +115,7 @@ Under the game's **Options > Keybindings > AddOns > Telegnome** you can set keys
 
 ### Clearing history
 
-In a conversation, **Clear history** empties it but keeps the conversation. The × on a conversation closes it and removes its history.
+In a conversation, **Clear history** (in the **...** menu next to the name, or right-click the conversation) empties it but keeps the conversation. The × on a conversation closes it and removes its history.
 
 ## Known limits
 
@@ -148,7 +148,7 @@ It's a plain text file - anyone with access to your computer can read it, like t
 
 **Removing it**
 
-- One conversation's messages: **Clear history** in that conversation.
+- One conversation's messages: **Clear history** in that conversation's **...** menu.
 - A person: right-click them in **+ New message** > **Forget contact**.
 - All messages at once: **Settings > Your data > Delete all messages**.
 - Everything, settings included: delete the file above while the game is closed.

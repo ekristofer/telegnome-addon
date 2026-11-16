@@ -9,7 +9,8 @@ local UI = TG.UI
 local R = { rows = {}, offset = 0 }
 TG.Requests = R
 
-local ROW_H = 54
+local ROW_H = 54     -- a request card
+local PITCH = 60     -- from one card to the next
 
 ---------------------------------------------------------------------------
 -- When is it collecting?
@@ -469,56 +470,77 @@ local function lastIncoming(th)
 end
 
 local function createRow(parent, i)
-    local row = CreateFrame("Button", nil, parent)
+    -- a card: name, level, class on top; the message underneath; the buttons on the right
+    local row = CreateFrame("Button", nil, parent, "BackdropTemplate")
     row:SetHeight(ROW_H)
-    row:SetPoint("TOPLEFT", 0, -(i - 1) * ROW_H)
+    row:SetPoint("TOPLEFT", 0, -(i - 1) * PITCH)
     row:SetPoint("RIGHT", 0, 0)
-
-    local bg = row:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(1, 1, 1, (i % 2 == 0) and 0.04 or 0)
+    S.Flat(row)
+    S.Paint(row, "card")
     local hl = row:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetAllPoints()
-    S.Paint(hl, "hi", 0.08)
+    hl:SetPoint("TOPLEFT", 1, -1)
+    hl:SetPoint("BOTTOMRIGHT", -1, 1)
+    S.Paint(hl, "hi", 0.06)
 
-    row.dismiss = S.Button(row, "x", 22, 22)
-    row.dismiss:SetPoint("BOTTOMRIGHT", -6, 5) -- buttons sit on the message line; the top line is name, level, class
-    row.dismiss:SetScript("OnClick", function() if row.key then R:Dismiss(row.key) end end)
-    S.Tooltip(row.dismiss, "Dismiss", "Closes this request and forgets the contact.")
+    local dismiss = CreateFrame("Button", nil, row)
+    dismiss:SetSize(20, 20)
+    dismiss:SetPoint("RIGHT", -8, 0)
+    local xi = S.Icon(dismiss, S.CLOSE, 10)
+    xi:SetPoint("CENTER")
+    xi:SetVertexColor(S.DIM[1], S.DIM[2], S.DIM[3])
+    dismiss:HookScript("OnEnter", function() xi:SetVertexColor(1, 0.91, 0.69) end)
+    dismiss:HookScript("OnLeave", function() xi:SetVertexColor(S.DIM[1], S.DIM[2], S.DIM[3]) end)
+    dismiss:SetScript("OnClick", function() if row.key then R:Dismiss(row.key) end end)
+    S.Tooltip(dismiss, "Dismiss", "Closes this request and forgets the contact.")
+    row.dismiss = dismiss
 
-    row.invite = S.Button(row, "Invite", 64, 22)
-    row.invite:SetPoint("RIGHT", row.dismiss, "LEFT", -6, 0)
+    row.invite = S.Button(row, "Invite", 64, 24, true)
+    row.invite:SetPoint("RIGHT", dismiss, "LEFT", -8, 0)
     row.invite:SetScript("OnClick", function() if row.key then R:Invite(row.key) end end)
 
-    row.lookup = S.Button(row, "Check", 56, 22)
-    row.lookup:SetPoint("RIGHT", row.invite, "LEFT", -6, 0)
+    row.reply = S.Button(row, "Reply", 56, 24)
+    row.reply:SetPoint("RIGHT", row.invite, "LEFT", -6, 0)
+    row.reply:SetScript("OnClick", function(b) if row.key then R:OpenReplyMenu(row.key, b) end end)
+    S.Tooltip(row.reply, "Quick reply", "One-click answers, and \"Decline\" to send your decline message and "
+        .. "dismiss the request. Edit them in Settings.")
+
+    row.lookup = S.Button(row, "Check", 56, 24)
+    row.lookup:SetPoint("RIGHT", row.reply, "LEFT", -6, 0)
     row.lookup:SetScript("OnClick", function() if row.key then R:LookUp(row.key) end end)
     S.Tooltip(row.lookup, "Check level", "Asks the game for this player's level and class (like /who). Use it when "
         .. "the level is missing or looks wrong. The game only answers every few seconds: the button counts "
         .. "down until you can ask again.")
 
-    row.reply = S.Button(row, "Reply", 56, 22)
-    row.reply:SetPoint("RIGHT", row.lookup, "LEFT", -6, 0)
-    row.reply:SetScript("OnClick", function(b) if row.key then R:OpenReplyMenu(row.key, b) end end)
-    S.Tooltip(row.reply, "Quick reply", "One-click answers, and \"Decline\" to send your decline message and "
-        .. "dismiss the request. Edit them in Settings.")
+    -- "Invited" / "In group", in place of the buttons that no longer apply
+    row.state = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.state:SetTextColor(0.5, 0.83, 0.58)
 
     row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    row.name:SetPoint("TOPLEFT", 10, -6)
+    row.name:SetPoint("TOPLEFT", 12, -9)
     row.name:SetJustifyH("LEFT")
 
-    row.info = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    row.info:SetPoint("LEFT", row.name, "RIGHT", 10, 0)
-    row.info:SetPoint("RIGHT", row, "RIGHT", -8, 0)
-    row.info:SetJustifyH("LEFT")
-    row.info:SetWordWrap(false)
+    row.level = S.Pill(row, 16)
+    row.level:SetPoint("LEFT", row.name, "RIGHT", 8, 0)
+    row.level.fs:SetTextColor(1, 0.82, 0)
+    S.Paint(row.level.parts[1], "shadetex", 2.3)
+    S.Paint(row.level.parts[2], "shadetex", 2.3)
+    S.Paint(row.level.parts[3], "shadetex", 2.3)
+
+    row.class = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.class:SetPoint("LEFT", row.level, "RIGHT", 6, 0)
+
+    row.extra = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    row.extra:SetPoint("LEFT", row.class, "RIGHT", 8, 0)
+    row.extra:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
+
+    row.unread = S.Pill(row, 16)
+    row.unread:SetPoint("LEFT", row.extra, "RIGHT", 8, 0)
 
     row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row.text:SetPoint("BOTTOMLEFT", 10, 10)
-    row.text:SetPoint("RIGHT", row.reply, "LEFT", -8, 0)
+    row.text:SetPoint("BOTTOMLEFT", 12, 10)
     row.text:SetJustifyH("LEFT")
     row.text:SetWordWrap(false)
-    row.text:SetTextColor(0.85, 0.82, 0.75)
+    row.text:SetTextColor(0.81, 0.76, 0.66)
 
     row:SetScript("OnClick", function(s)
         if not s.key then return end
@@ -533,63 +555,20 @@ function R:Create()
     if self.panel then return end
     UI:Create()
 
+    -- covers the list and the conversation: the overview has the whole width
     local f = CreateFrame("Frame", nil, UI.right, "BackdropTemplate")
-    f:SetAllPoints(UI.right)
+    f:SetAllPoints(UI.body)
     f:SetFrameLevel(UI.right:GetFrameLevel() + 30)
-    S.Inset(f)
-    S.Solid(f)
+    S.Flat(f)
+    S.Paint(f, "cover")
     f:EnableMouse(true)
     f:EnableMouseWheel(true)
     f:Hide()
     self.panel = f
 
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 14, -10)
-    title:SetText("Requests")
-    local cog = S.Cog(f, 18)
-    cog:SetPoint("LEFT", title, "RIGHT", 6, 0)
-    local line = S.Line(f)
-    line:SetPoint("TOPLEFT", 8, -34)
-    line:SetPoint("TOPRIGHT", -8, -34)
-
-    local status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    status:SetPoint("TOPLEFT", 14, -42)
-    status:SetPoint("RIGHT", -14, 0)
-    status:SetJustifyH("LEFT")
-    self.status = status
-
-    local list = CreateFrame("Frame", nil, f)
-    list:SetPoint("TOPLEFT", 8, -62)
-    list:SetPoint("BOTTOMRIGHT", -8, 42)
-    if list.SetClipsChildren then list:SetClipsChildren(true) end
-    self.list = list
-    f:SetScript("OnMouseWheel", function(_, delta)
-        R.offset = math.max(0, (R.offset or 0) - delta)
-        R:Refresh()
-    end)
-    f:SetScript("OnSizeChanged", function() R:Refresh() end)
-
-    local empty = list:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-    empty:SetPoint("TOPLEFT", 8, -10)
-    empty:SetPoint("RIGHT", -8, 0)
-    empty:SetJustifyH("LEFT")
-    self.empty = empty
-
-    local clear = S.Button(f, "Clear all", 74, 24)
-    clear:SetPoint("BOTTOMLEFT", 10, 10)
-    clear:SetScript("OnClick", function() R:ConfirmClearAll() end)
-    S.Tooltip(clear, "Clear all", "Closes every request and forgets those contacts. Star someone first to keep them.")
-    self.clearBtn = clear
-
-    local decline = S.Button(f, "Decline all", 86, 24)
-    decline:SetPoint("LEFT", clear, "RIGHT", 6, 0)
-    decline:SetScript("OnClick", function() R:ConfirmDeclineAll() end)
-    S.Tooltip(decline, "Decline all", "Sends your decline message to everyone still on the list and takes them off "
-        .. "it. People you invited or who are in your group stay. The message is in Settings > Requests.")
-    self.declineBtn = decline
-
+    -- top: what is being collected, and the switch for it
     local manual = S.Check(f, "Collect whispers")
-    manual:SetPoint("LEFT", decline, "RIGHT", 10, 0)
+    manual:SetPoint("TOPRIGHT", -(S.Num(manual.label:GetStringWidth(), 100) + 16), -10)
     manual:SetScript("OnClick", function(s)
         TG.db.settings.requestsCollect = s:GetChecked() and true or false
         TG:RefreshUnread()
@@ -600,9 +579,69 @@ function R:Create()
         .. "pause that and get them under Direct messages.")
     self.manual = manual
 
-    local done = S.Button(f, "Close", 80, 24)
-    done:SetPoint("BOTTOMRIGHT", -10, 10)
-    done:SetScript("OnClick", function() R:ClosePanel() end)
+    local dot = S.Dot(f, 8)
+    dot:SetPoint("TOPLEFT", 16, -18)
+    self.statusDot = dot
+    local status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    status:SetPoint("LEFT", dot, "RIGHT", 8, 0)
+    status:SetPoint("RIGHT", manual, "LEFT", -12, 0)
+    status:SetJustifyH("LEFT")
+    status:SetWordWrap(false)
+    self.status = status
+
+    local list = CreateFrame("Frame", nil, f)
+    list:SetPoint("TOPLEFT", 14, -42)
+    list:SetPoint("BOTTOMRIGHT", -20, 46)
+
+    -- a thin scroll indicator, shown when there are more requests than fit
+    local track = CreateFrame("Frame", nil, f)
+    track:SetPoint("TOPRIGHT", -9, -42)
+    track:SetPoint("BOTTOMRIGHT", -9, 52)
+    track:SetWidth(4)
+    local trackBg = track:CreateTexture(nil, "BACKGROUND")
+    trackBg:SetAllPoints()
+    trackBg:SetColorTexture(0, 0, 0, 0.35)
+    local thumb = track:CreateTexture(nil, "ARTWORK")
+    thumb:SetWidth(4)
+    S.Paint(thumb, "edgetex", 0.9)
+    track:Hide()
+    self.track, self.thumb = track, thumb
+    if list.SetClipsChildren then list:SetClipsChildren(true) end
+    self.list = list
+    f:SetScript("OnMouseWheel", function(_, delta)
+        R.offset = math.max(0, (R.offset or 0) - delta)
+        R:Refresh()
+    end)
+    f:SetScript("OnSizeChanged", function() R:Refresh() end)
+
+    local empty = list:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+    empty:SetPoint("TOPLEFT", 4, -10)
+    empty:SetPoint("RIGHT", -8, 0)
+    empty:SetJustifyH("LEFT")
+    self.empty = empty
+
+    -- bottom: how many, and the two ways to empty the list
+    local line = S.Line(f)
+    line:SetPoint("BOTTOMLEFT", 14, 42)
+    line:SetPoint("BOTTOMRIGHT", -14, 42)
+
+    local counts = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    counts:SetPoint("BOTTOMLEFT", 16, 16)
+    counts:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
+    self.counts = counts
+
+    local decline = S.Button(f, "Decline all", 90, 24)
+    decline:SetPoint("BOTTOMRIGHT", -30, 9) -- clear of the window's resize corner
+    decline:SetScript("OnClick", function() R:ConfirmDeclineAll() end)
+    S.Tooltip(decline, "Decline all", "Sends your decline message to everyone still on the list and takes them off "
+        .. "it. People you invited or who are in your group stay. The message is in Settings > Requests.")
+    self.declineBtn = decline
+
+    local clear = S.Link(f, "Clear all", "GameFontNormal")
+    clear:SetPoint("RIGHT", decline, "LEFT", -14, 0)
+    clear:SetScript("OnClick", function() R:ConfirmClearAll() end)
+    S.Tooltip(clear, "Clear all", "Closes every request and forgets those contacts. Star someone first to keep them.")
+    self.clearBtn = clear
 end
 
 function R:Refresh()
@@ -622,32 +661,65 @@ function R:Refresh()
     self:FillRows()
 end
 
--- The line under the title: what is being collected - or, right after a Check, its result and the wait.
+-- The line at the top: what is being collected - or, right after a Check, its result and the wait.
 function R:UpdateStatus()
     if not self.status then return end
     local s = TG.db.settings
+    local function set(dot, text)
+        self.statusDot:SetVertexColor(dot[1], dot[2], dot[3])
+        self.status:SetText(text)
+    end
     local left = (self.whoReady or 0) - GetTime()
     if left > 0 then
-        self.status:SetText(("|cffffd100%s|r  Next check in %d s (the game limits look-ups).")
+        set({ 1, 0.82, 0 }, ("|cffffd100%s|r  Next check in %d s (the game limits look-ups).")
             :format(self.checkNote or "", math.ceil(left)))
         return
     end
     local hosting = self:IsHosting() or (TG.Demo and TG.Demo.on) or false -- the samples look like a real listing
     if s.recruiting then
-        self.status:SetText("|cff66dd66Collecting (/tg recruit).|r Whispers from people you don't know land here.")
+        set(S.ONLINE, "Collecting (/tg recruit). Whispers from people you don't know land here.")
     elseif hosting and s.requestsCollect ~= false then
-        self.status:SetText("|cff66dd66You're listed in the group finder.|r Whispers from people you don't know land here.")
+        set(S.ONLINE, "You're listed in the group finder. Whispers from people you don't know land here.")
     elseif hosting then
-        self.status:SetText("|cffffaa33Paused.|r Tick the box below to collect whispers here again.")
+        set({ 1, 0.67, 0.2 }, "Paused. Tick Collect whispers to collect them here again.")
     else
-        self.status:SetText("|cffaaaaaaNot collecting right now.|r It starts by itself when you list in the group finder.")
+        set(S.OFFLINE, "Not collecting right now. It starts by itself when you list in the group finder.")
     end
+end
+
+local function classText(th)
+    local class = th.class and ((LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[th.class]) or th.class)
+    local c = th.class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[th.class]
+    return class or "", c and (c.r or 1) or 0.85, c and (c.g or 1) or 0.82, c and (c.b or 1) or 0.75
+end
+
+local function extraText(th)
+    local extra = {}
+    if ROLE_NAMES[th.role] then extra[#extra + 1] = ROLE_NAMES[th.role] end
+    if th.ilvl then extra[#extra + 1] = ("item level %d"):format(th.ilvl) end
+    if th.applied then extra[#extra + 1] = "applied" end
+    return table.concat(extra, "  \194\183  ")
 end
 
 function R:FillRows()
     local keys = self:Keys()
-    local visible = math.max(1, math.floor((self.list:GetHeight() or 0) / ROW_H))
+    local visible = math.max(1, math.floor((S.Num(self.list:GetHeight(), 300) + (PITCH - ROW_H)) / PITCH))
     self.offset = math.min(self.offset or 0, math.max(0, #keys - visible))
+    if #keys > visible then
+        local trackH = S.Num(self.track:GetHeight(), 200)
+        local h = math.max(20, trackH * visible / #keys)
+        self.thumb:ClearAllPoints()
+        self.thumb:SetPoint("TOP", self.track, "TOP", 0, -(self.offset / (#keys - visible)) * (trackH - h))
+        self.thumb:SetHeight(h)
+        self.track:Show()
+    else
+        self.track:Hide()
+    end
+    local waiting, invited, joined = 0, 0, 0
+    for _, key in ipairs(keys) do
+        local th = TG.db.threads[key]
+        if th.joined then joined = joined + 1 elseif th.invited then invited = invited + 1 else waiting = waiting + 1 end
+    end
     for i = 1, visible do
         local row = self.rows[i] or createRow(self.list, i)
         self.rows[i] = row
@@ -658,20 +730,34 @@ function R:FillRows()
             local name, color = TG:ThreadDisplay(key)
             row.name:SetText(name)
             row.name:SetTextColor(color[1], color[2], color[3])
-            row.info:SetText(R.DescribeColored(th))
+            row.level:SetLabel(th.level and tostring(th.level) or "?")
+            local class, cr, cg, cb = classText(th)
+            row.class:SetText(class)
+            row.class:SetTextColor(cr, cg, cb)
+            row.extra:SetText(extraText(th))
+            row.unread:SetCount(th.unread or 0)
             local m = lastIncoming(th)
-            local unread = (th.unread or 0) > 0 and ("|cffff5555(" .. th.unread .. ")|r ") or ""
-            row.text:SetText(unread .. (m and m.text or ""))
+            row.text:SetText(m and m.text or "")
+
+            -- waiting: Check, Reply, Invite. Invited: the word, and Invite to try again. In group: just the word.
+            local open = not th.joined and not th.invited
+            row.lookup:SetShown(open)
+            row.reply:SetShown(open)
+            row.invite:SetShown(not th.joined)
+            row.state:SetText(th.joined and "In group" or th.invited and "Invited" or "")
+            row.state:ClearAllPoints()
+            local leftmost
             if th.joined then
-                row.invite:SetText("In group")
-                row.invite:SetEnabled(false)
+                row.state:SetPoint("RIGHT", row.dismiss, "LEFT", -10, 0)
+                leftmost = row.state
             elseif th.invited then
-                row.invite:SetText("Invited")
-                row.invite:SetEnabled(true)
+                row.state:SetPoint("RIGHT", row.invite, "LEFT", -10, 0)
+                leftmost = row.state
             else
-                row.invite:SetText("Invite")
-                row.invite:SetEnabled(true)
+                row.state:SetPoint("RIGHT", row.lookup, "LEFT", -10, 0)
+                leftmost = row.lookup
             end
+            row.text:SetPoint("RIGHT", leftmost, "LEFT", -10, 0)
             row:Show()
         else
             row.key = nil
@@ -683,6 +769,8 @@ function R:FillRows()
         self.rows[i]:Hide()
     end
     self:UpdateLookupButtons()
+    self.counts:SetText(("%d waiting  \194\183  %d invited  \194\183  %d in group"):format(waiting, invited, joined))
+    self.counts:SetShown(#keys > 0)
     self.declineBtn:SetEnabled(#self:OpenKeys() > 0)
     self.empty:SetShown(#keys == 0)
     self.empty:SetText(self:IsActive() and "No requests yet. Whispers from people who aren't friends, guild members "
