@@ -50,7 +50,13 @@ function T:Create()
     if f.SetClipsChildren then f:SetClipsChildren(true) end
     f:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     f:RegisterForDrag("LeftButton")
-    S.Flat(f)
+    -- the game's tooltip border, so the pop-up looks like it belongs to the game
+    f:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 14,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
     S.Paint(f, "toast")
     f:Hide()
     self.frame = f

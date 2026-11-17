@@ -4,17 +4,17 @@
 
 A new look
 - Unread messages show as small badges on the tabs, the sections and each conversation, instead of red numbers. The count is no longer repeated in the window's title.
-- Simpler header: one cog and the name on the left, Settings and Close as icon buttons on the right. The tagline is in the cog's tooltip.
-- Tabs are plain labels with a line under the one you're on.
+- The window uses the game's own frame: the metal border, the title bar and the red close button, with Telegnome's cog in the round medallion. Settings is the cog at the right end of the tab row. The tagline is in the cog's tooltip.
+- Tabs are boxed like the game's own, lit when you're on them, with the unread badge inside.
 - The list shows two lines per conversation: the name with the time of the newest message, and a preview of it with the unread badge. Online dots are round and every name lines up.
 - Favorites, Friends and Others have quieter headers with an arrow to fold them. "Close all" appears when you point at the Others header.
 - The conversation shows the name large with the realm (and level and class when known) small underneath. The star stays; Clear history moved into the new ... menu next to it, which also has mute and close.
-- Messages from one person in a row are grouped under one name, in a bubble: yours on the right in a warmer colour, theirs on the left, times are dimmed and days are separated by a centred line.
+- Every message has its own bubble: yours on the right in a warmer colour, theirs on the left. The first in a run carries the name and time, the following ones sit close underneath; point at any bubble to see when it was sent. Days are separated by a small centred date.
 - The message box says who you're writing to while it's empty.
 - Requests uses the whole window: each request is a card with the level in a badge, the class in its colour and Invite as the one highlighted button. Clear all and Decline all are at the bottom, and a thin bar on the right shows when there are more requests than fit.
 - Compact chat (Settings > Window): one line per message, without bubbles, for those who prefer the old look.
 - Settings has its categories on the left (Notifications, Do not disturb, Window, Chat, Requests, Your data) and shows one at a time.
-- Flat panels and buttons with thin borders in the theme colour everywhere, including the notifier.
+- Panels and buttons inside the window have thin borders in the theme colour. The window's own border stays the game's gold in every theme, and the notifier has the game's tooltip border.
 - The window is a little larger by default (smallest size 700 x 490).
 
 Fixes

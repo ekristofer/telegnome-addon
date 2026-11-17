@@ -585,7 +585,7 @@ function O:Open()
     TG.Requests:ClosePanel()
     self:Refresh()
     self.frame:Show()
-    self:ShowPage(self.page)
+    self:ShowPage(CATEGORIES[1]) -- always start on the first page
 end
 
 function O:Close()

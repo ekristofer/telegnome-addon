@@ -12,6 +12,7 @@ local ROW_H = 40      -- a conversation in the list: name and time, preview and 
 local HEAD_H = 24     -- Favorites / Friends / Others
 local NAME_X = 22     -- every name starts here, with or without an online dot
 local TOP = 74        -- where the list and the conversation start, below the header and the tabs
+                      -- (set in UI:Create: the game's own frame has a lower title bar than the plain one)
 UI.ROW_H = 26         -- the one-line rows of the New message picker
 UI.MIN_W, UI.MIN_H = 700, 490
 
@@ -82,35 +83,71 @@ local TABS = { { "dm", "Direct messages" }, { "groups", "Group chats" }, { "chan
     { "requests", "Requests" } }
 
 local function makeTab(parent, id, label)
-    local tab = CreateFrame("Button", nil, parent)
-    tab:SetHeight(28)
+    -- a boxed tab like the game's own: lit in the theme colour when it's the one you're on
+    local tab = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    tab:SetHeight(26)
     tab.id, tab.baseText = id, label
+    S.Flat(tab)
+    local gloss = tab:CreateTexture(nil, "ARTWORK")
+    gloss:SetPoint("TOPLEFT", 1, -1)
+    gloss:SetPoint("RIGHT", -1, 0)
+    gloss:SetHeight(11)
+    gloss:SetColorTexture(1, 1, 1, 0.07)
+    tab.gloss = gloss
     local fs = tab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    fs:SetPoint("LEFT", 2, 1)
+    fs:SetPoint("LEFT", 12, 0)
     fs:SetText(label)
     tab.fs = fs
     tab.pill = S.Pill(tab, 16)
     tab.pill:SetPoint("LEFT", fs, "RIGHT", 6, 0)
-    -- the line under the tab you're on
-    local under = tab:CreateTexture(nil, "ARTWORK")
-    under:SetPoint("BOTTOMLEFT", 0, 0)
-    under:SetPoint("BOTTOMRIGHT", 0, 0)
-    under:SetHeight(2)
-    S.Paint(under, "hi", 1)
-    tab.under = under
-    tab:SetScript("OnEnter", function(s)
-        if s.id ~= UI.tab or TG.Settings:IsShown() then s.fs:SetTextColor(0.95, 0.88, 0.72) end
-    end)
-    tab:SetScript("OnLeave", function() UI:UpdateTabs() end)
+    local hl = tab:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetPoint("TOPLEFT", 1, -1)
+    hl:SetPoint("BOTTOMRIGHT", -1, 1)
+    hl:SetColorTexture(1, 1, 1, 0.05)
     -- Clicking a tab always leaves Settings and the other panels, also when it's the tab you're on.
     tab:SetScript("OnClick", function() UI:CloseOverlays(); UI:SetTab(id) end)
     return tab
 end
 
+-- The game's own window frame: metal border, title bar, round medallion and the red close button.
+-- Returns nil when this client doesn't have it (then the plain frame is used).
+local function nativeFrame()
+    local ok, f = pcall(CreateFrame, "Frame", nil, UIParent, "PortraitFrameTemplate")
+    if ok and type(f) == "table" and f.SetPoint then return f end
+    return nil
+end
+
+-- Telegnome's cog in the round medallion of the game's frame, on a dark disc. Returns the cog, or nil.
+local function medallionCog(f)
+    local holder = type(f.PortraitContainer) == "table" and f.PortraitContainer or nil
+    local portrait = (holder and holder.portrait) or f.portrait or f.Portrait
+    if type(portrait) ~= "table" or not portrait.SetTexture then return nil end
+    portrait:SetTexture(S.ROUND)
+    portrait:SetVertexColor(0.07, 0.05, 0.03, 1)
+    local parent = (holder and holder.CreateTexture) and holder or f
+    local layer, sub = "ARTWORK", 0
+    if portrait.GetDrawLayer then
+        local l, sl = portrait:GetDrawLayer()
+        if type(l) == "string" then layer = l end
+        if type(sl) == "number" then sub = sl end
+    end
+    local cog = parent:CreateTexture(nil, layer, nil, math.min(7, sub + 1))
+    cog:SetTexture(S.COG)
+    cog:SetPoint("TOPLEFT", portrait, "TOPLEFT", 7, -5)     -- 2 up: the ring's hole isn't centred on the portrait
+    cog:SetPoint("BOTTOMRIGHT", portrait, "BOTTOMRIGHT", -7, 9)
+    S.Paint(cog, "cog")
+    return cog
+end
+
 function UI:Create()
     if self.frame then return end
 
-    local f = CreateFrame("Frame", "TelegnomeFrame", UIParent, "BackdropTemplate")
+    local f = nativeFrame()
+    local native = f ~= nil
+    if not f then f = CreateFrame("Frame", nil, UIParent, "BackdropTemplate") end
+    _G.TelegnomeFrame = f
+    self.native = native
+    TOP = native and 62 or 74
     f:SetSize(760, 520)
     f:SetPoint("CENTER")
     f:SetFrameStrata("MEDIUM")
@@ -121,52 +158,107 @@ function UI:Create()
     if f.SetDontSavePosition then f:SetDontSavePosition(true) end
     if f.SetResizeBounds then f:SetResizeBounds(UI.MIN_W, UI.MIN_H, 1400, 1000) end
     f:EnableMouse(true)
-    S.Outer(f)
+    if not native then S.Outer(f) end
     f:Hide()
     tinsert(UISpecialFrames, "TelegnomeFrame") -- Escape closes it
     self.frame = f
     self:ApplyOpacity()
 
-    -- Header (drag handle): one cog as the logo, the name, and two icon buttons on the right.
+    -- Drag handle over the title bar. It sits above the frame's own art, and the title and its cogs are on it.
     local bar = CreateFrame("Frame", nil, f)
-    bar:SetPoint("TOPLEFT", 10, -8)
-    bar:SetPoint("TOPRIGHT", -10, -8)
-    bar:SetHeight(32)
+    if native then
+        bar:SetPoint("TOPLEFT", 60, -1)
+        bar:SetPoint("TOPRIGHT", -54, -1)
+        bar:SetHeight(20)
+    else
+        bar:SetPoint("TOPLEFT", 10, -8)
+        bar:SetPoint("TOPRIGHT", -10, -8)
+        bar:SetHeight(32)
+    end
+    -- above the frame's own pieces (border, title bar, close button), or its art covers what is on the bar
+    local topLevel = f:GetFrameLevel() + 20
+    if native then
+        for _, key in ipairs({ "NineSlice", "TitleContainer", "CloseButton", "PortraitContainer" }) do
+            local piece = f[key]
+            local level = type(piece) == "table" and piece.GetFrameLevel and piece:GetFrameLevel()
+            if type(level) == "number" and level + 2 > topLevel then topLevel = level + 2 end
+        end
+    end
+    bar:SetFrameLevel(topLevel)
     bar:EnableMouse(true)
     bar:RegisterForDrag("LeftButton")
     bar:SetScript("OnDragStart", function() f:StartMoving() end)
     bar:SetScript("OnDragStop", function() f:StopMovingOrSizing(); UI:SavePos() end)
     self.bar = bar
 
-    local cog = S.Cog(bar, 24)
-    cog:SetPoint("LEFT", 6, 0)
-    self.cogs = { cog }
-    self.cogSpins = { S.Spin(cog, 1.2, 144) }
-
-    local title = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("LEFT", cog, "RIGHT", 8, 0)
+    local title, logoOver
+    self.cogs, self.cogSpins = {}, {}
+    local function addCog(cog, duration, degrees)
+        self.cogs[#self.cogs + 1] = cog
+        self.cogSpins[#self.cogSpins + 1] = S.Spin(cog, duration, degrees)
+    end
+    if native then
+        -- the name, large, centred in the title bar
+        title = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        title:SetPoint("CENTER", f, "TOP", 0, -11)
+        -- the cog in the medallion turns when a message arrives
+        local ok, big = pcall(medallionCog, f)
+        if ok and big then
+            addCog(big, 1.6, 72)
+            logoOver = big
+        end
+        local tc = f.TitleContainer
+        if type(tc) == "table" and type(tc.TitleText) == "table" and tc.TitleText.SetText then tc.TitleText:SetText("") end
+    else
+        local cog = S.Cog(bar, 24)
+        cog:SetPoint("LEFT", 6, 0)
+        addCog(cog, 1.2, 144)
+        title = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        title:SetPoint("LEFT", cog, "RIGHT", 8, 0)
+        logoOver = cog
+    end
     self.title = title
 
     -- the tagline lives in a tooltip on the logo
-    local logo = CreateFrame("Frame", nil, bar)
-    logo:SetPoint("TOPLEFT", cog, "TOPLEFT", -2, 2)
-    logo:SetPoint("BOTTOMRIGHT", cog, "BOTTOMRIGHT", 2, -2)
-    logo:SetScript("OnEnter", function(s)
-        GameTooltip:SetOwner(s, "ANCHOR_BOTTOMRIGHT")
-        GameTooltip:SetText("Telegnome")
-        GameTooltip:AddLine("Gnomish Universal Messenger", 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    logo:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    if logoOver then
+        local logo = CreateFrame("Frame", nil, bar)
+        logo:SetPoint("TOPLEFT", logoOver, "TOPLEFT", -2, 2)
+        logo:SetPoint("BOTTOMRIGHT", logoOver, "BOTTOMRIGHT", 2, -2)
+        logo:SetScript("OnEnter", function(s)
+            GameTooltip:SetOwner(s, "ANCHOR_BOTTOMRIGHT")
+            GameTooltip:SetText("Telegnome")
+            GameTooltip:AddLine("Gnomish Universal Messenger", 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        logo:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
 
-    -- Children of the drag handle, so they sit above it and get their own clicks.
-    local close = S.IconButton(bar, S.CLOSE, 26, 12)
-    close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -12, -11)
-    close:SetScript("OnClick", function() f:Hide() end)
-    S.Tooltip(close, "Close", "Escape closes the window too.")
-
-    local settingsBtn = S.IconButton(bar, S.WRENCH, 26, 15)
-    settingsBtn:SetPoint("RIGHT", close, "LEFT", -6, 0)
+    -- Close: the game's red X when the frame has one, otherwise a plain icon button.
+    local close = native and type(f.CloseButton) == "table" and f.CloseButton.SetScript and f.CloseButton or nil
+    local settingsBtn
+    if close then
+        close:SetScript("OnClick", function() f:Hide() end)
+        -- Settings: a cog at the right end of the tab row, where there is room for a proper size
+        settingsBtn = S.CogButton(f, 24)
+        settingsBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -(TOP - 27))
+        settingsBtn:SetFrameLevel(f:GetFrameLevel() + 3)
+        function settingsBtn:SetLit(lit)
+            self.lit = lit
+            if lit then
+                self.tex:SetVertexColor(1, 0.9, 0.55)
+            else
+                self.tex:SetVertexColor(S.BRASS[1], S.BRASS[2], S.BRASS[3])
+            end
+        end
+        settingsBtn:HookScript("OnLeave", function(s) if s.lit then s:SetLit(true) end end)
+    else
+        close = S.IconButton(bar, S.CLOSE, 26, 12)
+        close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -12, native and -30 or -11)
+        close:SetScript("OnClick", function() f:Hide() end)
+        S.Tooltip(close, "Close", "Escape closes the window too.")
+        settingsBtn = S.IconButton(bar, S.WRENCH, 26, 15)
+        settingsBtn:SetPoint("RIGHT", close, "LEFT", -6, 0)
+    end
     settingsBtn:HookScript("OnEnter", function(s)
         GameTooltip:SetOwner(s, "ANCHOR_BOTTOM")
         GameTooltip:SetText("Settings")
@@ -186,20 +278,35 @@ function UI:Create()
         self.tabs[def[1]] = tab
         self.tabOrder[i] = tab
     end
-    local sep = S.Line(f)
-    sep:SetPoint("TOPLEFT", 2, -(TOP - 1))
-    sep:SetPoint("TOPRIGHT", -2, -(TOP - 1))
+    -- How far the content keeps from the window's edge: the game's frame has a thicker border.
+    local mx = native and 8 or 2
+    local baseLevel = f:GetFrameLevel() + 3
+    if native then
+        -- the game's dark inset with its thin inner border, behind the list and the conversation
+        local ok, inset = pcall(CreateFrame, "Frame", nil, f, "InsetFrameTemplate")
+        if ok and type(inset) == "table" and inset.SetPoint then
+            inset:SetPoint("TOPLEFT", mx - 3, -(TOP - 3))
+            inset:SetPoint("BOTTOMRIGHT", -(mx - 3), mx - 3)
+            inset:SetFrameLevel(f:GetFrameLevel() + 1)
+        end
+    else
+        local sep = S.Line(f)
+        sep:SetPoint("TOPLEFT", 2, -(TOP - 1))
+        sep:SetPoint("TOPRIGHT", -2, -(TOP - 1))
+    end
 
     -- Everything below the tabs. Requests and Settings cover all of it.
     local body = CreateFrame("Frame", nil, f)
-    body:SetPoint("TOPLEFT", 2, -TOP)
-    body:SetPoint("BOTTOMRIGHT", -2, 2)
+    body:SetPoint("TOPLEFT", mx, -TOP)
+    body:SetPoint("BOTTOMRIGHT", -mx, mx)
+    body:SetFrameLevel(baseLevel)
     self.body = body
 
     -- Left: New message + the list
     local left = S.Strip(f)
-    left:SetPoint("TOPLEFT", 2, -TOP)
-    left:SetPoint("BOTTOMLEFT", 2, 2)
+    left:SetPoint("TOPLEFT", mx, -TOP)
+    left:SetPoint("BOTTOMLEFT", mx, mx)
+    left:SetFrameLevel(baseLevel)
     left:SetWidth(LIST_W)
     if left.SetClipsChildren then left:SetClipsChildren(true) end
     self.left = left
@@ -249,8 +356,9 @@ function UI:Create()
 
     -- Right: the conversation
     local right = CreateFrame("Frame", nil, f)
-    right:SetPoint("TOPLEFT", 2 + LIST_W + 1, -TOP)
-    right:SetPoint("BOTTOMRIGHT", -2, 2)
+    right:SetPoint("TOPLEFT", mx + LIST_W + 1, -TOP)
+    right:SetPoint("BOTTOMRIGHT", -mx, mx)
+    right:SetFrameLevel(baseLevel)
     self.right = right
 
     -- The conversation itself sits in its own frame, so it can be hidden while a panel covers it:
@@ -437,7 +545,7 @@ function UI:Create()
     -- Resize grip
     local grip = CreateFrame("Button", nil, f)
     grip:SetSize(16, 16)
-    grip:SetPoint("BOTTOMRIGHT", -3, 3)
+    grip:SetPoint("BOTTOMRIGHT", native and -7 or -3, native and 7 or 3)
     grip:SetFrameLevel(right:GetFrameLevel() + 40)
     grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
     grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
@@ -986,18 +1094,29 @@ function UI:UpdateTabs()
         return
     end
     local prev
+    local e = S.BRONZE
+    local settings = TG.Settings and TG.Settings:IsShown()
     for _, tab in ipairs(self.tabOrder or {}) do
-        local on = tab.id == self.tab and not (TG.Settings and TG.Settings:IsShown())
+        local on = tab.id == self.tab and not settings
         tab.pill:SetCount(counts[tab.id])
-        tab.under:SetShown(on)
-        if on then tab.fs:SetTextColor(1, 0.82, 0) else tab.fs:SetTextColor(0.72, 0.66, 0.53) end
-        tab:SetWidth(num(tab.fs:GetStringWidth(), 90) + 4
+        tab.gloss:SetShown(on)
+        if on then
+            tab:SetBackdropColor(e[1] * 0.5, e[2] * 0.5, e[3] * 0.5, 1)
+            tab:SetBackdropBorderColor(e[1], e[2], e[3], 1)
+            tab.fs:SetTextColor(1, 0.95, 0.8)
+        else
+            tab:SetBackdropColor(S.PANEL[1] * 0.9, S.PANEL[2] * 0.9, S.PANEL[3] * 0.9, 1)
+            tab:SetBackdropBorderColor(e[1], e[2], e[3], 0.35)
+            tab.fs:SetTextColor(0.62, 0.57, 0.48)
+        end
+        tab:SetWidth(num(tab.fs:GetStringWidth(), 90) + 24
             + (tab.pill:IsShown() and num(tab.pill:GetWidth(), 16) + 6 or 0))
         tab:ClearAllPoints()
         if prev then
-            tab:SetPoint("LEFT", prev, "RIGHT", 22, 0)
+            tab:SetPoint("LEFT", prev, "RIGHT", 4, 0)
         else
-            tab:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 18, -(TOP - 29))
+            -- next to the medallion in the game's frame
+            tab:SetPoint("TOPLEFT", self.frame, "TOPLEFT", self.native and 66 or 14, -(TOP - 28))
         end
         prev = tab
     end

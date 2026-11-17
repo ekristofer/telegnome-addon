@@ -1,6 +1,7 @@
 -- Telegnome: the message area of a conversation.
--- Messages from one person in a row are grouped in one bubble under their name; your own sit on the right
--- in a warmer colour; days are separated by a centred line. (A plain scrolling chat frame can't do any of that.)
+-- Every message has its own bubble. The first in a run from one person carries the name and the time; the
+-- ones that follow are just the text, close underneath. Your own sit on the right in a warmer colour; days
+-- are separated by a centred line. (A plain scrolling chat frame can't do any of that.)
 
 local _, ns = ...
 local TG = ns.TG
@@ -9,11 +10,13 @@ local num = S.Num
 local MV = {}
 TG.MessageView = MV
 
-local PAD_X, PAD_Y = 10, 6   -- inside a message block
+local PAD_X, PAD_Y = 10, 5   -- inside a bubble
+local PAD_Y_CONT = 4         -- top and bottom of a follow-up bubble (no name line)
+local GAP_CONT = 2           -- between the bubbles of one run
 local GAP = 8                -- between blocks
 local GAP_COMPACT = 3        -- between lines in compact mode
 local NAME_H = 14
-local GROUP_SECONDS = 300    -- a new block after five quiet minutes
+local GROUP_SECONDS = 300    -- the name is shown again after five quiet minutes
 local WHEEL_STEP = 44
 
 local View = {}
@@ -24,8 +27,9 @@ local function hex(c)
 end
 
 -- compact (Settings > Window): every message is one line, "12:30 Name: text", without bubbles or grouping.
-function View:Gap()
-    return self.compact and GAP_COMPACT or GAP
+function View:GapBefore(item)
+    if self.compact then return GAP_COMPACT end
+    return item.cont and GAP_CONT or GAP
 end
 
 function MV.New(parent)
@@ -116,6 +120,16 @@ local function newBlock(v)
     -- item, quest and player links, and the [Join group] link. A frame needs the mouse for links to work,
     -- so it also passes the mouse wheel on to the list it sits in.
     f:EnableMouse(true)
+    -- when it was sent: every bubble tells on hover, also the ones without a name line
+    f:SetScript("OnEnter", function(s)
+        local item = s.item
+        if item and item.kind == "msg" and item.t then
+            GameTooltip:SetOwner(s, item.out and "ANCHOR_LEFT" or "ANCHOR_RIGHT")
+            GameTooltip:SetText(date("%A %d %B, %H:%M", item.t), 1, 1, 1)
+            GameTooltip:Show()
+        end
+    end)
+    f:SetScript("OnLeave", function() GameTooltip:Hide() end)
     f:EnableMouseWheel(true)
     f:SetScript("OnMouseWheel", function(_, delta)
         local onWheel = v.frame:GetScript("OnMouseWheel")
@@ -194,8 +208,11 @@ function View:Fill(f, item)
 
     -- a block of chat messages from one person
     local maxW = math.max(120, math.floor(viewW * 0.78) - 2 * PAD_X)
-    f.name:Show()
-    f.time:Show()
+    local cont = item.cont and true or false   -- a follow-up: no name line
+    local top = cont and PAD_Y_CONT or (PAD_Y + NAME_H + 2)
+    local bottom = cont and PAD_Y_CONT or PAD_Y
+    f.name:SetShown(not cont)
+    f.time:SetShown(not cont)
     f.name:SetText(item.who or "?")
     local c = item.color or S.GOLD
     f.name:SetTextColor(c[1], c[2], c[3])
@@ -204,14 +221,14 @@ function View:Fill(f, item)
     f.body:SetText(item.text)
     f.body:SetTextColor(S.TEXT[1], S.TEXT[2], S.TEXT[3])
     f.body:SetJustifyH("LEFT")
-    f.body:SetPoint("TOPLEFT", PAD_X, -(PAD_Y + NAME_H + 2))
+    f.body:SetPoint("TOPLEFT", PAD_X, -top)
 
     local bodyW = f.body.GetWrappedWidth and num(f.body:GetWrappedWidth(), 0) or 0
     if bodyW < 8 then bodyW = math.min(num(f.body:GetStringWidth(), maxW), maxW) end
     if bodyW < 8 then bodyW = maxW end
-    local headW = num(f.name:GetStringWidth(), 40) + 8 + num(f.time:GetStringWidth(), 30)
+    local headW = cont and 0 or (num(f.name:GetStringWidth(), 40) + 8 + num(f.time:GetStringWidth(), 30))
     local w = math.min(maxW, math.max(bodyW, headW)) + 2 * PAD_X
-    local h = PAD_Y + NAME_H + 2 + num(f.body:GetStringHeight(), 14) + PAD_Y
+    local h = top + num(f.body:GetStringHeight(), 14) + bottom
     f:SetSize(w, h)
     -- both sides get a bubble: yours warmer (a touch of the theme colour) on the right, theirs neutral on the left
     local p, e = S.PANEL, S.BRONZE
@@ -252,16 +269,16 @@ function View:Finish(replaceAll)
 end
 
 function View:Relayout(keepBottom)
-    local y = 0
+    local prev
     for i, item in ipairs(self.items) do
         local f = self.frames[i]
         if not f then
             f = newBlock(self)
             self.frames[i] = f
         end
-        item.y = y
+        item.y = prev and (prev.y + prev.h + self:GapBefore(item)) or 0
         item.h = self:Fill(f, item)
-        y = y + item.h + self:Gap()
+        prev = item
     end
     for i = #self.items + 1, #self.frames do
         self.frames[i]:Hide()
@@ -310,7 +327,7 @@ function View:Append(item)
         self.frames[n] = f
     end
     self.items[n] = item
-    item.y = prev and (prev.y + prev.h + self:Gap()) or 0
+    item.y = prev and (prev.y + prev.h + self:GapBefore(item)) or 0
     item.h = self:Fill(f, item)
     self:Finish(false)
     if bottom then self:ScrollToBottom() end
@@ -335,24 +352,14 @@ function View:AddNote(text, r, g, b, center)
 end
 
 -- msg: { sender = id, who = name, color = { r, g, b }, out = bool, t = time, text = string }
--- A message from the same person within a few minutes joins the block above it.
+-- A message from the same person within a few minutes gets a bubble without the name line (cont).
 function View:AddMessage(msg)
-    local n = #self.items
-    local last = self.items[n]
-    if not self.compact and last and last.kind == "msg" and last.sender == msg.sender and (msg.t or 0) - (last.lastT or 0) < GROUP_SECONDS
-        and (msg.t or 0) >= (last.lastT or 0) then
-        last.text = last.text .. "\n" .. msg.text
-        last.lastT = msg.t
-        if self.bulk then return end
-        local bottom = self:AtBottom()
-        last.h = self:Fill(self.frames[n], last)
-        self:Finish(false)
-        if bottom then self:ScrollToBottom() end
-        return
-    end
+    local last = self.items[#self.items]
+    local cont = not self.compact and last and last.kind == "msg" and last.sender == msg.sender
+        and (msg.t or 0) - (last.t or 0) < GROUP_SECONDS and (msg.t or 0) >= (last.t or 0)
     self:Append({
         kind = "msg", sender = msg.sender, who = msg.who, color = msg.color, out = msg.out,
-        time = msg.t and date("%H:%M", msg.t) or "", lastT = msg.t, text = msg.text,
+        time = msg.t and date("%H:%M", msg.t) or "", t = msg.t, text = msg.text, cont = cont or nil,
     })
 end
 

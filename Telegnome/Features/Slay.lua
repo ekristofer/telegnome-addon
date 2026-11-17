@@ -96,7 +96,7 @@ local function tick(_, elapsed)
         if UI.cogs then
             for i, cog in ipairs(UI.cogs) do cog:SetVertexColor(hue(base + i * 0.5)) end
         end
-        UI.frame:SetBackdropBorderColor(hue(base + 0.25))
+        if UI.frame.SetBackdropBorderColor then UI.frame:SetBackdropBorderColor(hue(base + 0.25)) end
     end
     local toast = TG.Toast
     if toast and toast.frame and toast.frame:IsShown() then

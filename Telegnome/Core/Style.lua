@@ -343,6 +343,18 @@ function S.Button(parent, text, w, h, primary)
     b:SetText(text)
     b.fs = fs
 
+    -- a lighter upper half and a dark line at the bottom: a hint of the game's bevelled buttons
+    local gloss = b:CreateTexture(nil, "BORDER")
+    gloss:SetPoint("TOPLEFT", 1, -1)
+    gloss:SetPoint("RIGHT", -1, 0)
+    gloss:SetHeight(math.max(2, math.floor(h / 2) - 1))
+    gloss:SetColorTexture(1, 1, 1, 0.06)
+    local shadow = b:CreateTexture(nil, "BORDER")
+    shadow:SetPoint("BOTTOMLEFT", 1, 1)
+    shadow:SetPoint("RIGHT", -1, 0)
+    shadow:SetHeight(1)
+    shadow:SetColorTexture(0, 0, 0, 0.35)
+
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
     hl:SetPoint("TOPLEFT", 1, -1)
     hl:SetPoint("BOTTOMRIGHT", -1, 1)
