@@ -42,7 +42,7 @@ local DEFAULTS = {
         textSize = "normal",  -- message text: small / normal / large
         compactChat = false,  -- one line per message ("12:30 Name: text") instead of bubbles
         listSort = "recent",  -- conversation list: recent / name / unread (unread first, then recent)
-        combatQuiet = true,   -- hold pop-ups and sounds during combat, one summary afterwards
+        combatNotify = "summary", -- in combat: "all" pop-ups and sounds as usual, "summary" afterwards, "count" only
         instanceChat = "ask", -- dungeons and raids: ask / always / never follow Party or Raid chat
         archiveOn = true,     -- direct messages with nothing new for archiveDays days go to Archive
         archiveDays = 7,
@@ -162,6 +162,11 @@ local function migrate(db)
         if d == 0 then db.settings.archiveOn = false end
         if d == 0 or d == 14 then db.settings.archiveDays = 7 end
         db.archiveDays090 = true
+    end
+    -- 0.9: "hold pop-ups during combat" became three choices
+    if db.settings.combatQuiet ~= nil then
+        db.settings.combatNotify = db.settings.combatQuiet == false and "all" or "summary"
+        db.settings.combatQuiet = nil
     end
     -- 0.7.0: the tick in the Requests view no longer means "collect at any time" - that is /tg recruit only.
     if not db.requestsTick070 then

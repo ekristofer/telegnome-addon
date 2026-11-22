@@ -144,9 +144,14 @@ local function inCombat()
     return UnitAffectingCombat and UnitAffectingCombat("player") and true or false
 end
 
--- Called instead of the pop-up and sound for a new message. True: it's held until the fight is over.
+-- Called instead of the pop-up and sound for a new message. True: no pop-up or sound now.
+-- Settings > Notifications, In combat: "all" as usual, "summary" one pop-up when the fight is over,
+-- "count" nothing but the numbers (notifier, minimap button, badges).
 function D:Hold(key, alert)
-    if not TG.db or TG.db.settings.combatQuiet == false or not inCombat() then return false end
+    if not TG.db or not inCombat() then return false end
+    local how = TG.db.settings.combatNotify or "summary"
+    if how == "all" then return false end
+    if how == "count" then return true end
     if not (alert or TG:PassesNotifyFilter(key)) then return true end -- would have stayed quiet anyway
     local held = self.held or { count = 0, keys = {}, seen = {} }
     self.held = held

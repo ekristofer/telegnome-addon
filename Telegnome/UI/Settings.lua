@@ -189,9 +189,30 @@ function O:Create()
     check("Show who joins and leaves group chats", 30,
         function() return s().groupJoinLeave end, function(v) s().groupJoinLeave = v end,
         "Joined / left", "A grey line in the group when a member comes online (joins) or goes offline (leaves).")
-    check("Hold pop-ups and sounds during combat", 30,
-        function() return s().combatQuiet ~= false end, function(v) s().combatQuiet = v end,
-        "In combat", "Messages still arrive and count. When the fight is over, one pop-up says what came in.")
+    local cbLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    cbLabel:SetPoint("TOPLEFT", 44, y - 3)
+    cbLabel:SetText("In combat:")
+    local prevC = cbLabel
+    self.combatRadios = {}
+    local combatTips = {
+        all = "Pop-ups and sounds as usual, also in the middle of a fight.",
+        summary = "No pop-ups or sounds during the fight. When it's over, one pop-up says what came in.",
+        count = "No pop-ups or sounds, and no summary. The notifier, the minimap button and the badges still count "
+            .. "the new messages.",
+    }
+    for _, opt in ipairs({ { "all", "Show everything" }, { "summary", "Summary afterwards" }, { "count", "Only the count" } }) do
+        local r = S.Radio(content, opt[2])
+        r:SetPoint("LEFT", prevC, "RIGHT", prevC == cbLabel and 8 or 12, prevC == cbLabel and 0 or -1)
+        r.value = opt[1]
+        r:SetScript("OnClick", function()
+            TG.db.settings.combatNotify = opt[1]
+            O:Refresh()
+        end)
+        S.Tooltip(r, opt[2], combatTips[opt[1]])
+        prevC = r.label
+        self.combatRadios[#self.combatRadios + 1] = r
+    end
+    y = y - 24
     check("Tell me about unread messages when I log in", 30,
         function() return s().loginSummary ~= false end, function(v) s().loginSummary = v end,
         "On login", "A line in chat a few seconds after you log in, when messages from last time are still unread.")
@@ -630,6 +651,7 @@ function O:Refresh()
     local sshade = st.sound and 1 or 0.5
     self.soundLabel:SetTextColor(sshade, sshade, sshade)
     for _, r in ipairs(self.growRadios) do r:SetChecked(r.value == (st.toastGrow or "right")) end
+    for _, r in ipairs(self.combatRadios or {}) do r:SetChecked(r.value == (st.combatNotify or "summary")) end
 
     for _, sw in ipairs(self.swatches) do
         if sw.theme == S.theme then

@@ -138,7 +138,7 @@ Followed channels tab > **+ Follow channel** > tick what you want. Messages are 
 
 When you enter a dungeon, Telegnome offers to follow Party chat until you leave; in a raid, Raid chat. Instance chat (used by group finder groups) is followed too. While you're inside it's pinned at the top of the All tab, with an "Entered ..." line where the run starts. Choose **Ask**, **Always follow** or **Never** in Settings > Chat, or type `/tg follow-instance`.
 
-In combat, pop-ups and sounds wait until the fight is over; then one pop-up says what came in. Turn it off in Settings > Notifications.
+In combat, pop-ups and sounds wait until the fight is over; then one pop-up says what came in. Settings > Notifications > In combat has two other choices: **Show everything** (pop-ups and sounds as usual) or **Only the count** (no pop-ups or summary; the notifier, minimap button and badges still count up).
 
 ### Do not disturb
 

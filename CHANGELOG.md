@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.1
+- New setting, Settings > Notifications > In combat: **Show everything** (pop-ups and sounds as usual), **Summary afterwards** (one pop-up when the fight is over - the default, as before) or **Only the count** (no pop-ups or summary; the notifier, minimap button and badges still count up).
+
 ## 0.9.0
 
 All your chats in one place
