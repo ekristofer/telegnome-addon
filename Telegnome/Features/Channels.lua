@@ -50,6 +50,15 @@ function C.KeyForChannel(name)
     return "C:CH:" .. baseName(name):lower()
 end
 
+-- Whether a followed channel's unread messages count (red badge, tab and notifier totals), or only show a
+-- quiet dot. Party, Raid and Instance count unless switched off; everything else is quiet unless switched on.
+local COUNT_DEFAULT = { PARTY = true, RAID = true, INSTANCE_CHAT = true }
+function C.Counts(th)
+    if not th or th.kind ~= "CHANNEL" then return true end
+    if th.count ~= nil then return th.count and true or false end
+    return COUNT_DEFAULT[th.ctype] or false
+end
+
 function C:IsFollowedKey(key)
     local th = TG.db.threads[key]
     return th and th.kind == "CHANNEL" or false
@@ -86,6 +95,12 @@ function C:Follow(ctype, cname)
     th.ctype = ctype
     th.cname = (ctype == "CHANNEL") and name or nil
     th.notify = false -- pop-ups are chosen per channel
+    -- followed before, just for a dungeon or raid: its history comes back
+    local archive = TG.db.archive
+    if archive and type(archive[key]) == "table" then
+        th.msgs = archive[key]
+        archive[key] = nil
+    end
     th.msgs[#th.msgs + 1] = { t = time(), sys = true, text = "Following " .. name .. ". New messages will show up here." }
     UI:RefreshList()
     TG:RefreshUnread()
@@ -234,9 +249,16 @@ function C:OpenMenu(key, anchor)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
     MenuUtil.CreateContextMenu(anchor, function(_, root)
         root:CreateTitle(th.name)
+        root:CreateButton(th.fav and "Unpin" or "Pin to the top", function() TG:SetFavorite(key, not th.fav) end)
         root:CreateCheckbox("Pop-up notifications",
             function() return th.notify and true or false end,
             function() th.notify = not th.notify end)
+        root:CreateCheckbox("Count unread messages (red badge)",
+            function() return C.Counts(th) end,
+            function() th.count = not C.Counts(th); TG:RefreshUnread(); UI:RefreshList() end)
+        root:CreateCheckbox("Show in the All tab",
+            function() return th.inAll ~= false end,
+            function() th.inAll = (th.inAll == false) and nil or false; TG:RefreshUnread(); UI:RefreshList() end)
         root:CreateButton(th.muted and "Unmute" or "Mute (no pop-ups or sound, alert words included)", function()
             TG:SetMuted(key, not th.muted)
         end)
@@ -293,7 +315,8 @@ function C:CreatePanel()
     intro:SetPoint("TOPLEFT", 14, -42)
     intro:SetPoint("RIGHT", -14, 0)
     intro:SetJustifyH("LEFT")
-    intro:SetText("Tick a chat to follow it in this tab. Also tick Pop-up to get the notifier for it; otherwise it stays quiet.")
+    intro:SetText("Tick a chat to follow it in this tab. Also tick Pop-up to get the notifier for it; otherwise it stays quiet. "
+        .. "Right-click a followed channel to choose whether it counts unread messages and shows in the All tab.")
 
     local function header(text, x, popX)
         local h = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -435,7 +458,7 @@ end
 
 function C:OpenPanel()
     UI:Show()
-    UI:SetTab("channels")
+    if UI.tab ~= "all" then UI:SetTab("channels") end
     self:CreatePanel()
     TG.Settings:Close()
     TG.Picker:Close()

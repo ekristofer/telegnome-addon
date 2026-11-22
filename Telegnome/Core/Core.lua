@@ -41,6 +41,9 @@ local DEFAULTS = {
         theme = "brass",      -- colour theme (see Style.THEMES)
         textSize = "normal",  -- message text: small / normal / large
         compactChat = false,  -- one line per message ("12:30 Name: text") instead of bubbles
+        listSort = "recent",  -- conversation list: recent / name / unread (unread first, then recent)
+        combatQuiet = true,   -- hold pop-ups and sounds during combat, one summary afterwards
+        instanceChat = "ask", -- dungeons and raids: ask / always / never follow Party or Raid chat
         -- one-click answers for requests (Settings > Requests)
         quickReplies = { "Inviting you now, {name}!", "What level and role are you?", "One moment, checking the group." },
         declineReply = "Sorry, the group is full.",
@@ -143,6 +146,8 @@ local function migrate(db)
         db.settings.sound = false
         db.soundReset060 = true
     end
+    -- 0.9: the All tab is where new installs start; people who used Telegnome before keep Direct messages.
+    if db.lastTab == nil then db.lastTab = (db.seq or 0) > 0 and "dm" or "all" end
     -- 0.7.0: the tick in the Requests view no longer means "collect at any time" - that is /tg recruit only.
     if not db.requestsTick070 then
         db.settings.recruiting = false
@@ -317,7 +322,8 @@ function TG:AddMessage(key, info, outgoing, text, extra)
         th.unread = 0
     elseif not self.UI:IsViewing(key) then
         th.unread = (th.unread or 0) + 1
-        if not db.settings.dnd then -- do not disturb: no sound, no pop-up preview
+        -- do not disturb: no sound, no pop-up preview. In combat they wait for the fight to end.
+        if not db.settings.dnd and not (self.Instances and self.Instances:Hold(key, alert)) then
             self:MaybePlaySound(key, alert)
             self.Toast:OnIncoming(key, text, extra and extra.from, alert)
         end
@@ -412,7 +418,7 @@ function TG:PassesNotifyFilter(key)
 end
 
 ---------------------------------------------------------------------------
--- Sections of the Direct messages list: favorites, friends, others
+-- Sections of the Direct messages list: pinned, friends, others
 ---------------------------------------------------------------------------
 
 -- Battle.net friends, your friends list and guild members.
@@ -491,7 +497,7 @@ function TG:ConfirmCloseOthers()
     if not StaticPopupDialogs.TELEGNOME_CLOSE_OTHERS then
         StaticPopupDialogs.TELEGNOME_CLOSE_OTHERS = {
             text = "Close all %s conversations under Others?\n\nTheir history is removed and they're taken out of "
-                .. "New message. Favorites and friends are not touched.",
+                .. "New message. Pinned conversations and friends are not touched.",
             button1 = "Close all",
             button2 = CANCEL or "Cancel",
             OnAccept = function() TG:CloseOthers() end,
@@ -502,6 +508,16 @@ function TG:ConfirmCloseOthers()
 end
 
 -- A grey note in a conversation (not a message: no unread count, no pop-up).
+-- Marks these conversations as read (right-click a section header or a tab).
+function TG:MarkRead(keys)
+    for _, key in ipairs(keys or {}) do
+        local th = self.db.threads[key]
+        if th then th.unread = 0 end
+    end
+    self:RefreshUnread()
+    self.UI:RefreshList()
+end
+
 function TG:AddSystemLine(key, text)
     local th = self.db.threads[key]
     if not th then return end
@@ -650,9 +666,10 @@ end
 
 function TG:TotalUnread()
     local n = 0
-    -- Followed channels are excluded: busy chats would drown out real missed messages.
+    -- Followed channels only count when their Count option is on (Party, Raid and Instance by default):
+    -- busy chats like Trade would drown out real missed messages.
     for _, th in pairs(self.db.threads) do
-        if th.kind ~= "CHANNEL" then n = n + (th.unread or 0) end
+        if th.kind ~= "CHANNEL" or self.Channels.Counts(th) then n = n + (th.unread or 0) end
     end
     return n
 end
@@ -937,6 +954,15 @@ SlashCmdList.TELEGNOME = function(input)
         TG.Channels:OpenPanel()
     elseif cmd == "mychannels" or cmd == "slots" then
         TG.ChannelList:Open()
+    elseif cmd == "follow-instance" or cmd == "dungeon" then
+        TG.Instances:Start()
+    elseif verb == "sort" or cmd == "sort" then
+        local how = (rest or ""):lower()
+        if TG.UI.SORTS[how] then
+            TG.UI:SetSort(how)
+        else
+            TG:Print("Sort by: /tg sort recent, /tg sort name or /tg sort unread")
+        end
     elseif verb == "search" or cmd == "search" or cmd == "find" then
         TG.Search:Open(nil, rest)
     elseif verb == "opacity" or cmd == "opacity" then
@@ -1023,6 +1049,7 @@ SlashCmdList.TELEGNOME = function(input)
         print("  /tg channels - choose followed channels")
         print("  /tg mychannels - every chat channel you're in, with Leave buttons")
         print("  /tg search <text> - search your saved messages")
+        print("  /tg sort recent | name | unread - how the conversation list is sorted")
         print("  /tg opacity <30-100> - main window opacity (" .. (s.opacity or 100) .. "%)")
         print("  /tg dnd - do not disturb (" .. onOff(s.dnd) .. ")")
         print("  /tg theme <name> - colour theme (" .. TG.Style.theme.label .. ")")

@@ -725,6 +725,7 @@ function G:OpenMenu(key, anchor)
 
     MenuUtil.CreateContextMenu(anchor, function(_, root)
         root:CreateTitle(th.name)
+        root:CreateButton(th.fav and "Unpin" or "Pin to the top", function() TG:SetFavorite(key, not th.fav) end)
         root:CreateButton("Who's online", function() G:RequestMembers(key) end)
         root:CreateButton(th.muted and "Unmute" or "Mute (no pop-ups or sound)", function()
             TG:SetMuted(key, not th.muted)
@@ -887,7 +888,7 @@ end
 
 function G:OpenPanel()
     UI:Show()
-    UI:SetTab("groups")
+    if UI.tab ~= "all" then UI:SetTab("groups") end
     self:CreatePanel()
     TG.Settings:Close()
     TG.Picker:Close()

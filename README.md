@@ -9,7 +9,8 @@ Telegnome moves your private messages out of the busy main chat and into a messe
 
 ## Features
 
-- **Direct messages**: every whisper and Battle.net whisper gets its own conversation with saved history. Reply from the window. The list is grouped into **Favorites**, **Friends** and **Others**, so a flood of strangers never buries your friends.
+- **Direct messages**: every whisper and Battle.net whisper gets its own conversation with saved history. Reply from the window. The list is grouped into **Pinned**, **Friends** and **Others**, so a flood of strangers never buries your friends.
+- **All tab**: everything in one list - pinned conversations on top, then direct messages, group chats and channels. Pin anything with the star.
 - **Requests**: while you're listed in the group finder, whispers from strangers land in their own tab with class, level, role and an Invite button.
 - **Search**: find any saved message, in all conversations or in one.
 - **Notes**: a short private note per person, shown under their name.
@@ -57,6 +58,8 @@ Open Telegnome with the minimap button, the addons button by the minimap, or `/t
 | `/tg config` | Settings |
 | `/tg mychannels` | Every chat channel you're in, with Leave buttons |
 | `/tg search <text>` | Search your saved messages |
+| `/tg sort recent\|name\|unread` | How the conversation list is sorted |
+| `/tg follow-instance` | Follow Party or Raid chat until you leave the dungeon or raid |
 | `/tg recruit` | Collect strangers' whispers under Requests (manual switch) |
 | `/tg dnd` | Toggle Do not disturb |
 | `/tg only` | Keep whispers, Battle.net whispers and followed channels out of the main chat |
@@ -70,15 +73,23 @@ Open Telegnome with the minimap button, the addons button by the minimap, or `/t
 
 **Notifier:** click to open the conversation, right-click to mark all as read, Shift-drag to move. In Settings you can choose who triggers it (everyone, friends & guild, friends only), whether it grows left or right, or turn it off.
 
-### Favorites, Friends and Others
+### The All tab
 
-The Direct messages list has three sections, newest conversation first in each:
+The **All** tab shows everything in one list: **Pinned** on top, then Direct messages, Group chats and Channels. Group chats have a two-people icon and channels a **#**. The **Direct**, **Groups** and **Channels** tabs show just one kind. Telegnome opens on the tab you used last.
 
-- **Favorites**: click the star next to a conversation's name (or right-click > Add to favorites). Always on top.
+Click the star next to a conversation's name to pin it - a person, a group chat or a channel. Right-click a section header or a tab to mark everything in it as read.
+
+### Pinned, Friends and Others
+
+The Direct list has three sections:
+
+- **Pinned**: click the star next to a conversation's name (or right-click > Pin to the top). Always on top.
 - **Friends**: Battle.net friends, your friends list, guild members and people you were in a group with in the last week - sorted in automatically.
 - **Others**: everyone else. Click the header to fold the section away; **Close all** closes every conversation in it and forgets those contacts.
 
 Right-click someone in **+ New message** and choose **Forget contact** to take them off that list.
+
+Inside each section, conversations are sorted by most recent by default. Right-click a section header (or go to Settings > Window) to sort by name or put unread conversations first.
 
 ### Search and notes
 
@@ -115,7 +126,15 @@ Everyone in the group needs Telegnome. The **Online** button lists who is in the
 
 ### Followed channels
 
+Right-click a followed channel for two options: **Count unread messages** gives it a red badge that adds to the totals (on for Party, Raid and Instance; other channels show a quiet dot instead), and **Show in the All tab**.
+
 Followed channels tab > **+ Follow channel** > tick what you want. Messages are copied into the tab and you can reply from there. Followed channels don't count towards the missed-messages counter. Each channel has its own **Pop-up** tick (off by default). **Alert words** (Settings > Notifications) make a message pop up anyway when it contains one of your words, e.g. `LFM, tank`.
+
+### Dungeons, raids and combat
+
+When you enter a dungeon, Telegnome offers to follow Party chat until you leave; in a raid, Raid chat. Instance chat (used by group finder groups) is followed too. While you're inside it's pinned at the top of the All tab, with an "Entered ..." line where the run starts. Choose **Ask**, **Always follow** or **Never** in Settings > Chat, or type `/tg follow-instance`.
+
+In combat, pop-ups and sounds wait until the fight is over; then one pop-up says what came in. Turn it off in Settings > Notifications.
 
 ### Do not disturb
 
@@ -187,6 +206,7 @@ Telegnome/               the addon folder (this is what goes into AddOns)
   Features/Channels.lua  followed channels
   Features/Requests.lua  Requests tab (group finder whispers)
   Features/Social.lua    recently grouped with, notes, reply blanks, login summary
+  Features/Instances.lua dungeon and raid chat, quiet in combat
   Media/                 icon and cog textures (.tga)
 docs/                    images for this README
 ```

@@ -7,6 +7,13 @@
 - Requests: a role summary at the top (Tanks, Healers, Damage), worked out from the group finder application or words in the whisper. Click a role to show only those requests.
 - Quick replies can use {name}, {class} and {level}, filled in for the person you answer.
 - On login, a line in chat tells you when unread messages are waiting (Settings > Notifications).
+- **All tab:** a new first tab with everything in one list: Pinned, Direct messages, Group chats and Channels. Group chats show a two-people icon and channels a #. The Direct, Groups and Channels tabs stay as filters. New installs start on All; Telegnome opens on the tab you used last.
+- **Pin anything:** the star now works on group chats and channels too ("Favorites" is now "Pinned"). Pinned conversations sit at the top of the All tab.
+- **Followed channels:** right-click one to choose "Count unread messages" (a red badge that adds to the totals) and "Show in the All tab". Party, Raid and Instance count by default; other channels show a quiet dot instead of a number.
+- **Mark all as read:** right-click a section header or a tab.
+- **Dungeons and raids:** entering one offers to follow Party chat (dungeons) or Raid chat (raids), with Instance chat, until you leave. It's pinned while you're inside, with an "Entered ..." line where the run starts. Ask, Always or Never in Settings > Chat; `/tg follow-instance` does it by hand. Chats followed this way are unfollowed when you leave; with "clear on new group" off, their history comes back next time.
+- **Combat:** pop-ups and sounds wait until the fight is over, then one pop-up says what came in (Settings > Notifications).
+- Sort the conversation list by most recent, name or unread first: Settings > Window, right-click a section header, or `/tg sort`. Sections (Favorites, Friends, Others) stay as they are; the sort applies inside each.
 
 ## 0.8.1
 - New setting (Settings > Chat): "Keep typing after sending a message". On by default; untick it and the message box lets go after each message, like the game's chat.

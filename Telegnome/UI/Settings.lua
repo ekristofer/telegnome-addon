@@ -189,6 +189,9 @@ function O:Create()
     check("Show who joins and leaves group chats", 30,
         function() return s().groupJoinLeave end, function(v) s().groupJoinLeave = v end,
         "Joined / left", "A grey line in the group when a member comes online (joins) or goes offline (leaves).")
+    check("Hold pop-ups and sounds during combat", 30,
+        function() return s().combatQuiet ~= false end, function(v) s().combatQuiet = v end,
+        "In combat", "Messages still arrive and count. When the fight is over, one pop-up says what came in.")
     check("Tell me about unread messages when I log in", 30,
         function() return s().loginSummary ~= false end, function(v) s().loginSummary = v end,
         "On login", "A line in chat a few seconds after you log in, when messages from last time are still unread.")
@@ -322,6 +325,23 @@ function O:Create()
         self.sizeRadios[#self.sizeRadios + 1] = r
     end
     y = y - 28
+
+    local soLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    soLabel:SetPoint("TOPLEFT", 18, y - 2)
+    soLabel:SetText("Sort list by")
+    self.sortRadios = {}
+    local prevO = soLabel
+    for _, how in ipairs(UI.SORT_ORDER) do
+        local r = S.Radio(content, UI.SORTS[how])
+        r:SetPoint("LEFT", prevO, "RIGHT", prevO == soLabel and 14 or 12, prevO == soLabel and 0 or -1)
+        r.value = how
+        r:SetScript("OnClick", function() UI:SetSort(how) end)
+        S.Tooltip(r, "Sort list by", "How conversations are sorted inside each section (Pinned, Friends, "
+            .. "Others) and in Group chats and Followed channels. Also: right-click a section header.")
+        prevO = r.label
+        self.sortRadios[#self.sortRadios + 1] = r
+    end
+    y = y - 28
     check("Compact chat: one line per message, no bubbles", 0,
         function() return s().compactChat end, function(v) s().compactChat = v; UI:ApplyChatStyle() end,
         "Compact chat", "Shows every message as one line - time, name, text - like the game's own chat. "
@@ -381,6 +401,26 @@ function O:Create()
         "Keep typing", "On: the cursor stays in the message box after you send, so you can write the next "
         .. "message straight away. Off: the box lets go after each message, like the game's chat, and you "
         .. "click it (or press Enter) to write again.")
+    local inLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    inLabel:SetPoint("TOPLEFT", 18, y - 2)
+    inLabel:SetText("In dungeons and raids")
+    self.instRadios = {}
+    local prevI = inLabel
+    for _, opt in ipairs({ { "ask", "Ask" }, { "always", "Always follow" }, { "never", "Never" } }) do
+        local r = S.Radio(content, opt[2])
+        r:SetPoint("LEFT", prevI, "RIGHT", prevI == inLabel and 14 or 12, prevI == inLabel and 0 or -1)
+        r.value = opt[1]
+        r:SetScript("OnClick", function()
+            TG.db.settings.instanceChat = opt[1]
+            O:Refresh()
+        end)
+        S.Tooltip(r, "Dungeons and raids", "Follow Party chat in a dungeon, or Raid chat in a raid (and Instance "
+            .. "chat), until you leave. It's pinned at the top of the All tab while you're inside. Ask: a pop-up "
+            .. "you click when you enter.")
+        prevI = r.label
+        self.instRadios[#self.instRadios + 1] = r
+    end
+    y = y - 28
     check("Count people I grouped with in the last week as friends", 0,
         function() return s().groupedFriends ~= false end, function(v) s().groupedFriends = v; TG:QueueRefresh() end,
         "Grouped with", "Players you were in a group with in the last seven days are listed under Friends, and their "
@@ -568,6 +608,8 @@ function O:Refresh()
     end
     self.themeName:SetText(S.theme.label)
     for _, r in ipairs(self.sizeRadios) do r:SetChecked(r.value == (st.textSize or "normal")) end
+    for _, r in ipairs(self.sortRadios) do r:SetChecked(r.value == (st.listSort or "recent")) end
+    for _, r in ipairs(self.instRadios) do r:SetChecked(r.value == (st.instanceChat or "ask")) end
     for _, box in ipairs(self.replyBoxes) do
         if not box:HasFocus() then box:SetText(box.get()) end
     end

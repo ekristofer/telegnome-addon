@@ -4,12 +4,13 @@ local _, ns = ...
 local TG = ns.TG
 local S = TG.Style
 local num = S.Num
-local UI = { rows = {}, offset = 0, tab = "dm", selectedByTab = {} }
+local UI = { rows = {}, offset = 0, tab = "all", selectedByTab = {} }
 TG.UI = UI
 
 local LIST_W = 216
 local ROW_H = 40      -- a conversation in the list: name and time, preview and unread badge
-local HEAD_H = 24     -- Favorites / Friends / Others
+local HEAD_H = 24     -- Pinned / Friends / Others
+local HINT_H = 22     -- the grey line under an empty Pinned section
 local NAME_X = 22     -- every name starts here, with or without an online dot
 local TOP = 74        -- where the list and the conversation start, below the header and the tabs
                       -- (set in UI:Create: the game's own frame has a lower title bar than the plain one)
@@ -79,13 +80,14 @@ end
 -- Frame construction
 ---------------------------------------------------------------------------
 
-local TABS = { { "dm", "Direct messages" }, { "groups", "Group chats" }, { "channels", "Followed channels" },
+local TABS = { { "all", "All" }, { "dm", "Direct" }, { "groups", "Groups" }, { "channels", "Channels" },
     { "requests", "Requests" } }
 
 local function makeTab(parent, id, label)
     -- a boxed tab like the game's own: lit in the theme colour when it's the one you're on
     local tab = CreateFrame("Button", nil, parent, "BackdropTemplate")
     tab:SetHeight(26)
+    tab:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     tab.id, tab.baseText = id, label
     S.Flat(tab)
     local gloss = tab:CreateTexture(nil, "ARTWORK")
@@ -105,7 +107,14 @@ local function makeTab(parent, id, label)
     hl:SetPoint("BOTTOMRIGHT", -1, 1)
     hl:SetColorTexture(1, 1, 1, 0.05)
     -- Clicking a tab always leaves Settings and the other panels, also when it's the tab you're on.
-    tab:SetScript("OnClick", function() UI:CloseOverlays(); UI:SetTab(id) end)
+    tab:SetScript("OnClick", function(s, button)
+        if button == "RightButton" then
+            UI:OpenTabMenu(s)
+            return
+        end
+        UI:CloseOverlays()
+        UI:SetTab(id)
+    end)
     return tab
 end
 
@@ -336,6 +345,12 @@ function UI:Create()
             TG.Groups:TogglePanel()
         elseif UI.tab == "channels" then
             TG.Channels:TogglePanel()
+        elseif UI.tab == "all" and MenuUtil and MenuUtil.CreateContextMenu then
+            MenuUtil.CreateContextMenu(newBtn, function(_, root)
+                root:CreateButton("New message", function() TG.Picker:Open() end)
+                root:CreateButton("New group chat", function() TG.Groups:OpenPanel() end)
+                root:CreateButton("Follow a channel", function() TG.Channels:OpenPanel() end)
+            end)
         else
             TG.Picker:Toggle()
         end
@@ -393,9 +408,9 @@ function UI:Create()
     favBtn:SetScript("OnEnter", function(s)
         local th = UI.selected and TG.db.threads[UI.selected]
         GameTooltip:SetOwner(s, "ANCHOR_BOTTOM")
-        GameTooltip:SetText(th and th.fav and "Remove from favorites" or "Add to favorites")
+        GameTooltip:SetText(th and th.fav and "Unpin" or "Pin to the top")
         GameTooltip:AddLine(th and th.req and "Keeps this person: they move from Requests to your Direct messages."
-            or "Favorites always stay at the top of the list.", 1, 1, 1, true)
+            or "Pinned conversations stay at the top of the All tab (and of Direct messages, for people).", 1, 1, 1, true)
         GameTooltip:Show()
     end)
     favBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -413,7 +428,7 @@ function UI:Create()
     self.inviteBtn = inviteBtn
 
     local renameBtn = S.Button(conv, "Rename", 70, 24)
-    renameBtn:SetPoint("RIGHT", moreBtn, "LEFT", -6, 0)
+    renameBtn:SetPoint("RIGHT", favBtn, "LEFT", -6, 0)
     renameBtn:SetScript("OnClick", function()
         if UI.selected then TG.Groups:AskRename(UI.selected) end
     end)
@@ -679,7 +694,7 @@ function UI.AddMenuEntries(root, key)
         root:CreateButton(th.muted and "Unmute" or "Mute (no pop-ups or sound)", function()
             TG:SetMuted(key, not th.muted)
         end)
-        root:CreateButton(th.fav and "Remove from favorites" or "Add to favorites", function()
+        root:CreateButton(th.fav and "Unpin" or "Pin to the top", function()
             TG:SetFavorite(key, not th.fav)
         end)
         root:CreateButton("Clear history", function() TG:ConfirmClearHistory(key) end)
@@ -793,6 +808,25 @@ function UI:GetRow(i)
     row.pill = S.Pill(row, 16)
     row.pill:SetPoint("BOTTOMRIGHT", -8, 5)
 
+    -- what kind of conversation: people have the online dot, groups a two-people icon, channels a #
+    row.groupIcon = S.Icon(row, S.GROUP, 14)
+    row.groupIcon:SetPoint("TOPLEFT", 5, -7)
+    row.groupIcon:SetVertexColor(0.79, 0.64, 0.29)
+    row.hash = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    row.hash:SetPoint("TOPLEFT", 7, -6)
+    row.hash:SetText("#")
+    row.hash:SetTextColor(0.56, 0.65, 0.79)
+    -- a quiet channel's new messages: a dot instead of a number
+    row.quiet = S.Dot(row, 7)
+    row.quiet:SetPoint("BOTTOMRIGHT", -12, 10)
+    row.quiet:SetVertexColor(0.79, 0.64, 0.29)
+    -- the grey line under an empty Pinned section
+    row.hint = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    row.hint:SetPoint("LEFT", NAME_X - 2, 0)
+    row.hint:SetPoint("RIGHT", -6, 0)
+    row.hint:SetJustifyH("LEFT")
+    row.hint:SetTextColor(0.55, 0.50, 0.42)
+
     -- Close (x) on the selected row, where the time is on the others
     local x = CreateFrame("Button", nil, row)
     x:SetSize(16, 16)
@@ -866,6 +900,10 @@ function UI:GetRow(i)
     closeAll:HookScript("OnLeave", hover)
 
     row:SetScript("OnClick", function(s, button)
+        if s.header and button == "RightButton" then
+            UI:OpenHeaderMenu(s)
+            return
+        end
         if s.header then
             TG.db.collapsed[s.header] = not TG.db.collapsed[s.header] or nil
             UI:RefreshList()
@@ -898,10 +936,22 @@ function UI:LayoutHeaderRule(row)
     row.rule:SetPoint("RIGHT", row, "RIGHT", -reserve, 0)
 end
 
+local function showHint(row, e)
+    row.key, row.headUnread, row.sectionKeys = nil, nil, nil
+    row.dot:Hide(); row.name:Hide(); row.time:Hide(); row.preview:Hide(); row.pill:Hide(); row.close:Hide()
+    row.chevDown:Hide(); row.chevRight:Hide(); row.caption:Hide(); row.rule:Hide(); row.headPill:Hide(); row.closeAll:Hide()
+    row.groupIcon:Hide(); row.hash:Hide(); row.quiet:Hide()
+    row:SetSelected(false)
+    row.hint:SetText(e.hint)
+    row.hint:Show()
+end
+
 local function showHeader(row, e)
     row.key = nil
     row.headUnread = e.unread
+    row.sectionKeys = e.keys
     row.dot:Hide(); row.name:Hide(); row.time:Hide(); row.preview:Hide(); row.pill:Hide(); row.close:Hide()
+    row.groupIcon:Hide(); row.hash:Hide(); row.quiet:Hide(); row.hint:Hide()
     row:SetSelected(false)
     row.chevDown:SetShown(not e.collapsed)
     row.chevRight:SetShown(e.collapsed)
@@ -918,10 +968,15 @@ local function showChat(row, key, selected, width)
     local th = TG.db.threads[key]
     row.key, row.headUnread = key, nil
     row.chevDown:Hide(); row.chevRight:Hide(); row.caption:Hide(); row.rule:Hide(); row.headPill:Hide(); row.closeAll:Hide()
+    row.hint:Hide()
+    row.sectionKeys = nil
     local name, color, online = TG:ThreadDisplay(key)
     UI.SetRowContact(row, name, color, online)
     if th.muted then row.name:SetText(name .. " |cff888888(muted)|r") end
     row.name:Show()
+    row.groupIcon:SetShown(th.kind == "GROUP")
+    row.hash:SetShown(th.kind == "CHANNEL")
+    if th.kind == "GROUP" or th.kind == "CHANNEL" then row.dot:Hide() end
 
     local last = th.msgs[#th.msgs]
     row.time:SetText(last and UI.ShortTime(last.t) or "")
@@ -930,11 +985,31 @@ local function showChat(row, key, selected, width)
     row.name:SetWidth(math.max(40, width - NAME_X - 8 - (selected and 18 or num(row.time:GetStringWidth(), 30) + 6)))
 
     local unread = th.unread or 0
-    row.pill:SetCount(selected and 0 or unread)
+    local counted = TG.Channels.Counts(th)
+    row.pill:SetCount((selected or not counted) and 0 or unread)
+    row.quiet:SetShown(not selected and not counted and unread > 0)
     row.preview:SetText(UI.PreviewOf(th))
     row.preview:Show()
     row.preview:SetWidth(math.max(40, width - NAME_X - 8 - (row.pill:IsShown() and num(row.pill:GetWidth(), 16) + 6 or 0)))
     row:SetSelected(selected)
+end
+
+-- The All tab: everything except requests, and except channels set not to show there (unless pinned).
+function UI.InAll(th)
+    if th.req then return false end
+    if th.kind == "CHANNEL" and th.inAll == false and not th.fav and not th.tempPin then return false end
+    return true
+end
+
+function UI.Belongs(th, tab)
+    if tab == "all" then return UI.InAll(th) end
+    return UI.TabOf(th) == tab
+end
+
+-- Unread messages that count: a quiet channel's don't.
+function UI.UnreadOf(th)
+    if not TG.Channels.Counts(th) then return 0 end
+    return th.unread or 0
 end
 
 function UI.TabOf(th)
@@ -944,27 +1019,138 @@ function UI.TabOf(th)
     return "dm"
 end
 
+-- How the list is sorted inside each section (Settings > Window, right-click a section header, /tg sort).
+UI.SORTS = { recent = "Most recent", name = "Name", unread = "Unread first" }
+UI.SORT_ORDER = { "recent", "name", "unread" }
+
+function UI:SetSort(how)
+    if not UI.SORTS[how] then return end
+    TG.db.settings.listSort = how
+    self.offset = 0
+    self:RefreshList()
+    if TG.Settings and TG.Settings:IsShown() then TG.Settings:Refresh() end
+end
+
 function UI:SortedKeys(tab)
     tab = tab or self.tab
     local threads = TG.db.threads
     local keys = {}
     for k, th in pairs(threads) do
-        if UI.TabOf(th) == tab then keys[#keys + 1] = k end
+        if UI.Belongs(th, tab) then keys[#keys + 1] = k end
     end
-    table.sort(keys, function(a, b) return (threads[a].order or 0) > (threads[b].order or 0) end)
+    local how = TG.db.settings.listSort or "recent"
+    local function recent(a, b) return (threads[a].order or 0) > (threads[b].order or 0) end
+    if how == "name" then
+        local names = {}
+        for _, k in ipairs(keys) do names[k] = tostring((TG:ThreadDisplay(k))):lower() end
+        table.sort(keys, function(a, b)
+            if names[a] ~= names[b] then return names[a] < names[b] end
+            return recent(a, b)
+        end)
+    elseif how == "unread" then
+        table.sort(keys, function(a, b)
+            local ua, ub = (threads[a].unread or 0) > 0, (threads[b].unread or 0) > 0
+            if ua ~= ub then return ua end
+            return recent(a, b)
+        end)
+    else
+        table.sort(keys, recent)
+    end
     return keys
 end
 
+-- Right-click a section header: mark it as read, or choose how the list is sorted.
+function UI:OpenHeaderMenu(row)
+    if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+    local keys = row.sectionKeys or {}
+    MenuUtil.CreateContextMenu(row, function(_, root)
+        root:CreateButton("Mark all as read", function() TG:MarkRead(keys) end)
+        root:CreateDivider()
+        root:CreateTitle("Sort conversations")
+        for _, how in ipairs(UI.SORT_ORDER) do
+            root:CreateRadio(UI.SORTS[how], function() return (TG.db.settings.listSort or "recent") == how end,
+                function() UI:SetSort(how) end)
+        end
+    end)
+end
+
+-- Right-click a tab: mark everything in it as read.
+function UI:OpenTabMenu(tab)
+    if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+    MenuUtil.CreateContextMenu(tab, function(_, root)
+        root:CreateTitle(tab.baseText)
+        root:CreateButton("Mark all as read", function()
+            TG:MarkRead(tab.id == "requests" and TG.Requests:Keys() or UI:SortedKeys(tab.id))
+        end)
+    end)
+end
+
+-- Choose how the list is sorted.
+function UI:OpenSortMenu(anchor)
+    if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+    MenuUtil.CreateContextMenu(anchor, function(_, root)
+        root:CreateTitle("Sort conversations")
+        for _, how in ipairs(UI.SORT_ORDER) do
+            root:CreateRadio(UI.SORTS[how], function() return (TG.db.settings.listSort or "recent") == how end,
+                function() UI:SetSort(how) end)
+        end
+    end)
+end
+
 local SECTIONS = {
-    { id = "fav", label = "Favorites" },
+    { id = "fav", label = "Pinned" },
     { id = "friends", label = "Friends" },
     { id = "others", label = "Others" },
 }
 
 -- What the list shows, top to bottom: { key = ... } rows and, on the Direct messages tab,
--- { header = id, ... } rows for Favorites / Friends / Others (newest first inside each).
+local ALL_SECTIONS = {
+    { id = "all_pinned", label = "Pinned" },
+    { id = "all_dm", label = "Direct messages" },
+    { id = "all_groups", label = "Group chats" },
+    { id = "all_channels", label = "Channels" },
+}
+
+-- The All tab: Pinned (anything starred, and a dungeon's chat while you're inside), then each kind.
+function UI:BuildAllEntries(keys)
+    local entries = {}
+    if #keys == 0 then return entries end
+    local threads = TG.db.threads
+    local buckets = { all_pinned = {}, all_dm = {}, all_groups = {}, all_channels = {} }
+    for _, k in ipairs(keys) do
+        local th = threads[k]
+        local id = (th.fav or th.tempPin) and "all_pinned" or th.kind == "GROUP" and "all_groups"
+            or th.kind == "CHANNEL" and "all_channels" or "all_dm"
+        local b = buckets[id]
+        b[#b + 1] = k
+    end
+    local collapsed = TG.db.collapsed
+    for _, sec in ipairs(ALL_SECTIONS) do
+        local b = buckets[sec.id]
+        if #b > 0 or sec.id == "all_pinned" then
+            local unread = 0
+            for _, k in ipairs(b) do
+                if k ~= self.selected then unread = unread + UI.UnreadOf(threads[k]) end
+            end
+            entries[#entries + 1] = {
+                header = sec.id, label = sec.label, count = #b, unread = unread, keys = b,
+                collapsed = collapsed[sec.id] and true or false,
+            }
+            if not collapsed[sec.id] then
+                if #b == 0 then
+                    entries[#entries + 1] = { hint = "Star a person, group or channel to pin it here." }
+                end
+                for _, k in ipairs(b) do entries[#entries + 1] = { key = k } end
+            end
+        end
+    end
+    return entries
+end
+
+-- { header = id, ... } rows for Pinned / Friends / Others (sorted inside each).
 function UI:BuildEntries()
     local keys = self:SortedKeys()
+    if self.tab == "all" then return self:BuildAllEntries(keys) end
     local entries = {}
     if self.tab ~= "dm" then
         for i, k in ipairs(keys) do entries[i] = { key = k } end
@@ -985,7 +1171,8 @@ function UI:BuildEntries()
                 if k ~= self.selected then unread = unread + (threads[k].unread or 0) end
             end
             entries[#entries + 1] = {
-                header = sec.id, label = sec.label, count = #b, unread = unread, collapsed = collapsed[sec.id] and true or false,
+                header = sec.id, label = sec.label, count = #b, unread = unread, keys = b,
+                collapsed = collapsed[sec.id] and true or false,
             }
             if not collapsed[sec.id] then
                 for _, k in ipairs(b) do entries[#entries + 1] = { key = k } end
@@ -1000,7 +1187,7 @@ function UI:RefreshList()
     local entries = self:BuildEntries()
     local listH = math.max(ROW_H, num(self.list:GetHeight(), 300))
     local width = math.max(120, num(self.list:GetWidth(), LIST_W - 12))
-    local function heightOf(e) return e.header and HEAD_H or ROW_H end
+    local function heightOf(e) return e.header and HEAD_H or e.hint and HINT_H or ROW_H end
 
     -- don't scroll past the point where the last entries fill the list
     local fit, maxOffset = 0, #entries
@@ -1012,6 +1199,7 @@ function UI:RefreshList()
     self.offset = math.max(0, math.min(self.offset or 0, maxOffset))
 
     local empties = {
+        all = "No conversations yet.\nWhispers, group chats and followed\nchannels will show up here.",
         dm = "No conversations yet.\nWhispers will show up here.",
         groups = "No group chats yet.\nClick + New group to create\none or join with a code.",
         channels = "No followed channels yet.\nClick + Follow channel to\npick guild, party, Trade...",
@@ -1033,6 +1221,8 @@ function UI:RefreshList()
         row.header = e.header or nil
         if e.header then
             showHeader(row, e)
+        elseif e.hint then
+            showHint(row, e)
         else
             showChat(row, e.key, e.key == self.selected, width)
         end
@@ -1060,9 +1250,9 @@ function UI:UpdateHeaderButtons(th)
     self.moreBtn:SetShown(th ~= nil)
     self.renameBtn:SetShown(isGroup)
     self.whoBtn:SetShown(isGroup)
-    self.favBtn:SetShown(isDM)
+    self.favBtn:SetShown(th ~= nil)
     self.inviteBtn:SetShown(isReq)
-    if isDM then
+    if th then
         if th.fav then
             self.favBtn.star:SetVertexColor(1, 0.82, 0.1)
             self.favBtn.star:SetAlpha(1)
@@ -1072,7 +1262,7 @@ function UI:UpdateHeaderButtons(th)
         end
     end
     -- the name gets whatever the buttons leave
-    self.headerBtn:SetPoint("TOPRIGHT", -(isGroup and 196 or isReq and 148 or isDM and 78 or 48), -6)
+    self.headerBtn:SetPoint("TOPRIGHT", -(isGroup and 226 or isReq and 148 or th and 78 or 48), -6)
 end
 
 -- Closes whatever panel is open over the conversation.
@@ -1095,17 +1285,19 @@ end
 
 function UI:UpdateTabs()
     if not self.tabs then return end
-    local counts = { dm = 0, groups = 0, channels = 0, requests = 0 }
+    local counts = { all = 0, dm = 0, groups = 0, channels = 0, requests = 0 }
     for _, th in pairs(TG.db.threads) do
         local t = UI.TabOf(th)
-        counts[t] = counts[t] + (th.unread or 0)
+        local n = UI.UnreadOf(th)
+        counts[t] = counts[t] + n
+        if UI.InAll(th) then counts.all = counts.all + n end
     end
     -- The Requests tab only exists while you're recruiting or still have requests.
     local showReq = TG.Requests:TabVisible()
     self.tabs.requests:SetShown(showReq)
     if self.tab == "requests" and not showReq then
         TG.Requests:ClosePanel()
-        self:SetTab("dm")
+        self:SetTab("all")
         return
     end
     local prev
@@ -1139,7 +1331,8 @@ end
 
 function UI:UpdateNewButton()
     if not self.newBtn then return end
-    local labels = { dm = "+ New message", groups = "+ New group", channels = "+ Follow channel", requests = "All requests" }
+    local labels = { all = "+ New", dm = "+ New message", groups = "+ New group", channels = "+ Follow channel",
+        requests = "All requests" }
     self.newBtn:SetText(labels[self.tab] or "+ New message")
 end
 
@@ -1154,6 +1347,7 @@ function UI:SetTab(tab)
     end
     self.tab = tab
     self.offset = 0
+    if tab ~= "requests" then TG.db.lastTab = tab end
     self:UpdateNewButton()
     self:UpdateTabs()
     if self.tab ~= tab then return end -- the tab isn't available (no requests); UpdateTabs moved on
@@ -1161,7 +1355,7 @@ function UI:SetTab(tab)
     -- (a request that was starred, a stranger who became a request...).
     local key = self.selectedByTab[tab]
     local th = key and TG.db.threads[key]
-    if not th or UI.TabOf(th) ~= tab then
+    if not th or not UI.Belongs(th, tab) then
         key = self:SortedKeys(tab)[1]
         self.selectedByTab[tab] = key
     end
@@ -1253,6 +1447,7 @@ function UI:Select(key)
     local th = TG.db.threads[key]
     if not th then return end
     local tab = UI.TabOf(th)
+    if self.tab == "all" and UI.InAll(th) then tab = "all" end
     if tab ~= self.tab then
         self.tab = tab
         self.offset = 0
@@ -1292,6 +1487,7 @@ function UI:ShowEmpty()
     self.msgs:Clear()
     self.lastDay = nil
     local hints = {
+        all = "Click + New to start a conversation, make a group chat or follow a channel.",
         dm = "Click + New message to start a conversation.",
         groups = "Click + New group to create a group chat or join one with an invite code.",
         channels = "Click + Follow channel to bring guild, party or other channels into Telegnome.",
@@ -1318,7 +1514,7 @@ function UI:OnThreadUpdated(key, incoming)
     if not self.frame or not self.frame:IsShown() then return end
     if incoming then self:PulseCogs() end
     local th = TG.db.threads[key]
-    local sameTab = th and UI.TabOf(th) == self.tab
+    local sameTab = th and UI.Belongs(th, self.tab)
     if (not self.selected or not TG.db.threads[self.selected]) and sameTab then
         self:Select(key)
         return
@@ -1344,6 +1540,11 @@ function UI:OnThreadDeleted(key)
 end
 
 function UI:OnShow()
+    if not self.tabRestored then
+        self.tabRestored = true
+        local last = TG.db.lastTab
+        if last and last ~= "requests" and self.tabs and self.tabs[last] then self.tab = last end
+    end
     local key = self.selected
     if not key or not TG.db.threads[key] then key = self:SortedKeys()[1] end
     self:UpdateNewButton()

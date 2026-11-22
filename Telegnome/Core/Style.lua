@@ -17,6 +17,7 @@ S.CHEV_DOWN = S.MEDIA .. "ChevDown"
 S.CHEV_RIGHT = S.MEDIA .. "ChevRight"
 S.DOTS = S.MEDIA .. "Dots"
 S.SEARCH = S.MEDIA .. "Search"
+S.GROUP = S.MEDIA .. "Group"
 S.TEXT = { 0.94, 0.90, 0.82 }      -- message and body text
 S.DIM = { 0.66, 0.59, 0.48 }       -- secondary text: times, previews, captions
 S.BADGE = { 0.70, 0.15, 0.12 }     -- unread badges
