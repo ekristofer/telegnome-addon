@@ -105,6 +105,35 @@ end
 
 local ROLE_NAMES = { TANK = "Tank", HEALER = "Healer", DAMAGER = "Damage" }
 
+-- Words that say which role someone plays, and classes that can only deal damage.
+local ROLE_WORDS = {
+    TANK = { "tank", "prot", "protection", "bear", "blood" },
+    HEALER = { "heal", "heals", "healer", "healing", "holy", "resto", "restoration", "disc", "discipline", "mw" },
+    DAMAGER = { "dps", "dd", "damage", "ret", "fury", "arms", "feral", "boomkin", "balance", "shadow", "ele",
+        "elemental", "enh", "enhancement", "unholy", "frost", "fire", "arcane", "affli", "destro", "demo",
+        "assa", "combat", "sub", "mm", "bm", "survival" },
+}
+local DAMAGE_CLASSES = { ROGUE = true, MAGE = true, HUNTER = true, WARLOCK = true }
+
+-- The roles a request could fill: { TANK = true, ... }, or nil when there is no clue.
+function R.RolesOf(th)
+    if ROLE_NAMES[th.role] then return { [th.role] = true } end
+    local words = {}
+    for _, m in ipairs(th.msgs or {}) do
+        if not m.out and not m.sys and type(m.text) == "string" then
+            for w in m.text:lower():gmatch("%a+") do words[w] = true end
+        end
+    end
+    local roles, any = {}, false
+    for role, list in pairs(ROLE_WORDS) do
+        for _, w in ipairs(list) do
+            if words[w] then roles[role] = true; any = true; break end
+        end
+    end
+    if not any and DAMAGE_CLASSES[th.class] then return { DAMAGER = true } end
+    return any and roles or nil
+end
+
 -- People who applied through the group finder come with level, class, role and item level.
 function R:ScanApplicants()
     if not (C_LFGList and C_LFGList.GetApplicants and C_LFGList.GetApplicantInfo and C_LFGList.GetApplicantMemberInfo) then
@@ -307,14 +336,14 @@ end
 
 function R:Reply(key, text)
     if type(text) ~= "string" or not text:match("%S") then return end
-    TG:Send(key, text)
+    TG:Send(key, TG.Social.Expand(text, key))
 end
 
 -- Sends the decline message, then dismisses the request.
 function R:Decline(key)
     local text = TG.db.settings.declineReply
     if type(text) == "string" and text:match("%S") and TG.db.threads[key] then
-        TG:Send(key, text)
+        TG:Send(key, TG.Social.Expand(text, key))
         if not (TG.Demo and TG.Demo.on) then self.declined[key] = GetTime() end
     end
     self:Dismiss(key)
@@ -329,13 +358,13 @@ function R:OpenReplyMenu(key, anchor)
         for _, text in ipairs(s.quickReplies or {}) do
             if type(text) == "string" and text:match("%S") then
                 any = true
-                root:CreateButton(text, function() R:Reply(key, text) end)
+                root:CreateButton(TG.Social.Expand(text, key), function() R:Reply(key, text) end)
             end
         end
         if not any then root:CreateTitle("|cff888888(none set - see Settings)|r") end
         if type(s.declineReply) == "string" and s.declineReply:match("%S") then
             root:CreateDivider()
-            root:CreateButton("Decline: " .. s.declineReply, function() R:Decline(key) end)
+            root:CreateButton("Decline: " .. TG.Social.Expand(s.declineReply, key), function() R:Decline(key) end)
         end
     end)
 end
@@ -589,13 +618,44 @@ function R:Create()
     status:SetWordWrap(false)
     self.status = status
 
+    -- role summary and filter: All 6 · Tanks 1 · Healers 2 · Damage 3 · Unknown 1
+    self.chips = {}
+    local prevChip
+    for _, def in ipairs({ { nil, "All" }, { "TANK", "Tanks" }, { "HEALER", "Healers" }, { "DAMAGER", "Damage" },
+        { "UNKNOWN", "Unknown" } }) do
+        local chip = S.Link(f, def[2])
+        chip.role, chip.label = def[1], def[2]
+        chip.fs:SetFontObject("GameFontNormal")
+        chip:SetHeight(18)
+        local under = chip:CreateTexture(nil, "ARTWORK")
+        under:SetPoint("BOTTOMLEFT", 2, 0)
+        under:SetPoint("BOTTOMRIGHT", -2, 0)
+        under:SetHeight(2)
+        S.Paint(under, "hi", 1)
+        chip.under = under
+        if prevChip then
+            chip:SetPoint("LEFT", prevChip, "RIGHT", 14, 0)
+        else
+            chip:SetPoint("TOPLEFT", 14, -38)
+        end
+        chip:SetScript("OnClick", function()
+            R.roleFilter = chip.role
+            R.offset = 0
+            R:Refresh()
+        end)
+        prevChip = chip
+        self.chips[#self.chips + 1] = chip
+    end
+    S.Tooltip(self.chips[2], "Roles", "From the group finder application, or words in their whispers "
+        .. "(\"tank\", \"holy\", \"dps\"...). Counts are for requests still waiting. Click to show only that role.")
+
     local list = CreateFrame("Frame", nil, f)
-    list:SetPoint("TOPLEFT", 14, -42)
+    list:SetPoint("TOPLEFT", 14, -64)
     list:SetPoint("BOTTOMRIGHT", -20, 46)
 
     -- a thin scroll indicator, shown when there are more requests than fit
     local track = CreateFrame("Frame", nil, f)
-    track:SetPoint("TOPRIGHT", -9, -42)
+    track:SetPoint("TOPRIGHT", -9, -64)
     track:SetPoint("BOTTOMRIGHT", -9, 52)
     track:SetWidth(4)
     local trackBg = track:CreateTexture(nil, "BACKGROUND")
@@ -693,16 +753,59 @@ local function classText(th)
     return class or "", c and (c.r or 1) or 0.85, c and (c.g or 1) or 0.82, c and (c.b or 1) or 0.75
 end
 
-local function extraText(th)
+local function extraText(th, key)
     local extra = {}
+    local note = TG.Social:GetNote(key)
+    if note then
+        local short = TG.Utf8Left(note, 32)
+        extra[#extra + 1] = "|cffd9b56a" .. (short ~= note and short .. "..." or short):gsub("|", "||") .. "|r"
+    end
     if ROLE_NAMES[th.role] then extra[#extra + 1] = ROLE_NAMES[th.role] end
     if th.ilvl then extra[#extra + 1] = ("item level %d"):format(th.ilvl) end
     if th.applied then extra[#extra + 1] = "applied" end
     return table.concat(extra, "  \194\183  ")
 end
 
-function R:FillRows()
+-- The chips: how many waiting requests could fill each role, and which filter is on.
+function R:UpdateChips()
+    if not self.chips then return end
+    local counts = { TANK = 0, HEALER = 0, DAMAGER = 0, UNKNOWN = 0 }
+    local open = self:OpenKeys()
+    for _, key in ipairs(open) do
+        local roles = R.RolesOf(TG.db.threads[key])
+        if roles then
+            for role in pairs(roles) do counts[role] = counts[role] + 1 end
+        else
+            counts.UNKNOWN = counts.UNKNOWN + 1
+        end
+    end
+    for _, chip in ipairs(self.chips) do
+        local n = chip.role and counts[chip.role] or #open
+        chip.fs:SetText(("%s |cffffffff%d|r"):format(chip.label, n))
+        chip:SetWidth(S.Num(chip.fs:GetStringWidth(), 50) + 6)
+        local on = chip.role == self.roleFilter
+        chip.under:SetShown(on)
+        if on then chip.fs:SetTextColor(1, 0.82, 0) else chip.fs:SetTextColor(0.72, 0.66, 0.53) end
+        chip:SetShown(chip.role ~= "UNKNOWN" or counts.UNKNOWN > 0 or self.roleFilter == "UNKNOWN")
+    end
+end
+
+-- Requests shown under the current role filter.
+function R:FilteredKeys()
     local keys = self:Keys()
+    local want = self.roleFilter
+    if not want then return keys end
+    local out = {}
+    for _, key in ipairs(keys) do
+        local roles = R.RolesOf(TG.db.threads[key])
+        if (want == "UNKNOWN" and not roles) or (roles and roles[want]) then out[#out + 1] = key end
+    end
+    return out
+end
+
+function R:FillRows()
+    self:UpdateChips()
+    local keys = self:FilteredKeys()
     local visible = math.max(1, math.floor((S.Num(self.list:GetHeight(), 300) + (PITCH - ROW_H)) / PITCH))
     self.offset = math.min(self.offset or 0, math.max(0, #keys - visible))
     if #keys > visible then
@@ -734,7 +837,7 @@ function R:FillRows()
             local class, cr, cg, cb = classText(th)
             row.class:SetText(class)
             row.class:SetTextColor(cr, cg, cb)
-            row.extra:SetText(extraText(th))
+            row.extra:SetText(extraText(th, key))
             row.unread:SetCount(th.unread or 0)
             local m = lastIncoming(th)
             row.text:SetText(m and m.text or "")

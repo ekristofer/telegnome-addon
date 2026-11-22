@@ -189,6 +189,9 @@ function O:Create()
     check("Show who joins and leaves group chats", 30,
         function() return s().groupJoinLeave end, function(v) s().groupJoinLeave = v end,
         "Joined / left", "A grey line in the group when a member comes online (joins) or goes offline (leaves).")
+    check("Tell me about unread messages when I log in", 30,
+        function() return s().loginSummary ~= false end, function(v) s().loginSummary = v end,
+        "On login", "A line in chat a few seconds after you log in, when messages from last time are still unread.")
 
     local kwLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     kwLabel:SetPoint("TOPLEFT", 44, y - 8)
@@ -378,6 +381,10 @@ function O:Create()
         "Keep typing", "On: the cursor stays in the message box after you send, so you can write the next "
         .. "message straight away. Off: the box lets go after each message, like the game's chat, and you "
         .. "click it (or press Enter) to write again.")
+    check("Count people I grouped with in the last week as friends", 0,
+        function() return s().groupedFriends ~= false end, function(v) s().groupedFriends = v; TG:QueueRefresh() end,
+        "Grouped with", "Players you were in a group with in the last seven days are listed under Friends, and their "
+        .. "whispers don't go to Requests. The conversation says when you last grouped.")
     check("Pick up group codes from chat", 0,
         function() return s().detectInvites end, function(v) s().detectInvites = v end,
         "Group codes",
@@ -406,6 +413,11 @@ function O:Create()
     local qrHint = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     qrHint:SetPoint("TOPLEFT", 18, y)
     qrHint:SetText("Quick replies (the Reply button on a request):")
+    y = y - 16
+    local blanks = content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    blanks:SetPoint("TOPLEFT", 18, y)
+    blanks:SetText("{name}, {class} and {level} are filled in for the person you answer.")
+    blanks:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
     y = y - 18
     self.replyBoxes = {}
     local function replyBox(label, get, set)

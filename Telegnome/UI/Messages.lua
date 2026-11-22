@@ -347,8 +347,27 @@ function View:AddDivider(text)
     self:Append({ kind = "divider", text = text })
 end
 
-function View:AddNote(text, r, g, b, center)
-    self:Append({ kind = "note", text = text, r = r, g = g, b = b, center = center })
+function View:AddNote(text, r, g, b, center, idx)
+    self:Append({ kind = "note", text = text, r = r, g = g, b = b, center = center, idx = idx })
+end
+
+-- Scrolls to the message with this number in the conversation and lights it up for a moment (search).
+function View:Reveal(idx)
+    if not idx then return end
+    for i, item in ipairs(self.items) do
+        if item.idx == idx then
+            self:ScrollTo(self.topPad + item.y - 30)
+            local f = self.frames[i]
+            if f and f.bg then
+                f.bg:SetShown(true)
+                f.bg:SetColor(S.HI[1] * 0.45, S.HI[2] * 0.45, S.HI[3] * 0.45, 1)
+                C_Timer.After(1.6, function()
+                    if f.item == item then self:Fill(f, item) end
+                end)
+            end
+            return
+        end
+    end
 end
 
 -- msg: { sender = id, who = name, color = { r, g, b }, out = bool, t = time, text = string }
@@ -359,7 +378,7 @@ function View:AddMessage(msg)
         and (msg.t or 0) - (last.t or 0) < GROUP_SECONDS and (msg.t or 0) >= (last.t or 0)
     self:Append({
         kind = "msg", sender = msg.sender, who = msg.who, color = msg.color, out = msg.out,
-        time = msg.t and date("%H:%M", msg.t) or "", t = msg.t, text = msg.text, cont = cont or nil,
+        time = msg.t and date("%H:%M", msg.t) or "", t = msg.t, text = msg.text, cont = cont or nil, idx = msg.idx,
     })
 end
 

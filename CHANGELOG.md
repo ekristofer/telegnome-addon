@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0
+- Search: the magnifier next to + New message (or `/tg search <text>`) finds messages in all conversations. "Search in this conversation" is in the ... menu. Click a result to open the conversation at that message.
+- Notes: "Add note..." in a person's menu. The note shows under their name in the conversation and on their request card.
+- Recently grouped with: people you were in a group with in the last week sort under Friends, and their whispers don't go to Requests. The conversation says when you last grouped. Can be turned off in Settings > Chat.
+- Requests: a role summary at the top (Tanks, Healers, Damage), worked out from the group finder application or words in the whisper. Click a role to show only those requests.
+- Quick replies can use {name}, {class} and {level}, filled in for the person you answer.
+- On login, a line in chat tells you when unread messages are waiting (Settings > Notifications).
+
 ## 0.8.1
 - New setting (Settings > Chat): "Keep typing after sending a message". On by default; untick it and the message box lets go after each message, like the game's chat.
 - Slaay mode: the rainbow stripe no longer runs through the tab names.

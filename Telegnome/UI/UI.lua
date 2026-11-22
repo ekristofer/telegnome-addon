@@ -322,8 +322,13 @@ function UI:Create()
     watermark:SetPoint("BOTTOMRIGHT", 50, -50)
     watermark:SetAlpha(0.05)
 
-    local newBtn = S.Button(left, "+ New message", LIST_W - 20, 26)
-    newBtn:SetPoint("TOP", 0, -10)
+    local newBtn = S.Button(left, "+ New message", LIST_W - 52, 26)
+    newBtn:SetPoint("TOPLEFT", 10, -10)
+    local searchBtn = S.IconButton(left, S.SEARCH, 26, 15)
+    searchBtn:SetPoint("LEFT", newBtn, "RIGHT", 6, 0)
+    searchBtn:SetScript("OnClick", function() TG.Search:Toggle() end)
+    S.Tooltip(searchBtn, "Search", "Find a message in any conversation. Also: /tg search <text>")
+    self.searchBtn = searchBtn
     newBtn:SetScript("OnClick", function()
         if UI.tab == "requests" then
             TG.Requests:TogglePanel()
@@ -567,6 +572,7 @@ function UI:Create()
     f:SetScript("OnShow", function() UI:OnShow() end)
     f:SetScript("OnHide", function()
         TG.Picker:Close(); TG.Settings:Close(); TG.Groups:ClosePanel(); TG.Channels:ClosePanel(); TG.ChannelList:Close(); TG.Requests:ClosePanel()
+        TG.Search:Close()
     end)
 
     self:RestorePos()
@@ -578,9 +584,11 @@ end
 function UI:UpdateCovered()
     local settings = TG.Settings:IsShown() and true or false
     local whole = settings or TG.Requests:IsPanelShown() or false          -- these cover the list too
-    local convCovered = whole or TG.Groups:IsPanelShown() or TG.Channels:IsPanelShown()
-        or TG.ChannelList:IsShown() or false
+    local otherPanel = TG.Groups:IsPanelShown() or TG.Channels:IsPanelShown() or TG.ChannelList:IsShown() or false
     local picker = TG.Picker.frame and TG.Picker.frame:IsShown() or false  -- this one covers just the list
+    -- Search gives way when another panel opens on top of it
+    if TG.Search:IsShown() and (whole or otherPanel or picker) then TG.Search:Close() end
+    local convCovered = whole or otherPanel or TG.Search:IsShown() or false
     local state = (settings and 1 or 0) + (whole and 2 or 0) + (convCovered and 4 or 0) + (picker and 8 or 0)
     if state == self.coveredState then return end
     self.coveredState = state
@@ -665,7 +673,9 @@ end
 -- Telegnome's own entries for a person's right-click menu.
 function UI.AddMenuEntries(root, key)
     local th = TG.db.threads[key]
+    root:CreateButton(TG.Social:GetNote(key) and "Edit note..." or "Add note...", function() TG.Social:EditNote(key) end)
     if th then
+        root:CreateButton("Search in this conversation", function() TG.Search:Open(key) end)
         root:CreateButton(th.muted and "Unmute" or "Mute (no pop-ups or sound)", function()
             TG:SetMuted(key, not th.muted)
         end)
@@ -1073,6 +1083,7 @@ function UI:CloseOverlays()
     TG.Channels:ClosePanel()
     TG.ChannelList:Close()
     TG.Requests:ClosePanel()
+    TG.Search:Close()
 end
 
 -- A passing note in the open conversation (not saved), e.g. who is online in a group.
@@ -1181,7 +1192,7 @@ local YOU = { 0.96, 0.82, 0.48 }
 local YOU_SLAY = { 1, 0.41, 0.71 }
 local OTHER = { 0.9, 0.9, 0.9 }
 
-function UI:RenderMessage(th, m, name, color)
+function UI:RenderMessage(th, m, name, color, idx)
     local view = self.msgs
     local day = date("%Y-%m-%d", m.t)
     if day ~= self.lastDay then
@@ -1189,17 +1200,17 @@ function UI:RenderMessage(th, m, name, color)
         view:AddDivider(date("%A %d %B", m.t))
     end
     if m.sys then
-        view:AddNote(("%s  %s"):format(date("%H:%M", m.t), m.text), nil, nil, nil, true)
+        view:AddNote(("%s  %s"):format(date("%H:%M", m.t), m.text), nil, nil, nil, true, idx)
         return
     end
     if m.out then
-        view:AddMessage({ sender = "\1me", who = "You", out = true, t = m.t, text = m.text,
+        view:AddMessage({ sender = "\1me", who = "You", out = true, t = m.t, text = m.text, idx = idx,
             color = TG.Slay and TG.Slay:IsOn() and YOU_SLAY or YOU })
         return
     end
     if th.kind == "GROUP" or th.kind == "CHANNEL" then
         local c = m.cls and RAID_CLASS_COLORS and RAID_CLASS_COLORS[m.cls]
-        view:AddMessage({ sender = m.from or "?", who = m.from or "?", t = m.t,
+        view:AddMessage({ sender = m.from or "?", who = m.from or "?", t = m.t, idx = idx,
             color = c and { c.r, c.g, c.b } or OTHER,
             text = (m.hl and "|cffffd100>>|r " or "") .. m.text })
         return
@@ -1209,11 +1220,11 @@ function UI:RenderMessage(th, m, name, color)
     if code then
         text = text .. ("\n|Htelegnome:join:%s:%s|h|cffffd100[Join %s]|r|h"):format(code, gname or "", gname or "group")
     end
-    view:AddMessage({ sender = "\1them", who = name, color = color, t = m.t, text = text })
+    view:AddMessage({ sender = "\1them", who = name, color = color, t = m.t, text = text, idx = idx })
 end
 
 -- The small line under the name.
-local function subLine(th)
+local function subLine(th, key)
     local parts = {}
     if th.kind == "GROUP" then
         parts[1] = th.code and ("Code: " .. th.code) or "Invite code unknown"
@@ -1231,6 +1242,10 @@ local function subLine(th)
         end
     end
     if th.muted then parts[#parts + 1] = "Muted" end
+    local grouped = TG.Social and TG.Social:GroupedAt(th)
+    if grouped then parts[#parts + 1] = "Grouped " .. UI.ShortTime(grouped) end
+    local note = TG.Social and TG.Social:GetNote(key)
+    if note then parts[#parts + 1] = "|cffd9b56a" .. note:gsub("|", "||") .. "|r" end
     return table.concat(parts, "  \194\183  ")
 end
 
@@ -1250,7 +1265,7 @@ function UI:Select(key)
     local name, color = TG:ThreadDisplay(key)
     self.header:SetText(name)
     self.header:SetTextColor(color[1], color[2], color[3])
-    self.subHeader:SetText(subLine(th))
+    self.subHeader:SetText(subLine(th, key))
     self:UpdateHeaderButtons(th)
 
     local view = self.msgs
@@ -1260,7 +1275,7 @@ function UI:Select(key)
     if #th.msgs == 0 then
         view:AddNote("New conversation - type below and press Enter.", nil, nil, nil, true)
     end
-    for _, m in ipairs(th.msgs) do self:RenderMessage(th, m, name, color) end
+    for i, m in ipairs(th.msgs) do self:RenderMessage(th, m, name, color, i) end
     view:End()
 
     self:UpdatePlaceholder()
@@ -1292,7 +1307,7 @@ end
 -- A panel (settings, new group, follow channels, your channels) covers the conversation.
 function UI:OverlayShown()
     return TG.Settings:IsShown() or TG.Groups:IsPanelShown() or TG.Channels:IsPanelShown()
-        or TG.ChannelList:IsShown() or TG.Requests:IsPanelShown() or false
+        or TG.ChannelList:IsShown() or TG.Requests:IsPanelShown() or TG.Search:IsShown() or false
 end
 
 function UI:IsViewing(key)

@@ -35,12 +35,14 @@ local DEFAULTS = {
         groupJoinLeave = true, -- "X joined / left" lines in group chats
         enterToTelegnome = true, -- Enter puts the cursor in Telegnome while its window is open
         keepTyping = true,    -- after sending, the cursor stays in the message box
+        groupedFriends = true, -- people you grouped with in the last week count as friends
+        loginSummary = true,  -- a line in chat on login when unread messages are waiting
         slay = false,         -- /tg slaay-mode
         theme = "brass",      -- colour theme (see Style.THEMES)
         textSize = "normal",  -- message text: small / normal / large
         compactChat = false,  -- one line per message ("12:30 Name: text") instead of bubbles
         -- one-click answers for requests (Settings > Requests)
-        quickReplies = { "Inviting you now.", "What level and role are you?", "One moment, checking the group." },
+        quickReplies = { "Inviting you now, {name}!", "What level and role are you?", "One moment, checking the group." },
         declineReply = "Sorry, the group is full.",
         requestsTab = true,   -- collect strangers' whispers under Requests while listed in the group finder
         requestsCollect = true, -- the tick in the Requests view: untick to pause collecting while listed
@@ -417,6 +419,7 @@ end
 function TG:IsFriendly(th)
     if th.kind == "BN" then return true end
     if self:IsCharacterFriend(th) then return true end
+    if self.Social and self.Social:GroupedAt(th) then return true end
     if th.guid and IsGuildMember then
         local ok, res = pcall(IsGuildMember, th.guid)
         if ok and res then return true end
@@ -934,6 +937,8 @@ SlashCmdList.TELEGNOME = function(input)
         TG.Channels:OpenPanel()
     elseif cmd == "mychannels" or cmd == "slots" then
         TG.ChannelList:Open()
+    elseif verb == "search" or cmd == "search" or cmd == "find" then
+        TG.Search:Open(nil, rest)
     elseif verb == "opacity" or cmd == "opacity" then
         local n = tonumber(rest or "")
         if n then
@@ -1017,6 +1022,7 @@ SlashCmdList.TELEGNOME = function(input)
         print("  /tg join <code> - join a group chat")
         print("  /tg channels - choose followed channels")
         print("  /tg mychannels - every chat channel you're in, with Leave buttons")
+        print("  /tg search <text> - search your saved messages")
         print("  /tg opacity <30-100> - main window opacity (" .. (s.opacity or 100) .. "%)")
         print("  /tg dnd - do not disturb (" .. onOff(s.dnd) .. ")")
         print("  /tg theme <name> - colour theme (" .. TG.Style.theme.label .. ")")

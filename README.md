@@ -10,7 +10,10 @@ Telegnome moves your private messages out of the busy main chat and into a messe
 ## Features
 
 - **Direct messages**: every whisper and Battle.net whisper gets its own conversation with saved history. Reply from the window. The list is grouped into **Favorites**, **Friends** and **Others**, so a flood of strangers never buries your friends.
-- **Requests**: while you're listed in the group finder, whispers from strangers land in their own tab with class, level and an Invite button.
+- **Requests**: while you're listed in the group finder, whispers from strangers land in their own tab with class, level, role and an Invite button.
+- **Search**: find any saved message, in all conversations or in one.
+- **Notes**: a short private note per person, shown under their name.
+- **Recently grouped with**: people you grouped with in the last week sort under Friends.
 - **Group chats**: private, password-protected group chats you join with a friendly invite code like `sprocket-whistle-gizmo-427`.
 - **Followed channels**: mirror Guild, Officer, Party, Raid, Instance, Say, Yell or any joined channel (General, Trade, custom) into their own tab.
 - **Notifier**: a small on-screen cog shows how many messages you've missed. It grows to show new messages, then shrinks back.
@@ -22,7 +25,8 @@ Telegnome moves your private messages out of the busy main chat and into a messe
 - Sound for new messages, with a choice of sounds.
 - Adjustable window opacity, so you can keep it open over the game. It turns solid when you hover or type.
 - Delivery feedback in the conversation (offline, away, ignoring you), shift-click links, key bindings, alert words for followed channels.
-- Classic look, with brass cogs - or pick another colour theme (Orange, Horde red, Alliance blue, Arcane, Fel green, Steel).
+- The game's own window frame, with brass cogs - and a colour theme for everything inside it (Brass, Orange, Horde red, Alliance blue, Arcane, Fel green, Steel).
+- Chat bubbles, or compact one-line messages if you prefer the game's look.
 
 ## Installation
 
@@ -52,6 +56,7 @@ Open Telegnome with the minimap button, the addons button by the minimap, or `/t
 | `/tg theme <name>` | Colour theme: brass, orange, horde, alliance, arcane, fel, steel |
 | `/tg config` | Settings |
 | `/tg mychannels` | Every chat channel you're in, with Leave buttons |
+| `/tg search <text>` | Search your saved messages |
 | `/tg recruit` | Collect strangers' whispers under Requests (manual switch) |
 | `/tg dnd` | Toggle Do not disturb |
 | `/tg only` | Keep whispers, Battle.net whispers and followed channels out of the main chat |
@@ -70,16 +75,23 @@ Open Telegnome with the minimap button, the addons button by the minimap, or `/t
 The Direct messages list has three sections, newest conversation first in each:
 
 - **Favorites**: click the star next to a conversation's name (or right-click > Add to favorites). Always on top.
-- **Friends**: Battle.net friends, your friends list and guild members - sorted in automatically.
+- **Friends**: Battle.net friends, your friends list, guild members and people you were in a group with in the last week - sorted in automatically.
 - **Others**: everyone else. Click the header to fold the section away; **Close all** closes every conversation in it and forgets those contacts.
 
 Right-click someone in **+ New message** and choose **Forget contact** to take them off that list.
+
+### Search and notes
+
+- The magnifier next to **+ New message** searches every saved message (or type `/tg search <text>`). Click a result to open the conversation at that message.
+- **Search in this conversation** and **Add note...** are in the **...** menu next to a person's name. Notes are private and show under the name and on their request card.
 
 ### Requests
 
 List yourself or your group in the group finder and a **Requests** tab appears. Whispers from people who aren't friends, guild members or favorites are collected there, so they don't flood your Direct messages.
 
 - Each request shows the player's class, level and latest message.
+- The row at the top counts the roles waiting (Tanks, Healers, Damage), from the group finder application or words like "tank", "holy" or "dps" in the whisper. Click a role to show only those requests.
+- Quick replies can use `{name}`, `{class}` and `{level}`, which are filled in for the person you answer.
 - **Invite** invites them to your group; **x** dismisses the request; clicking the row opens the conversation.
 - The level is read from the whisper ("70 mage", "lvl 45") or from their group finder application. **Check** looks the player up, also when a level looks wrong; the game only answers every few seconds, so the button counts down until you can ask again.
 - Click the star in a request's conversation to keep that person - they move to Direct messages.
@@ -163,15 +175,18 @@ Telegnome/               the addon folder (this is what goes into AddOns)
   Bindings.xml           key bindings
   Core/Core.lua          saved data, whisper events, sending, chat filters, slash commands
   Core/Style.lua         shared classic-style widgets (panels, buttons, cogs)
-  UI/UI.lua              main window, tabs, conversation view
+  UI/Messages.lua        the message area (bubbles, compact lines, dates)
+  UI/UI.lua              main window, tabs, conversation list and header
   UI/Picker.lua          "New message" contact picker
   UI/ChannelList.lua     "Your chat channels" list
+  UI/Search.lua          message search
   UI/Settings.lua        settings panel
   UI/Notifier.lua        on-screen counter / notification
   UI/Minimap.lua         minimap button
   Features/Groups.lua    group chats (invite codes, hashing, channels)
   Features/Channels.lua  followed channels
   Features/Requests.lua  Requests tab (group finder whispers)
+  Features/Social.lua    recently grouped with, notes, reply blanks, login summary
   Media/                 icon and cog textures (.tga)
 docs/                    images for this README
 ```
