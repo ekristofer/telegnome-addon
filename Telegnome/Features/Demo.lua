@@ -200,7 +200,7 @@ function D:Stop(quiet)
     if UI.frame then
         UI:ShowEmpty()
         UI:RefreshList()
-        local first = UI:SortedKeys()[1]
+        local first = UI:FirstKey()
         if first and UI.frame:IsShown() then UI:Select(first) end
     end
     TG:RefreshUnread()

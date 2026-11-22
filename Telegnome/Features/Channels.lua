@@ -267,7 +267,6 @@ function C:OpenMenu(key, anchor)
         root:CreateTitle(th.name)
         root:CreateButton(th.fav and "Unpin" or "Pin to the top", function() TG:SetFavorite(key, not th.fav) end)
         UI.AddPinMoveEntries(root, key)
-        UI.AddArchiveEntry(root, key)
         root:CreateCheckbox("Pop-up notifications",
             function() return th.notify and true or false end,
             function() th.notify = not th.notify end)
@@ -493,7 +492,7 @@ function C:ClosePanel()
     self.panel:Hide()
     UI:UpdateNewButton()
     if UI.frame:IsShown() then
-        local key = UI.selected or UI:SortedKeys()[1]
+        local key = UI.selected or UI:FirstKey()
         if key then UI:Select(key) end
     end
 end

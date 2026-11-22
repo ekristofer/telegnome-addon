@@ -12,7 +12,9 @@
 - Requests no longer show item level.
 - A thin scroll indicator shows at the edge of the conversation list when not everything fits.
 - Reorder Pinned: drag a pinned conversation onto another, or use Move up / Move down in its right-click menu.
-- Archive: a folded section at the bottom of the All and Direct tabs. Direct messages with nothing new for two weeks go there (Settings > Chat: 1 week, 2 weeks, 1 month or never), and you can archive any conversation from its right-click menu. A new message brings it back.
+- Archive: a folded section at the bottom of the All and Direct tabs. Direct messages with nothing new for a week go there (Settings > Chat: pick the number of days, or turn it off), and you can archive one from its right-click menu. A new message brings it back. Close all on the Archive header closes every archived conversation. Group chats and channels are never archived.
+- After closing a conversation or switching tabs, Telegnome opens the one at the top of the list, never one hidden in a folded section.
+- A Party or Raid chat followed just for a dungeon stays followed if you pinned it while inside.
 - Right-clicking a Battle.net friend who is offline opens Telegnome's menu when the game's own menu doesn't appear.
 - **All tab:** a new first tab with everything in one list: Pinned, Direct messages, Group chats and Channels. Group chats show a two-people icon and channels a #. The Direct, Groups and Channels tabs stay as filters. New installs start on All; Telegnome opens on the tab you used last.
 - **Pin anything:** the star now works on group chats and channels too ("Favorites" is now "Pinned"). Pinned conversations sit at the top of the All tab.

@@ -44,7 +44,8 @@ local DEFAULTS = {
         listSort = "recent",  -- conversation list: recent / name / unread (unread first, then recent)
         combatQuiet = true,   -- hold pop-ups and sounds during combat, one summary afterwards
         instanceChat = "ask", -- dungeons and raids: ask / always / never follow Party or Raid chat
-        archiveDays = 14,     -- direct messages with no messages for this many days go to Archive (0: never)
+        archiveOn = true,     -- direct messages with nothing new for archiveDays days go to Archive
+        archiveDays = 7,
         -- one-click answers for requests (Settings > Requests)
         quickReplies = { "Inviting you now, {name}!", "What level and role are you?", "One moment, checking the group." },
         declineReply = "Sorry, the group is full.",
@@ -154,6 +155,13 @@ local function migrate(db)
         db.collapsed = db.collapsed or {}
         db.collapsed.archive, db.collapsed.all_archive = true, true
         db.archive090 = true
+    end
+    -- 0.9 beta: a number of days instead of fixed choices, one week by default
+    if not db.archiveDays090 then
+        local d = db.settings.archiveDays
+        if d == 0 then db.settings.archiveOn = false end
+        if d == 0 or d == 14 then db.settings.archiveDays = 7 end
+        db.archiveDays090 = true
     end
     -- 0.7.0: the tick in the Requests view no longer means "collect at any time" - that is /tg recruit only.
     if not db.requestsTick070 then
@@ -309,6 +317,7 @@ function TG:EnsureThread(key, info)
 
     db.seq = (db.seq or 0) + 1
     th.order = db.seq
+    th.active = time() -- a message, or opened from New message (for Archive)
     if info.kind ~= "GROUP" and info.kind ~= "CHANNEL" then self:RememberContact(key, info) end
     return th
 end
@@ -454,14 +463,16 @@ end
 -- (Settings > Chat). A new message, sent or received, brings a conversation back.
 function TG:LastActivity(th)
     local m = th.msgs and th.msgs[#th.msgs]
-    return math.max(m and m.t or 0, th.unarchivedAt or 0)
+    return math.max(m and m.t or 0, th.active or 0, th.unarchivedAt or 0)
 end
 
 function TG:IsArchived(th)
     if not th or th.fav or th.tempPin or (th.unread or 0) > 0 then return false end
+    if th.kind ~= "WHISPER" and th.kind ~= "BN" then return false end -- direct messages only
     if th.archived then return true end
-    local days = self.db.settings.archiveDays or 14
-    if days <= 0 or th.kind == "CHANNEL" or th.kind == "GROUP" then return false end
+    local st = self.db.settings
+    local days = tonumber(st.archiveDays) or 7
+    if st.archiveOn == false or days < 1 then return false end
     local last = self:LastActivity(th)
     return last > 0 and time() - last > days * 86400
 end
@@ -518,7 +529,8 @@ end
 function TG:OtherKeys()
     local keys = {}
     for key, th in pairs(self.db.threads) do
-        if (th.kind == "WHISPER" or th.kind == "BN") and not th.req and self:SectionOf(th) == "others" then
+        if (th.kind == "WHISPER" or th.kind == "BN") and not th.req and self:SectionOf(th) == "others"
+            and not self:IsArchived(th) then
             keys[#keys + 1] = key
         end
     end
@@ -534,6 +546,38 @@ function TG:CloseOthers()
     end
     if self.Picker then self.Picker:Refresh() end
     return #keys
+end
+
+-- "Close all" on Archive: the conversations and their history. Contacts stay, so they're still
+-- in New message.
+function TG:ArchivedKeys()
+    local keys = {}
+    for key, th in pairs(self.db.threads) do
+        if not th.req and self:IsArchived(th) then keys[#keys + 1] = key end
+    end
+    return keys
+end
+
+function TG:CloseArchived()
+    local keys = self:ArchivedKeys()
+    for _, key in ipairs(keys) do self:DeleteThread(key) end
+    return #keys
+end
+
+function TG:ConfirmCloseArchived()
+    local n = #self:ArchivedKeys()
+    if n == 0 then return end
+    if not StaticPopupDialogs.TELEGNOME_CLOSE_ARCHIVED then
+        StaticPopupDialogs.TELEGNOME_CLOSE_ARCHIVED = {
+            text = "Close all %s archived conversations?\n\nTheir history is removed. The people stay in New "
+                .. "message, and a new message starts a fresh conversation.",
+            button1 = "Close all",
+            button2 = CANCEL or "Cancel",
+            OnAccept = function() TG:CloseArchived() end,
+            timeout = 0, whileDead = true, hideOnEscape = true,
+        }
+    end
+    StaticPopup_Show("TELEGNOME_CLOSE_ARCHIVED", n)
 end
 
 function TG:ConfirmCloseOthers()

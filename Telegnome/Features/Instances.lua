@@ -121,7 +121,8 @@ function D:Leave()
         local th = TG.db.threads[key]
         if th then
             th.tempPin = nil
-            if mode == "temp" then
+            -- pinned while inside: you want to keep it, so it stays followed
+            if mode == "temp" and not th.fav then
                 if not TG.db.settings.clearGroupChat then
                     TG.db.archive = TG.db.archive or {}
                     TG.db.archive[key] = th.msgs

@@ -721,10 +721,13 @@ function UI.AddPinMoveEntries(root, key)
     root:CreateButton("Move down in Pinned", function() UI:MovePinned(key, 1) end)
 end
 
--- "Archive" / "Move out of Archive".
+-- Section headers with "Close all".
+UI.CLOSE_ALL = { others = "others", archive = "archive", all_archive = "archive" }
+
+-- "Archive" / "Move out of Archive" (direct messages).
 function UI.AddArchiveEntry(root, key)
     local th = TG.db.threads[key]
-    if not th or th.fav or th.tempPin then return end
+    if not th or th.fav or th.tempPin or (th.kind ~= "WHISPER" and th.kind ~= "BN") then return end
     if TG:IsArchived(th) then
         root:CreateButton("Move out of Archive", function() TG:SetArchived(key, false) end)
     else
@@ -929,16 +932,29 @@ function UI:GetRow(i)
     row.headPill = S.Pill(row, 16)
     row.headPill:SetPoint("RIGHT", -6, 0)
 
-    -- "Close all" on the Others header, while the mouse is over it
+    -- "Close all" on the Others and Archive headers, while the mouse is over it
     local closeAll = S.Link(row, "Close all")
     closeAll:SetPoint("RIGHT", -6, 0)
-    closeAll:SetScript("OnClick", function() TG:ConfirmCloseOthers() end)
-    S.Tooltip(closeAll, "Close all", "Closes every conversation under Others and forgets those contacts. "
-        .. "Favorites and friends are not touched.")
+    closeAll:SetScript("OnClick", function()
+        if UI.CLOSE_ALL[row.header] == "archive" then TG:ConfirmCloseArchived() else TG:ConfirmCloseOthers() end
+    end)
+    closeAll:HookScript("OnEnter", function(s)
+        GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Close all")
+        if UI.CLOSE_ALL[row.header] == "archive" then
+            GameTooltip:AddLine("Closes every archived conversation and its history. The people stay in New message.",
+                1, 1, 1, true)
+        else
+            GameTooltip:AddLine("Closes every conversation under Others and forgets those contacts. "
+                .. "Pinned conversations and friends are not touched.", 1, 1, 1, true)
+        end
+        GameTooltip:Show()
+    end)
+    closeAll:HookScript("OnLeave", function() GameTooltip:Hide() end)
     closeAll:Hide()
     row.closeAll = closeAll
     local function hover()
-        if row.header ~= "others" then return end
+        if not UI.CLOSE_ALL[row.header] then return end
         local over = row:IsMouseOver() and true or false
         closeAll:SetShown(over)
         row.headPill:SetShown(not over and (row.headUnread or 0) > 0)
@@ -1028,7 +1044,7 @@ local function showHeader(row, e)
     row.caption:Show()
     row.caption:SetText(("%s  |cff8a7a5c%d|r"):format(e.label:upper(), e.count))
     row.rule:Show()
-    local over = e.header == "others" and row:IsMouseOver() and true or false
+    local over = UI.CLOSE_ALL[e.header] and row:IsMouseOver() and true or false
     row.closeAll:SetShown(over)
     row.headPill:SetCount(over and 0 or e.unread)
     UI:LayoutHeaderRule(row)
@@ -1267,6 +1283,15 @@ function UI:BuildAllEntries(keys)
     return entries
 end
 
+-- The conversation at the top of the list as you see it (not inside a folded section), for picking
+-- what to show when the open one closes or you switch tabs.
+function UI:FirstKey()
+    for _, e in ipairs(self:BuildEntries()) do
+        if e.key then return e.key end
+    end
+    return self:SortedKeys()[1]
+end
+
 -- { header = id, ... } rows for Pinned / Friends / Others (sorted inside each).
 function UI:BuildEntries()
     local keys = self:SortedKeys()
@@ -1492,7 +1517,7 @@ function UI:SetTab(tab)
     local key = self.selectedByTab[tab]
     local th = key and TG.db.threads[key]
     if not th or not UI.Belongs(th, tab) then
-        key = self:SortedKeys(tab)[1]
+        key = self:FirstKey()
         self.selectedByTab[tab] = key
     end
     if key then self:Select(key) else self:ShowEmpty() end
@@ -1669,7 +1694,7 @@ end
 function UI:OnThreadDeleted(key)
     if not self.frame then return end
     if self.selected == key then
-        local first = self:SortedKeys()[1]
+        local first = self:FirstKey()
         if first then self:Select(first) else self:ShowEmpty() end
     end
     self:RefreshList()
@@ -1682,7 +1707,7 @@ function UI:OnShow()
         if last and last ~= "requests" and self.tabs and self.tabs[last] then self.tab = last end
     end
     local key = self.selected
-    if not key or not TG.db.threads[key] then key = self:SortedKeys()[1] end
+    if not key or not TG.db.threads[key] then key = self:FirstKey() end
     self:UpdateNewButton()
     if key then self:Select(key) else self:ShowEmpty() end
     self:RefreshList()

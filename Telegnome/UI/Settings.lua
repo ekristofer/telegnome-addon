@@ -342,27 +342,6 @@ function O:Create()
         self.sortRadios[#self.sortRadios + 1] = r
     end
     y = y - 28
-    local arLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    arLabel:SetPoint("TOPLEFT", 18, y - 2)
-    arLabel:SetText("Archive quiet chats after")
-    self.archRadios = {}
-    local prevA = arLabel
-    for _, opt in ipairs({ { 7, "1 week" }, { 14, "2 weeks" }, { 30, "1 month" }, { 0, "Never" } }) do
-        local r = S.Radio(content, opt[2])
-        r:SetPoint("LEFT", prevA, "RIGHT", prevA == arLabel and 14 or 12, prevA == arLabel and 0 or -1)
-        r.value = opt[1]
-        r:SetScript("OnClick", function()
-            TG.db.settings.archiveDays = opt[1]
-            O:Refresh()
-            UI:RefreshList()
-        end)
-        S.Tooltip(r, "Archive", "Direct messages with no new messages for this long move to Archive, a folded "
-            .. "section at the bottom of the All and Direct tabs. A new message brings them back. Right-click "
-            .. "any conversation to archive it yourself, or to move it out.")
-        prevA = r.label
-        self.archRadios[#self.archRadios + 1] = r
-    end
-    y = y - 28
     check("Compact chat: one line per message, no bubbles", 0,
         function() return s().compactChat end, function(v) s().compactChat = v; UI:ApplyChatStyle() end,
         "Compact chat", "Shows every message as one line - time, name, text - like the game's own chat. "
@@ -446,6 +425,38 @@ function O:Create()
         function() return s().groupedFriends ~= false end, function(v) s().groupedFriends = v; TG:QueueRefresh() end,
         "Grouped with", "Players you were in a group with in the last seven days are listed under Friends, and their "
         .. "whispers don't go to Requests. The conversation says when you last grouped.")
+    local archTip = "Direct messages with no new messages for this many days move to Archive, a folded section at "
+        .. "the bottom of the All and Direct tabs. A new message brings them back. Right-click any conversation "
+        .. "to archive it yourself, or to move it out."
+    local arch = check("Archive direct messages after", 0,
+        function() return s().archiveOn ~= false end, function(v) s().archiveOn = v; UI:RefreshList() end,
+        "Archive", archTip)
+    local days = S.EditBox(content)
+    days:SetPoint("LEFT", arch.label, "RIGHT", 8, -1)
+    days:SetSize(44, 22)
+    days:SetNumeric(true)
+    days:SetMaxLetters(3)
+    days:SetJustifyH("CENTER")
+    days:SetScript("OnTextChanged", function(box, userInput)
+        if not userInput then return end
+        local n = tonumber(box:GetText())
+        if n and n >= 1 then
+            s().archiveDays = n
+            UI:RefreshList()
+        end
+    end)
+    local function settle(box)
+        box:SetText(tostring(s().archiveDays or 7))
+        box:ClearFocus()
+    end
+    days:SetScript("OnEnterPressed", settle)
+    days:SetScript("OnEditFocusLost", function(box) box:SetText(tostring(s().archiveDays or 7)) end)
+    S.Tooltip(days, "Archive", archTip)
+    local daysLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    daysLabel:SetPoint("LEFT", days, "RIGHT", 6, 1)
+    daysLabel:SetText("days without new messages")
+    self.archiveDays = days
+    gap(4)
     check("Pick up group codes from chat", 0,
         function() return s().detectInvites end, function(v) s().detectInvites = v end,
         "Group codes",
@@ -631,7 +642,10 @@ function O:Refresh()
     for _, r in ipairs(self.sizeRadios) do r:SetChecked(r.value == (st.textSize or "normal")) end
     for _, r in ipairs(self.sortRadios) do r:SetChecked(r.value == (st.listSort or "recent")) end
     for _, r in ipairs(self.instRadios) do r:SetChecked(r.value == (st.instanceChat or "ask")) end
-    for _, r in ipairs(self.archRadios or {}) do r:SetChecked(r.value == (st.archiveDays or 14)) end
+    if self.archiveDays then
+        if not self.archiveDays:HasFocus() then self.archiveDays:SetText(tostring(st.archiveDays or 7)) end
+        self.archiveDays:SetAlpha(st.archiveOn == false and 0.5 or 1)
+    end
     for _, box in ipairs(self.replyBoxes) do
         if not box:HasFocus() then box:SetText(box.get()) end
     end
