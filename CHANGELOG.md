@@ -1,30 +1,39 @@
 # Changelog
 
 ## 0.9.0
-- Search: the magnifier next to + New message (or `/tg search <text>`) finds messages in all conversations. "Search in this conversation" is in the ... menu. Click a result to open the conversation at that message.
-- Notes: "Add note..." in a person's menu. The note shows under their name in the conversation and on their request card.
-- Recently grouped with: people you were in a group with in the last week sort under Friends, and their whispers don't go to Requests. The conversation says when you last grouped. Can be turned off in Settings > Chat.
-- Requests: a role summary at the top (Tanks, Healers, Damage), worked out from the group finder application or words in the whisper. Click a role to show only those requests.
+
+All your chats in one place
+- **All tab:** a new first tab with everything in one list: Pinned, Direct messages (split into Friends and Others), Channels and Group chats. Group chats show a two-people icon and channels a #. The Direct, Channels and Groups tabs stay as filters. New installs start on All, and Telegnome opens on the tab you used last.
+- **Pin anything:** the star works on group chats and channels too ("Favorites" is now "Pinned"). Reorder Pinned by dragging a conversation onto another, or with Move up / Move down in its right-click menu.
+- **Archive:** a folded section at the bottom of the All and Direct tabs. Direct messages with nothing new for a week go there by themselves (Settings > Chat: choose the number of days, or turn it off), and you can archive one from its right-click menu. A new message brings it straight back. Close all on the Archive header closes every archived conversation; the people stay in New message.
+- Every section folds with a click on its header. Right-click a header or a tab for Mark all as read and sorting.
+- Sort the list by most recent, name or unread first: Settings > Window, right-click a section header, or `/tg sort`.
+- A thin scroll indicator shows at the edge of the list when not everything fits.
+- Tabs are ordered All, Direct, Channels, Groups (then Requests).
+
+Followed channels
+- The game's own chat colours (Guild green, Party blue, Raid orange...), also if you've changed them in the game.
+- Right-click one to choose "Count unread messages" (a red badge that adds to the totals) and "Show in the All tab". Party, Raid and Instance count by default; other channels show a quiet dot instead of a number.
+
+Dungeons, raids and combat
+- Entering a dungeon offers to follow Party chat, a raid Raid chat (with Instance chat), until you leave. It's pinned while you're inside, with an "Entered ..." line where the run starts. Ask, Always or Never in Settings > Chat; `/tg follow-instance` does it by hand. If you pin it while inside, it stays followed when you leave.
+- In combat, pop-ups and sounds wait until the fight is over, then one pop-up says what came in (Settings > Notifications).
+
+Requests
+- The row at the top shows a class icon and a count for each class that's waiting (the class comes with the first whisper). Click one to show only that class. Each request has its class icon by the name.
+- Anyone you invite counts as Invited, however you invite them (Telegnome's button, the game's menu or /invite), and anyone in your group as In group. Decline all never sends them the decline message.
 - Quick replies can use {name}, {class} and {level}, filled in for the person you answer.
+- Item level is no longer shown. Level words and the level cap follow WoW Forever's classic classes.
+
+People
+- Search: the magnifier next to + New message (or `/tg search <text>`) finds messages in all conversations. "Search in this conversation" is in the ... menu. Click a result to open the conversation at that message.
+- Notes: "Add note..." in a person's menu. The note shows under their name and on their request card.
+- Recently grouped with: people you grouped with in the last week sort under Friends, and their whispers don't go to Requests. Can be turned off in Settings > Chat.
 - On login, a line in chat tells you when unread messages are waiting (Settings > Notifications).
-- Tabs are ordered All, Direct, Channels, Groups (then Requests); in the All tab, Channels come before Group chats.
-- Followed channels have the game's own chat colours (Guild green, Party blue, Raid orange...), also if you've changed them in the game.
-- Requests no longer show item level.
-- Requests: the row at the top shows a class icon and a count for each class that's waiting (the class comes with the first whisper); click one to show only that class. Each request has its class icon by the name. Roles are no longer guessed from words. Level words are the classic classes' only, and the level cap falls back to 60. Sample requests (/tg demo) look like WoW Forever too.
-- A thin scroll indicator shows at the edge of the conversation list when not everything fits.
-- Reorder Pinned: drag a pinned conversation onto another, or use Move up / Move down in its right-click menu.
-- Archive: a folded section at the bottom of the All and Direct tabs. Direct messages with nothing new for a week go there (Settings > Chat: pick the number of days, or turn it off), and you can archive one from its right-click menu. A new message brings it back. Close all on the Archive header closes every archived conversation. Group chats and channels are never archived.
-- Direct messages on the All tab are split into Friends and Others, each foldable on its own. Others has Close all, like on the Direct tab.
-- After closing a conversation or switching tabs, Telegnome opens the one at the top of the list, never one hidden in a folded section.
-- A Party or Raid chat followed just for a dungeon stays followed if you pinned it while inside.
+
+Fixes
 - Right-clicking a Battle.net friend who is offline opens Telegnome's menu when the game's own menu doesn't appear.
-- **All tab:** a new first tab with everything in one list: Pinned, Direct messages, Group chats and Channels. Group chats show a two-people icon and channels a #. The Direct, Groups and Channels tabs stay as filters. New installs start on All; Telegnome opens on the tab you used last.
-- **Pin anything:** the star now works on group chats and channels too ("Favorites" is now "Pinned"). Pinned conversations sit at the top of the All tab.
-- **Followed channels:** right-click one to choose "Count unread messages" (a red badge that adds to the totals) and "Show in the All tab". Party, Raid and Instance count by default; other channels show a quiet dot instead of a number.
-- **Mark all as read:** right-click a section header or a tab.
-- **Dungeons and raids:** entering one offers to follow Party chat (dungeons) or Raid chat (raids), with Instance chat, until you leave. It's pinned while you're inside, with an "Entered ..." line where the run starts. Ask, Always or Never in Settings > Chat; `/tg follow-instance` does it by hand. Chats followed this way are unfollowed when you leave; with "clear on new group" off, their history comes back next time.
-- **Combat:** pop-ups and sounds wait until the fight is over, then one pop-up says what came in (Settings > Notifications).
-- Sort the conversation list by most recent, name or unread first: Settings > Window, right-click a section header, or `/tg sort`. Sections (Favorites, Friends, Others) stay as they are; the sort applies inside each.
+- After closing a conversation or switching tabs, Telegnome opens the one at the top of the list, never one hidden in a folded section.
 
 ## 0.8.1
 - New setting (Settings > Chat): "Keep typing after sending a message". On by default; untick it and the message box lets go after each message, like the game's chat.

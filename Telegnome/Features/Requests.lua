@@ -430,6 +430,8 @@ function R:CheckGroup()
                 or (UnitInRaid and (UnitInRaid(target) or UnitInRaid(short))) or false
             inGroup = inGroup and true or false
             if (th.joined or false) ~= inGroup then th.joined, changed = inGroup or nil, true end
+            -- in the group means invited, however it happened: Decline all leaves them alone, also if they leave
+            if inGroup and not th.invited then th.invited, changed = time(), true end
         end
     end
     if changed then self:Refresh() end
@@ -972,6 +974,20 @@ end
 ---------------------------------------------------------------------------
 -- Events
 ---------------------------------------------------------------------------
+
+-- Invited from anywhere (the game's menus, /invite, another addon): the request is marked Invited, so
+-- Decline all doesn't send them the decline message.
+local function onInvite(name)
+    if not TG.db or type(name) ~= "string" or TG.isSecret(name) or name == "" then return end
+    local full = TG.FullName(name)
+    local th = full and TG.db.threads[TG.WhisperKey(full)]
+    if th and th.req and not th.invited and not th.joined then
+        th.invited = time()
+        R:Refresh()
+    end
+end
+if C_PartyInfo and C_PartyInfo.InviteUnit then pcall(hooksecurefunc, C_PartyInfo, "InviteUnit", onInvite) end
+if InviteUnit then pcall(hooksecurefunc, "InviteUnit", onInvite) end
 
 local f = CreateFrame("Frame")
 for _, ev in ipairs({ "LFG_LIST_ACTIVE_ENTRY_UPDATE", "LFG_LIST_APPLICANT_UPDATED", "LFG_LIST_APPLICANT_LIST_UPDATED",
