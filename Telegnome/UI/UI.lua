@@ -478,7 +478,11 @@ function UI:Create()
     input:SetScript("OnEnterPressed", function(s)
         local text = s:GetText()
         if UI.selected and text and text:match("%S") then
-            if TG:Send(UI.selected, text) then s:SetText("") end
+            if TG:Send(UI.selected, text) then
+                s:SetText("")
+                -- like the game's chat: the box lets go after sending, unless you'd rather keep typing
+                if TG.db.settings.keepTyping == false then s:ClearFocus() end
+            end
         else
             -- Enter on an empty box hands the keyboard to the game's own chat.
             s:ClearFocus()

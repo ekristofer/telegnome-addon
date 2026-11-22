@@ -373,6 +373,11 @@ function O:Create()
         function() return s().enterToTelegnome end, function(v) s().enterToTelegnome = v end,
         "Enter key", "With a conversation open, pressing Enter puts the cursor in Telegnome's message box "
         .. "instead of the game's chat. Press Enter again on the empty box to get the game's chat.")
+    check("Keep typing after sending a message", 0,
+        function() return s().keepTyping ~= false end, function(v) s().keepTyping = v end,
+        "Keep typing", "On: the cursor stays in the message box after you send, so you can write the next "
+        .. "message straight away. Off: the box lets go after each message, like the game's chat, and you "
+        .. "click it (or press Enter) to write again.")
     check("Pick up group codes from chat", 0,
         function() return s().detectInvites end, function(v) s().detectInvites = v end,
         "Group codes",

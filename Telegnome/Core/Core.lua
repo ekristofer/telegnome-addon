@@ -34,6 +34,7 @@ local DEFAULTS = {
         keywords = "",        -- alert words for followed channels, comma-separated
         groupJoinLeave = true, -- "X joined / left" lines in group chats
         enterToTelegnome = true, -- Enter puts the cursor in Telegnome while its window is open
+        keepTyping = true,    -- after sending, the cursor stays in the message box
         slay = false,         -- /tg slaay-mode
         theme = "brass",      -- colour theme (see Style.THEMES)
         textSize = "normal",  -- message text: small / normal / large

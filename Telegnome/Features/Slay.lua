@@ -68,10 +68,13 @@ end
 
 function Y:EnsureBars()
     if UI.frame and not self.bars.window then
+        -- along the top edge of the content, just below the tabs, so it never runs through them
         local b = flagBar(UI.frame)
-        b:SetPoint("TOPLEFT", 16, -44)
-        b:SetPoint("TOPRIGHT", -16, -44)
-        b:SetHeight(4)
+        local top = UI.body or UI.frame
+        b:SetPoint("TOPLEFT", top, "TOPLEFT", 0, 0)
+        b:SetPoint("TOPRIGHT", top, "TOPRIGHT", 0, 0)
+        b:SetHeight(3)
+        b:SetFrameLevel(top:GetFrameLevel() + 40)
         self.bars.window = b
     end
     local toast = TG.Toast and TG.Toast.frame

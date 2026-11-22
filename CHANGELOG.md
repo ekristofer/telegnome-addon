@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.1
+- New setting (Settings > Chat): "Keep typing after sending a message". On by default; untick it and the message box lets go after each message, like the game's chat.
+- Slaay mode: the rainbow stripe no longer runs through the tab names.
+
 ## 0.8.0
 
 A new look
