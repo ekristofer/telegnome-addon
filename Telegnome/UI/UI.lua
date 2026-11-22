@@ -11,6 +11,7 @@ local LIST_W = 216
 local ROW_H = 40      -- a conversation in the list: name and time, preview and unread badge
 local HEAD_H = 24     -- Pinned / Friends / Others
 local HINT_H = 22     -- the grey line under an empty Pinned section
+local SUB_H = 22      -- Friends / Others inside Direct messages on the All tab
 local NAME_X = 22     -- every name starts here, with or without an online dot
 local TOP = 74        -- where the list and the conversation start, below the header and the tabs
                       -- (set in UI:Create: the game's own frame has a lower title bar than the plain one)
@@ -722,7 +723,7 @@ function UI.AddPinMoveEntries(root, key)
 end
 
 -- Section headers with "Close all".
-UI.CLOSE_ALL = { others = "others", archive = "archive", all_archive = "archive" }
+UI.CLOSE_ALL = { others = "others", all_others = "others", archive = "archive", all_archive = "archive" }
 
 -- "Archive" / "Move out of Archive" (direct messages).
 function UI.AddArchiveEntry(root, key)
@@ -1039,6 +1040,13 @@ local function showHeader(row, e)
     row.dot:Hide(); row.name:Hide(); row.time:Hide(); row.preview:Hide(); row.pill:Hide(); row.close:Hide()
     row.groupIcon:Hide(); row.hash:Hide(); row.quiet:Hide(); row.hint:Hide()
     row:SetSelected(false)
+    -- Friends / Others inside Direct messages sit a step in, a little quieter
+    local indent = e.sub and 12 or 0
+    row.chevDown:SetPoint("LEFT", 5 + indent, 0)
+    row.chevRight:SetPoint("LEFT", 5 + indent, 0)
+    row.caption:SetPoint("LEFT", NAME_X - 2 + indent, 0)
+    row.caption:SetAlpha(e.sub and 0.8 or 1)
+    row.rule:SetAlpha(e.sub and 0.5 or 1)
     row.chevDown:SetShown(not e.collapsed)
     row.chevRight:SetShown(e.collapsed)
     row.caption:Show()
@@ -1245,6 +1253,34 @@ function UI:MovePinned(key, target)
     self:RefreshList()
 end
 
+-- Direct messages on the All tab, split into Friends and Others like the Direct tab.
+local DM_SUBS = { { id = "all_friends", sec = "friends", label = "Friends" }, { id = "all_others", sec = "others", label = "Others" } }
+
+function UI:AddDMSubsections(entries, keys)
+    local threads, collapsed = TG.db.threads, TG.db.collapsed
+    local parts = { friends = {}, others = {} }
+    for _, k in ipairs(keys) do
+        local p = TG:SectionOf(threads[k]) == "friends" and parts.friends or parts.others
+        p[#p + 1] = k
+    end
+    for _, sub in ipairs(DM_SUBS) do
+        local b = parts[sub.sec]
+        if #b > 0 then
+            local unread = 0
+            for _, k in ipairs(b) do
+                if k ~= self.selected then unread = unread + UI.UnreadOf(threads[k]) end
+            end
+            entries[#entries + 1] = {
+                header = sub.id, sub = true, label = sub.label, count = #b, unread = unread, keys = b,
+                collapsed = collapsed[sub.id] and true or false,
+            }
+            if not collapsed[sub.id] then
+                for _, k in ipairs(b) do entries[#entries + 1] = { key = k } end
+            end
+        end
+    end
+end
+
 -- The All tab: Pinned (anything starred, and a dungeon's chat while you're inside), then each kind.
 function UI:BuildAllEntries(keys)
     local entries = {}
@@ -1276,7 +1312,11 @@ function UI:BuildAllEntries(keys)
                 if #b == 0 then
                     entries[#entries + 1] = { hint = "Star a person, group or channel to pin it here." }
                 end
-                for _, k in ipairs(b) do entries[#entries + 1] = { key = k } end
+                if sec.id == "all_dm" then
+                    self:AddDMSubsections(entries, b)
+                else
+                    for _, k in ipairs(b) do entries[#entries + 1] = { key = k } end
+                end
             end
         end
     end
@@ -1334,7 +1374,7 @@ function UI:RefreshList()
     local entries = self:BuildEntries()
     local listH = math.max(ROW_H, num(self.list:GetHeight(), 300))
     local width = math.max(120, num(self.list:GetWidth(), LIST_W - 12))
-    local function heightOf(e) return e.header and HEAD_H or e.hint and HINT_H or ROW_H end
+    local function heightOf(e) return e.header and (e.sub and SUB_H or HEAD_H) or e.hint and HINT_H or ROW_H end
 
     -- don't scroll past the point where the last entries fill the list
     local fit, maxOffset = 0, #entries

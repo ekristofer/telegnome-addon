@@ -13,6 +13,7 @@
 - A thin scroll indicator shows at the edge of the conversation list when not everything fits.
 - Reorder Pinned: drag a pinned conversation onto another, or use Move up / Move down in its right-click menu.
 - Archive: a folded section at the bottom of the All and Direct tabs. Direct messages with nothing new for a week go there (Settings > Chat: pick the number of days, or turn it off), and you can archive one from its right-click menu. A new message brings it back. Close all on the Archive header closes every archived conversation. Group chats and channels are never archived.
+- Direct messages on the All tab are split into Friends and Others, each foldable on its own. Others has Close all, like on the Direct tab.
 - After closing a conversation or switching tabs, Telegnome opens the one at the top of the list, never one hidden in a folded section.
 - A Party or Raid chat followed just for a dungeon stays followed if you pinned it while inside.
 - Right-clicking a Battle.net friend who is offline opens Telegnome's menu when the game's own menu doesn't appear.
