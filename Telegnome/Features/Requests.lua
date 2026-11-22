@@ -60,10 +60,11 @@ end
 
 -- Words that say a nearby number is a character level ("70 mage", "prot 80").
 local HINTS = {}
-for word in ([[warrior war warr paladin pala pally hunter hunt rogue priest dk deathknight shaman sham shammy
-    mage warlock lock monk druid dudu dh evoker tank healer heal heals dps holy prot ret fury arms frost fire
-    arcane resto balance boomkin feral shadow disc bm mm surv ele enh enhance aff affli destro demo guardian
-    bear brew mw ww havoc vengeance blood unholy outlaw assa sub dev pres aug]]):gmatch("%a+") do
+-- WoW Forever has the classic classes: warrior, paladin, hunter, rogue, priest, shaman, mage, warlock, druid.
+for word in ([[warrior war warr paladin pala pally hunter hunt rogue priest shaman sham shammy
+    mage warlock lock druid dudu tank healer heal heals dps holy prot ret fury arms frost fire
+    arcane resto balance boomkin feral shadow disc bm mm surv ele enh enhance aff affli destro demo
+    bear cat assa sub combat]]):gmatch("%a+") do
     HINTS[word] = true
 end
 -- ...and words that say it is something else ("480 ilvl", "2900 io").
@@ -72,7 +73,7 @@ local NOT_LEVEL = { ilvl = true, ilevel = true, io = true, gs = true, k = true, 
 
 local function maxLevel()
     local m = GetMaxPlayerLevel and GetMaxPlayerLevel()
-    return (type(m) == "number" and m > 0) and m or 90
+    return (type(m) == "number" and m > 0) and m or 60
 end
 
 -- "lvl 70", "level 45 priest", "70 mage here", "mage 70" -> the level, or nil.
@@ -105,33 +106,13 @@ end
 
 local ROLE_NAMES = { TANK = "Tank", HEALER = "Healer", DAMAGER = "Damage" }
 
--- Words that say which role someone plays, and classes that can only deal damage.
-local ROLE_WORDS = {
-    TANK = { "tank", "prot", "protection", "bear", "blood" },
-    HEALER = { "heal", "heals", "healer", "healing", "holy", "resto", "restoration", "disc", "discipline", "mw" },
-    DAMAGER = { "dps", "dd", "damage", "ret", "fury", "arms", "feral", "boomkin", "balance", "shadow", "ele",
-        "elemental", "enh", "enhancement", "unholy", "frost", "fire", "arcane", "affli", "destro", "demo",
-        "assa", "combat", "sub", "mm", "bm", "survival" },
-}
-local DAMAGE_CLASSES = { ROGUE = true, MAGE = true, HUNTER = true, WARLOCK = true }
+-- The classes, in the order they're shown above the requests (WoW Forever has the classic ones).
+R.CLASSES = { "WARRIOR", "PALADIN", "PRIEST", "SHAMAN", "DRUID", "ROGUE", "MAGE", "HUNTER", "WARLOCK" }
 
--- The roles a request could fill: { TANK = true, ... }, or nil when there is no clue.
-function R.RolesOf(th)
-    if ROLE_NAMES[th.role] then return { [th.role] = true } end
-    local words = {}
-    for _, m in ipairs(th.msgs or {}) do
-        if not m.out and not m.sys and type(m.text) == "string" then
-            for w in m.text:lower():gmatch("%a+") do words[w] = true end
-        end
-    end
-    local roles, any = {}, false
-    for role, list in pairs(ROLE_WORDS) do
-        for _, w in ipairs(list) do
-            if words[w] then roles[role] = true; any = true; break end
-        end
-    end
-    if not any and DAMAGE_CLASSES[th.class] then return { DAMAGER = true } end
-    return any and roles or nil
+-- The class from the first whisper (or from Check), or "UNKNOWN".
+function R.ClassOf(th)
+    local c = th and th.class
+    return (type(c) == "string" and c ~= "") and c or "UNKNOWN"
 end
 
 -- People who applied through the group finder come with level, class, role and item level.
@@ -542,6 +523,11 @@ local function createRow(parent, i)
     row.state = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     row.state:SetTextColor(0.5, 0.83, 0.58)
 
+    -- the class icon in front of the name
+    row.classIcon = row:CreateTexture(nil, "ARTWORK")
+    row.classIcon:SetSize(16, 16)
+    row.classIcon:SetPoint("TOPLEFT", 10, -7)
+
     row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     row.name:SetPoint("TOPLEFT", 12, -9)
     row.name:SetJustifyH("LEFT")
@@ -616,36 +602,71 @@ function R:Create()
     status:SetWordWrap(false)
     self.status = status
 
-    -- role summary and filter: All 6 · Tanks 1 · Healers 2 · Damage 3 · Unknown 1
+    -- the classes waiting: All 6, then an icon and a count for each class that has requests. Click to filter.
     self.chips = {}
-    local prevChip
-    for _, def in ipairs({ { nil, "All" }, { "TANK", "Tanks" }, { "HEALER", "Healers" }, { "DAMAGER", "Damage" },
-        { "UNKNOWN", "Unknown" } }) do
-        local chip = S.Link(f, def[2])
-        chip.role, chip.label = def[1], def[2]
-        chip.fs:SetFontObject("GameFontNormal")
-        chip:SetHeight(18)
+    local function underline(chip)
         local under = chip:CreateTexture(nil, "ARTWORK")
-        under:SetPoint("BOTTOMLEFT", 2, 0)
-        under:SetPoint("BOTTOMRIGHT", -2, 0)
+        under:SetPoint("BOTTOMLEFT", 1, -2)
+        under:SetPoint("BOTTOMRIGHT", -1, -2)
         under:SetHeight(2)
         S.Paint(under, "hi", 1)
         chip.under = under
-        if prevChip then
-            chip:SetPoint("LEFT", prevChip, "RIGHT", 14, 0)
-        else
-            chip:SetPoint("TOPLEFT", 14, -38)
+    end
+    local function pick(chip)
+        R.classFilter = chip.class
+        R.offset = 0
+        R:Refresh()
+    end
+    local all = S.Link(f, "All")
+    all.fs:SetFontObject("GameFontNormal")
+    all:SetHeight(18)
+    all:SetPoint("TOPLEFT", 14, -38)
+    underline(all)
+    all:SetScript("OnClick", pick)
+    S.Tooltip(all, "All requests", "Click a class icon to show only that class.")
+    self.chips[1] = all
+    local order = {}
+    for _, c in ipairs(R.CLASSES) do order[#order + 1] = c end
+    order[#order + 1] = "UNKNOWN"
+    for _, class in ipairs(order) do
+        local chip = CreateFrame("Button", nil, f)
+        chip:SetHeight(18)
+        chip.class = class
+        local icon = chip:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(16, 16)
+        icon:SetPoint("LEFT", 0, 0)
+        if not S.SetClassIcon(icon, class) then
+            -- no class: a grey question mark
+            icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+            icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            icon:SetDesaturated(true)
         end
-        chip:SetScript("OnClick", function()
-            R.roleFilter = chip.role
-            R.offset = 0
-            R:Refresh()
+        chip.icon = icon
+        local fs = chip:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        fs:SetPoint("LEFT", icon, "RIGHT", 3, 0)
+        chip.fs = fs
+        local hl = chip:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints()
+        hl:SetColorTexture(1, 1, 1, 0.08)
+        underline(chip)
+        chip:SetScript("OnClick", pick)
+        chip:SetScript("OnEnter", function(s)
+            GameTooltip:SetOwner(s, "ANCHOR_BOTTOM")
+            if class == "UNKNOWN" then
+                GameTooltip:SetText("Class unknown")
+                GameTooltip:AddLine("The game didn't say which class they are. Click Check on their request to look "
+                    .. "them up.", 1, 1, 1, true)
+            else
+                local c = RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+                local name = (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[class]) or class
+                GameTooltip:SetText(name, c and c.r or 1, c and c.g or 1, c and c.b or 1)
+                GameTooltip:AddLine(("%d waiting. Click to show only this class."):format(s.count or 0), 1, 1, 1, true)
+            end
+            GameTooltip:Show()
         end)
-        prevChip = chip
+        chip:SetScript("OnLeave", function() GameTooltip:Hide() end)
         self.chips[#self.chips + 1] = chip
     end
-    S.Tooltip(self.chips[2], "Roles", "From the group finder application, or words in their whispers "
-        .. "(\"tank\", \"holy\", \"dps\"...). Counts are for requests still waiting. Click to show only that role.")
 
     local list = CreateFrame("Frame", nil, f)
     list:SetPoint("TOPLEFT", 14, -64)
@@ -763,39 +784,50 @@ local function extraText(th, key)
     return table.concat(extra, "  \194\183  ")
 end
 
--- The chips: how many waiting requests could fill each role, and which filter is on.
+-- The chips: how many waiting requests there are of each class, and which filter is on. Classes with no
+-- waiting requests are left out, so the row stays short.
 function R:UpdateChips()
     if not self.chips then return end
-    local counts = { TANK = 0, HEALER = 0, DAMAGER = 0, UNKNOWN = 0 }
+    local counts = {}
     local open = self:OpenKeys()
     for _, key in ipairs(open) do
-        local roles = R.RolesOf(TG.db.threads[key])
-        if roles then
-            for role in pairs(roles) do counts[role] = counts[role] + 1 end
-        else
-            counts.UNKNOWN = counts.UNKNOWN + 1
-        end
+        local c = R.ClassOf(TG.db.threads[key])
+        counts[c] = (counts[c] or 0) + 1
     end
-    for _, chip in ipairs(self.chips) do
-        local n = chip.role and counts[chip.role] or #open
-        chip.fs:SetText(("%s |cffffffff%d|r"):format(chip.label, n))
-        chip:SetWidth(S.Num(chip.fs:GetStringWidth(), 50) + 6)
-        local on = chip.role == self.roleFilter
+    local prev
+    for i, chip in ipairs(self.chips) do
+        local on = chip.class == self.classFilter
+        local n = chip.class and (counts[chip.class] or 0) or #open
+        chip.count = n
+        if i == 1 then
+            chip.fs:SetText(("All |cffffffff%d|r"):format(n))
+            chip:SetWidth(S.Num(chip.fs:GetStringWidth(), 40) + 6)
+            if on then chip.fs:SetTextColor(1, 0.82, 0) else chip.fs:SetTextColor(0.72, 0.66, 0.53) end
+            prev = chip
+        else
+            chip.fs:SetText(tostring(n))
+            if on then chip.fs:SetTextColor(1, 0.82, 0) else chip.fs:SetTextColor(1, 1, 1) end
+            chip:SetWidth(19 + S.Num(chip.fs:GetStringWidth(), 8) + 2)
+            local shown = n > 0 or on
+            chip:SetShown(shown)
+            if shown then
+                chip:ClearAllPoints()
+                chip:SetPoint("LEFT", prev, "RIGHT", 12, 0)
+                prev = chip
+            end
+        end
         chip.under:SetShown(on)
-        if on then chip.fs:SetTextColor(1, 0.82, 0) else chip.fs:SetTextColor(0.72, 0.66, 0.53) end
-        chip:SetShown(chip.role ~= "UNKNOWN" or counts.UNKNOWN > 0 or self.roleFilter == "UNKNOWN")
     end
 end
 
--- Requests shown under the current role filter.
+-- Requests shown under the current class filter.
 function R:FilteredKeys()
     local keys = self:Keys()
-    local want = self.roleFilter
+    local want = self.classFilter
     if not want then return keys end
     local out = {}
     for _, key in ipairs(keys) do
-        local roles = R.RolesOf(TG.db.threads[key])
-        if (want == "UNKNOWN" and not roles) or (roles and roles[want]) then out[#out + 1] = key end
+        if R.ClassOf(TG.db.threads[key]) == want then out[#out + 1] = key end
     end
     return out
 end
@@ -830,6 +862,9 @@ function R:FillRows()
             local name, color = TG:ThreadDisplay(key)
             row.name:SetText(name)
             row.name:SetTextColor(color[1], color[2], color[3])
+            local hasIcon = S.SetClassIcon(row.classIcon, th.class)
+            row.classIcon:SetShown(hasIcon)
+            row.name:SetPoint("TOPLEFT", hasIcon and 30 or 12, -9)
             row.level:SetLabel(th.level and tostring(th.level) or "?")
             local class, cr, cg, cb = classText(th)
             row.class:SetText(class)

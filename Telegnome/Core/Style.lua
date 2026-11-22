@@ -397,6 +397,22 @@ function S.IconButton(parent, tex, size, iconSize)
 end
 
 -- Text that acts as a button ("Close all", "Clear all").
+-- Class icons (the round ones from character creation). Sets the texture; false when the class is unknown.
+S.CLASS_ICONS = "Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes"
+local CLASS_COORDS = {
+    WARRIOR = { 0, 0.25, 0, 0.25 }, MAGE = { 0.25, 0.49609375, 0, 0.25 }, ROGUE = { 0.49609375, 0.7421875, 0, 0.25 },
+    DRUID = { 0.7421875, 0.98828125, 0, 0.25 }, HUNTER = { 0, 0.25, 0.25, 0.5 }, SHAMAN = { 0.25, 0.49609375, 0.25, 0.5 },
+    PRIEST = { 0.49609375, 0.7421875, 0.25, 0.5 }, WARLOCK = { 0.7421875, 0.98828125, 0.25, 0.5 },
+    PALADIN = { 0, 0.25, 0.5, 0.75 },
+}
+function S.SetClassIcon(tex, class)
+    local c = class and ((CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]) or CLASS_COORDS[class])
+    if type(c) ~= "table" then return false end
+    tex:SetTexture(S.CLASS_ICONS)
+    tex:SetTexCoord(c[1], c[2], c[3], c[4])
+    return true
+end
+
 function S.Link(parent, text, font)
     local b = CreateFrame("Button", nil, parent)
     local fs = b:CreateFontString(nil, "OVERLAY", font or "GameFontNormalSmall")

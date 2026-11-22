@@ -10,6 +10,7 @@
 - Tabs are ordered All, Direct, Channels, Groups (then Requests); in the All tab, Channels come before Group chats.
 - Followed channels have the game's own chat colours (Guild green, Party blue, Raid orange...), also if you've changed them in the game.
 - Requests no longer show item level.
+- Requests: the row at the top shows a class icon and a count for each class that's waiting (the class comes with the first whisper); click one to show only that class. Each request has its class icon by the name. Roles are no longer guessed from words. Level words are the classic classes' only, and the level cap falls back to 60. Sample requests (/tg demo) look like WoW Forever too.
 - A thin scroll indicator shows at the edge of the conversation list when not everything fits.
 - Reorder Pinned: drag a pinned conversation onto another, or use Move up / Move down in its right-click menu.
 - Archive: a folded section at the bottom of the All and Direct tabs. Direct messages with nothing new for a week go there (Settings > Chat: pick the number of days, or turn it off), and you can archive one from its right-click menu. A new message brings it back. Close all on the Archive header closes every archived conversation. Group chats and channels are never archived.

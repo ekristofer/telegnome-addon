@@ -11,7 +11,7 @@ Telegnome moves your private messages out of the busy main chat and into a messe
 
 - **Direct messages**: every whisper and Battle.net whisper gets its own conversation with saved history. Reply from the window. The list is grouped into **Pinned**, **Friends** and **Others**, so a flood of strangers never buries your friends.
 - **All tab**: everything in one list - pinned conversations on top, then direct messages, group chats and channels. Pin anything with the star.
-- **Requests**: while you're listed in the group finder, whispers from strangers land in their own tab with class, level, role and an Invite button.
+- **Requests**: while you're listed in the group finder, whispers from strangers land in their own tab with class, level and an Invite button.
 - **Search**: find any saved message, in all conversations or in one.
 - **Notes**: a short private note per person, shown under their name.
 - **Recently grouped with**: people you grouped with in the last week sort under Friends.
@@ -105,7 +105,7 @@ Inside each section, conversations are sorted by most recent by default. Right-c
 List yourself or your group in the group finder and a **Requests** tab appears. Whispers from people who aren't friends, guild members or favorites are collected there, so they don't flood your Direct messages.
 
 - Each request shows the player's class, level and latest message.
-- The row at the top counts the roles waiting (Tanks, Healers, Damage), from the group finder application or words like "tank", "holy" or "dps" in the whisper. Click a role to show only those requests.
+- The row at the top shows a class icon and a count for each class that's waiting - the class comes with the first whisper. Click an icon to show only that class, or All to see everyone. Each request has its class icon by the name.
 - Quick replies can use `{name}`, `{class}` and `{level}`, which are filled in for the person you answer.
 - **Invite** invites them to your group; **x** dismisses the request; clicking the row opens the conversation.
 - The level is read from the whisper ("70 mage", "lvl 45") or from their group finder application. **Check** looks the player up, also when a level looks wrong; the game only answers every few seconds, so the button counts down until you can ask again.

@@ -55,7 +55,7 @@ local PEOPLE = {
         { 14, false, "It's still up, hurry!" },
       }, unread = 2 },
     { key = "W:lootgobbler-gnomeregan", kind = "WHISPER", name = "Lootgobbler-Gnomeregan", class = "HUNTER", sec = "others",
-      msgs = { { 9, false, "inv pls, 2.9k score" } }, unread = 1 },
+      msgs = { { 9, false, "inv pls, 60 hunter" } }, unread = 1 },
     { key = "W:dungeonbob-gnomeregan", kind = "WHISPER", name = "Dungeonbob-Gnomeregan", class = "PALADIN", sec = "others",
       msgs = { { 11, false, "Still need a healer?" }, { 10, true, "We're full, sorry!" } } },
     { key = "W:pewpewlol-gnomeregan", kind = "WHISPER", name = "Pewpewlol-Gnomeregan", class = "WARLOCK", sec = "others",
@@ -64,18 +64,17 @@ local PEOPLE = {
 
 -- Shown under the Requests tab (as if you were listed in the group finder).
 local REQUESTS = {
-    { key = "W:mendwell-gnomeregan", name = "Mendwell-Gnomeregan", class = "PRIEST", level = 70, applied = true, role = "HEALER", ilvl = 478,
-      msgs = { { 2, false, "Holy priest, can heal. Invite?" } }, unread = 1 },
-    { key = "W:stabsworth-gnomeregan", name = "Stabsworth-Gnomeregan", class = "ROGUE", level = 68,
-      msgs = { { 4, false, "68 rogue here, know the tactics" } }, unread = 1 },
+    { key = "W:mendwell-gnomeregan", name = "Mendwell-Gnomeregan", class = "PRIEST", level = 60,
+      msgs = { { 2, false, "60 holy priest, can heal. Invite?" } }, unread = 1 },
+    { key = "W:stabsworth-gnomeregan", name = "Stabsworth-Gnomeregan", class = "ROGUE", level = 58,
+      msgs = { { 4, false, "58 rogue here, know the tactics" } }, unread = 1 },
     { key = "W:moonfluff-gnomeregan", name = "Moonfluff-Gnomeregan", class = "DRUID",
       msgs = { { 6, false, "room for a tank?" }, { 5, true, "Yes - what level are you?" } } },
-    { key = "W:zapgrin-gnomeregan", name = "Zapgrin-Gnomeregan", class = "SHAMAN", level = 70, invited = true,
-      msgs = { { 8, false, "lvl 70 ele shaman, 3k score" }, { 7, true, "Inviting you now" } } },
-    { key = "W:boltwick-gnomeregan", name = "Boltwick-Gnomeregan", class = "HUNTER", level = 69,
-      msgs = { { 3, false, "69 hunter, can come right now" } }, unread = 1 },
-    { key = "W:shieldara-gnomeregan", name = "Shieldara-Gnomeregan", class = "WARRIOR", level = 70, applied = true,
-      role = "TANK", ilvl = 484, joined = true,
+    { key = "W:zapgrin-gnomeregan", name = "Zapgrin-Gnomeregan", class = "SHAMAN", level = 60, invited = true,
+      msgs = { { 8, false, "lvl 60 ele shaman, have the key" }, { 7, true, "Inviting you now" } } },
+    { key = "W:boltwick-gnomeregan", name = "Boltwick-Gnomeregan", class = "HUNTER", level = 59,
+      msgs = { { 3, false, "59 hunter, can come right now" } }, unread = 1 },
+    { key = "W:shieldara-gnomeregan", name = "Shieldara-Gnomeregan", class = "WARRIOR", level = 60, joined = true,
       msgs = { { 12, false, "Prot warrior, done this many times" }, { 11, true, "Inviting you now." } } },
 }
 
@@ -90,14 +89,14 @@ local GROUPS = {
     { key = "G:tgn0000000000b2", name = "Gnomeregan Reunion", code = "sprocket-whistle-gizmo-427", msgs = {
         { 400, false, "Old guild meetup on Saturday?", "Elowen", "DRUID" },
         { 398, false, "I'm in!", "Tinkspark", "MAGE" },
-        { 30, false, "Bring your worst transmog", "Brakk", "WARRIOR" },
+        { 30, false, "Bring your silliest hat", "Brakk", "WARRIOR" },
       }, unread = 3 },
 }
 
 local CHANNELS = {
     { key = "C:GUILD", name = "Guild", ctype = "GUILD", msgs = {
         { 320, false, "Morning all", "Elowen", "DRUID" },
-        { 318, false, "Morning! Anyone up for the weekly?", "Tinkspark", "MAGE" },
+        { 318, false, "Morning! Anyone up for Scholomance?", "Tinkspark", "MAGE" },
         { 317, true, "I'm in, give me ten minutes" },
         { 200, false, "Grats on the mount, Sprocketta!", "Mirelle", "PRIEST" },
         { 199, false, "Took 143 tries...", "Sprocketta", "ROGUE" },
