@@ -7,6 +7,13 @@
 - Requests: a role summary at the top (Tanks, Healers, Damage), worked out from the group finder application or words in the whisper. Click a role to show only those requests.
 - Quick replies can use {name}, {class} and {level}, filled in for the person you answer.
 - On login, a line in chat tells you when unread messages are waiting (Settings > Notifications).
+- Tabs are ordered All, Direct, Channels, Groups (then Requests); in the All tab, Channels come before Group chats.
+- Followed channels have the game's own chat colours (Guild green, Party blue, Raid orange...), also if you've changed them in the game.
+- Requests no longer show item level.
+- A thin scroll indicator shows at the edge of the conversation list when not everything fits.
+- Reorder Pinned: drag a pinned conversation onto another, or use Move up / Move down in its right-click menu.
+- Archive: a folded section at the bottom of the All and Direct tabs. Direct messages with nothing new for two weeks go there (Settings > Chat: 1 week, 2 weeks, 1 month or never), and you can archive any conversation from its right-click menu. A new message brings it back.
+- Right-clicking a Battle.net friend who is offline opens Telegnome's menu when the game's own menu doesn't appear.
 - **All tab:** a new first tab with everything in one list: Pinned, Direct messages, Group chats and Channels. Group chats show a two-people icon and channels a #. The Direct, Groups and Channels tabs stay as filters. New installs start on All; Telegnome opens on the tab you used last.
 - **Pin anything:** the star now works on group chats and channels too ("Favorites" is now "Pinned"). Pinned conversations sit at the top of the All tab.
 - **Followed channels:** right-click one to choose "Count unread messages" (a red badge that adds to the totals) and "Show in the All tab". Party, Raid and Instance count by default; other channels show a quiet dot instead of a number.

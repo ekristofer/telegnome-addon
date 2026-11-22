@@ -77,7 +77,11 @@ Open Telegnome with the minimap button, the addons button by the minimap, or `/t
 
 The **All** tab shows everything in one list: **Pinned** on top, then Direct messages, Group chats and Channels. Group chats have a two-people icon and channels a **#**. The **Direct**, **Groups** and **Channels** tabs show just one kind. Telegnome opens on the tab you used last.
 
-Click the star next to a conversation's name to pin it - a person, a group chat or a channel. Right-click a section header or a tab to mark everything in it as read.
+Click the star next to a conversation's name to pin it - a person, a group chat or a channel. Drag a pinned conversation onto another to reorder Pinned, or use Move up / Move down in its right-click menu.
+
+**Archive** is a folded section at the bottom of the All and Direct tabs. Direct messages with nothing new for two weeks move there by themselves (change it, or turn it off, in Settings > Chat), and you can right-click any conversation to archive it. A new message brings it straight back.
+
+Right-click a section header or a tab to mark everything in it as read.
 
 ### Pinned, Friends and Others
 

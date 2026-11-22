@@ -342,6 +342,27 @@ function O:Create()
         self.sortRadios[#self.sortRadios + 1] = r
     end
     y = y - 28
+    local arLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    arLabel:SetPoint("TOPLEFT", 18, y - 2)
+    arLabel:SetText("Archive quiet chats after")
+    self.archRadios = {}
+    local prevA = arLabel
+    for _, opt in ipairs({ { 7, "1 week" }, { 14, "2 weeks" }, { 30, "1 month" }, { 0, "Never" } }) do
+        local r = S.Radio(content, opt[2])
+        r:SetPoint("LEFT", prevA, "RIGHT", prevA == arLabel and 14 or 12, prevA == arLabel and 0 or -1)
+        r.value = opt[1]
+        r:SetScript("OnClick", function()
+            TG.db.settings.archiveDays = opt[1]
+            O:Refresh()
+            UI:RefreshList()
+        end)
+        S.Tooltip(r, "Archive", "Direct messages with no new messages for this long move to Archive, a folded "
+            .. "section at the bottom of the All and Direct tabs. A new message brings them back. Right-click "
+            .. "any conversation to archive it yourself, or to move it out.")
+        prevA = r.label
+        self.archRadios[#self.archRadios + 1] = r
+    end
+    y = y - 28
     check("Compact chat: one line per message, no bubbles", 0,
         function() return s().compactChat end, function(v) s().compactChat = v; UI:ApplyChatStyle() end,
         "Compact chat", "Shows every message as one line - time, name, text - like the game's own chat. "
@@ -610,6 +631,7 @@ function O:Refresh()
     for _, r in ipairs(self.sizeRadios) do r:SetChecked(r.value == (st.textSize or "normal")) end
     for _, r in ipairs(self.sortRadios) do r:SetChecked(r.value == (st.listSort or "recent")) end
     for _, r in ipairs(self.instRadios) do r:SetChecked(r.value == (st.instanceChat or "ask")) end
+    for _, r in ipairs(self.archRadios or {}) do r:SetChecked(r.value == (st.archiveDays or 14)) end
     for _, box in ipairs(self.replyBoxes) do
         if not box:HasFocus() then box:SetText(box.get()) end
     end

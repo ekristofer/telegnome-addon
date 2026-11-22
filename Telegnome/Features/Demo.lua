@@ -176,7 +176,7 @@ function D:Start()
         pendingInvite = db.pendingInvite,
     }
     db.threads, db.contacts, db.seq = build()
-    db.collapsed, db.pendingInvite = {}, nil
+    db.collapsed, db.pendingInvite = { archive = true, all_archive = true }, nil
     self.on, self.ping = true, 0
     UI.selected = nil
     UI:Show()

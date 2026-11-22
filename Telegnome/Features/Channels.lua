@@ -77,6 +77,22 @@ function C.ColorKey(th)
     return th.ctype or "SAY"
 end
 
+-- The game's own colour for each kind of chat, in case its colour table can't be read.
+local DEFAULT_COLOR = {
+    GUILD = { 0.25, 1, 0.25 }, OFFICER = { 0.25, 0.75, 0.25 }, PARTY = { 0.67, 0.67, 1 },
+    RAID = { 1, 0.5, 0 }, INSTANCE_CHAT = { 1, 0.5, 0 }, SAY = { 1, 1, 1 }, YELL = { 1, 0.25, 0.25 },
+    CHANNEL = { 1, 0.75, 0.75 },
+}
+
+-- A followed channel's colour, the same as in the game's chat (also when you've changed it there).
+function C.Color(th)
+    local info = ChatTypeInfo and ChatTypeInfo[C.ColorKey(th)]
+    if type(info) == "table" and type(info.r) == "number" and type(info.g) == "number" and type(info.b) == "number" then
+        return { info.r, info.g, info.b }
+    end
+    return DEFAULT_COLOR[th.ctype] or DEFAULT_COLOR.CHANNEL
+end
+
 ---------------------------------------------------------------------------
 -- Follow / unfollow
 ---------------------------------------------------------------------------
@@ -250,6 +266,8 @@ function C:OpenMenu(key, anchor)
     MenuUtil.CreateContextMenu(anchor, function(_, root)
         root:CreateTitle(th.name)
         root:CreateButton(th.fav and "Unpin" or "Pin to the top", function() TG:SetFavorite(key, not th.fav) end)
+        UI.AddPinMoveEntries(root, key)
+        UI.AddArchiveEntry(root, key)
         root:CreateCheckbox("Pop-up notifications",
             function() return th.notify and true or false end,
             function() th.notify = not th.notify end)

@@ -44,6 +44,7 @@ local DEFAULTS = {
         listSort = "recent",  -- conversation list: recent / name / unread (unread first, then recent)
         combatQuiet = true,   -- hold pop-ups and sounds during combat, one summary afterwards
         instanceChat = "ask", -- dungeons and raids: ask / always / never follow Party or Raid chat
+        archiveDays = 14,     -- direct messages with no messages for this many days go to Archive (0: never)
         -- one-click answers for requests (Settings > Requests)
         quickReplies = { "Inviting you now, {name}!", "What level and role are you?", "One moment, checking the group." },
         declineReply = "Sorry, the group is full.",
@@ -148,6 +149,12 @@ local function migrate(db)
     end
     -- 0.9: the All tab is where new installs start; people who used Telegnome before keep Direct messages.
     if db.lastTab == nil then db.lastTab = (db.seq or 0) > 0 and "dm" or "all" end
+    -- 0.9: the Archive sections start folded
+    if not db.archive090 then
+        db.collapsed = db.collapsed or {}
+        db.collapsed.archive, db.collapsed.all_archive = true, true
+        db.archive090 = true
+    end
     -- 0.7.0: the tick in the Requests view no longer means "collect at any time" - that is /tg recruit only.
     if not db.requestsTick070 then
         db.settings.recruiting = false
@@ -245,6 +252,9 @@ function TG:DisplayFor(key, rec)
     if rec.kind == "GROUP" then
         return rec.name or "Group", { 1.0, 0.72, 0.42 }, nil
     end
+    if rec.kind == "CHANNEL" then
+        return rec.name or "Channel", self.Channels.Color(rec), nil
+    end
     if rec.kind == "BN" and rec.demo then
         return rec.name or "Friend", { 0.51, 0.77, 1.0 }, rec.demoOnline or false
     end
@@ -317,6 +327,7 @@ function TG:AddMessage(key, info, outgoing, text, extra)
     }
     local max = db.settings.maxPerThread or 200
     while #msgs > max do table.remove(msgs, 1) end
+    th.archived = nil -- a new message brings it back from Archive
 
     if outgoing then
         th.unread = 0
@@ -439,6 +450,30 @@ function TG:SectionOf(th)
     return self:IsFriendly(th) and "friends" or "others"
 end
 
+-- Archive: conversations you archived, and direct messages with nothing new for a while
+-- (Settings > Chat). A new message, sent or received, brings a conversation back.
+function TG:LastActivity(th)
+    local m = th.msgs and th.msgs[#th.msgs]
+    return math.max(m and m.t or 0, th.unarchivedAt or 0)
+end
+
+function TG:IsArchived(th)
+    if not th or th.fav or th.tempPin or (th.unread or 0) > 0 then return false end
+    if th.archived then return true end
+    local days = self.db.settings.archiveDays or 14
+    if days <= 0 or th.kind == "CHANNEL" or th.kind == "GROUP" then return false end
+    local last = self:LastActivity(th)
+    return last > 0 and time() - last > days * 86400
+end
+
+function TG:SetArchived(key, on)
+    local th = self.db.threads[key]
+    if not th then return end
+    th.archived = on and true or nil
+    th.unarchivedAt = (not on) and time() or nil -- taken out by hand: stays out until it goes quiet again
+    self.UI:RefreshList()
+end
+
 -- Muted: no pop-up and no sound for this conversation. Messages still arrive and count.
 function TG:SetMuted(key, on)
     local th = self.db.threads[key]
@@ -453,6 +488,16 @@ function TG:SetFavorite(key, on)
     if th then
         th.fav = on and true or nil
         if on then th.req = nil end -- starring a request keeps the person: they move to Direct messages
+        -- a new pin goes to the bottom of Pinned; reorder by dragging or with Move up / Move down
+        if on then
+            local top = 0
+            for _, t in pairs(self.db.threads) do
+                if t.fav and t ~= th and (t.pinOrder or 0) > top then top = t.pinOrder end
+            end
+            th.pinOrder = top + 1
+        else
+            th.pinOrder = nil
+        end
     end
     local c = self.db.contacts[key]
     if c then c.fav = on and true or nil end

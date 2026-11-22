@@ -80,7 +80,7 @@ end
 -- Frame construction
 ---------------------------------------------------------------------------
 
-local TABS = { { "all", "All" }, { "dm", "Direct" }, { "groups", "Groups" }, { "channels", "Channels" },
+local TABS = { { "all", "All" }, { "dm", "Direct" }, { "channels", "Channels" }, { "groups", "Groups" },
     { "requests", "Requests" } }
 
 local function makeTab(parent, id, label)
@@ -366,6 +366,20 @@ function UI:Create()
         UI:RefreshList()
     end)
     self.list = list
+
+    -- a thin scroll indicator at the list's right edge, shown when not everything fits
+    local track = CreateFrame("Frame", nil, left)
+    track:SetPoint("TOPRIGHT", left, "TOPRIGHT", -1, -44)
+    track:SetPoint("BOTTOMRIGHT", left, "BOTTOMRIGHT", -1, 6)
+    track:SetWidth(3)
+    local trackBg = track:CreateTexture(nil, "BACKGROUND")
+    trackBg:SetAllPoints()
+    trackBg:SetColorTexture(0, 0, 0, 0.35)
+    local thumb = track:CreateTexture(nil, "ARTWORK")
+    thumb:SetWidth(3)
+    S.Paint(thumb, "edgetex", 0.9)
+    track:Hide()
+    self.track, self.thumb = track, thumb
 
     local empty = list:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     empty:SetPoint("TOPLEFT", 8, -8)
@@ -672,17 +686,50 @@ function UI:OpenContactMenu(key, anchor)
         local id, acct = TG:LookupBN(key)
         if id and acct and FriendsFrame_ShowBNDropdown then
             local online = acct.gameAccountInfo and acct.gameAccountInfo.isOnline or false
-            if pcall(FriendsFrame_ShowBNDropdown, acct.accountName, online, nil, "BN_WHISPER", nil, nil, id) then
+            local name = acct.accountName
+            if type(name) ~= "string" or TG.isSecret(name) then name = acct.battleTag end
+            -- The game's menu sometimes opens nothing (seen for offline friends): then ours is used.
+            if pcall(FriendsFrame_ShowBNDropdown, name, online, nil, "BN_WHISPER", nil, nil, id)
+                and UI.MenuOpened(not online) then
                 return
             end
         end
     elseif FriendsFrame_ShowDropdown then
         if pcall(FriendsFrame_ShowDropdown, TG.WhisperTarget(rec.name), true, nil, "WHISPER", nil, nil, nil,
-            nil, nil, nil, nil, rec.guid) then
+            nil, nil, nil, nil, rec.guid) and UI.MenuOpened(false) then
             return
         end
     end
     self:OpenFallbackMenu(key, rec, anchor)
+end
+
+-- Whether the game's menu really opened. When the game can't tell us, `guess` is the answer.
+function UI.MenuOpened(guessNot)
+    local mgr = Menu and Menu.GetManager and Menu.GetManager()
+    if mgr and mgr.GetOpenMenu then
+        local ok, open = pcall(mgr.GetOpenMenu, mgr)
+        if ok then return open ~= nil end
+    end
+    return not guessNot
+end
+
+-- "Move up" / "Move down" for a pinned conversation.
+function UI.AddPinMoveEntries(root, key)
+    local th = TG.db.threads[key]
+    if not (th and th.fav) then return end
+    root:CreateButton("Move up in Pinned", function() UI:MovePinned(key, -1) end)
+    root:CreateButton("Move down in Pinned", function() UI:MovePinned(key, 1) end)
+end
+
+-- "Archive" / "Move out of Archive".
+function UI.AddArchiveEntry(root, key)
+    local th = TG.db.threads[key]
+    if not th or th.fav or th.tempPin then return end
+    if TG:IsArchived(th) then
+        root:CreateButton("Move out of Archive", function() TG:SetArchived(key, false) end)
+    else
+        root:CreateButton("Archive", function() TG:SetArchived(key, true) end)
+    end
 end
 
 -- Telegnome's own entries for a person's right-click menu.
@@ -697,6 +744,8 @@ function UI.AddMenuEntries(root, key)
         root:CreateButton(th.fav and "Unpin" or "Pin to the top", function()
             TG:SetFavorite(key, not th.fav)
         end)
+        UI.AddPinMoveEntries(root, key)
+        UI.AddArchiveEntry(root, key)
         root:CreateButton("Clear history", function() TG:ConfirmClearHistory(key) end)
         root:CreateButton("Close conversation", function() TG:DeleteThread(key) end)
     end
@@ -899,6 +948,27 @@ function UI:GetRow(i)
     row:HookScript("OnLeave", hover)
     closeAll:HookScript("OnLeave", hover)
 
+    -- drag a pinned conversation onto another pinned one to reorder Pinned
+    row:RegisterForDrag("LeftButton")
+    row:SetScript("OnDragStart", function(s)
+        local th = s.key and TG.db.threads[s.key]
+        if not (th and th.fav) then return end
+        UI.dragKey = s.key
+        s:SetAlpha(0.5)
+    end)
+    row:SetScript("OnDragStop", function(s)
+        s:SetAlpha(1)
+        local key = UI.dragKey
+        UI.dragKey = nil
+        if not key then return end
+        for _, r in ipairs(UI.rows) do
+            if r ~= s and r:IsShown() and r.key and r:IsMouseOver() then
+                local th = TG.db.threads[r.key]
+                if th and th.fav then UI:MovePinned(key, r.key) end
+                return
+            end
+        end
+    end)
     row:SetScript("OnClick", function(s, button)
         if s.header and button == "RightButton" then
             UI:OpenHeaderMenu(s)
@@ -1101,29 +1171,79 @@ local SECTIONS = {
     { id = "fav", label = "Pinned" },
     { id = "friends", label = "Friends" },
     { id = "others", label = "Others" },
+    { id = "archive", label = "Archive" },
 }
 
 -- What the list shows, top to bottom: { key = ... } rows and, on the Direct messages tab,
 local ALL_SECTIONS = {
     { id = "all_pinned", label = "Pinned" },
     { id = "all_dm", label = "Direct messages" },
-    { id = "all_groups", label = "Group chats" },
     { id = "all_channels", label = "Channels" },
+    { id = "all_groups", label = "Group chats" },
+    { id = "all_archive", label = "Archive" },
 }
+
+-- Pinned is in your own order: a dungeon's chat first while you're inside, then by pinOrder (drag to change),
+-- then pins from before 0.9 in the list's sort order.
+local function sortPinned(b, threads)
+    local pos = {}
+    for i, k in ipairs(b) do pos[k] = i end
+    table.sort(b, function(x, y)
+        local a, c = threads[x], threads[y]
+        local ta, tc = (a.tempPin and not a.fav) and true or false, (c.tempPin and not c.fav) and true or false
+        if ta ~= tc then return ta end
+        local pa, pc = a.pinOrder or math.huge, c.pinOrder or math.huge
+        if pa ~= pc then return pa < pc end
+        return pos[x] < pos[y]
+    end)
+end
+
+-- Every pinned conversation (any kind), in Pinned's order.
+function UI:PinnedKeys()
+    local threads, b = TG.db.threads, {}
+    for k, th in pairs(threads) do
+        if th.fav then b[#b + 1] = k end
+    end
+    table.sort(b, function(x, y) return (threads[x].order or 0) > (threads[y].order or 0) end)
+    sortPinned(b, threads)
+    return b
+end
+
+-- Moves a pinned conversation: by a step (-1 up, 1 down), or onto another pinned one (dragging).
+function UI:MovePinned(key, target)
+    local order = self:PinnedKeys()
+    local from
+    for i, k in ipairs(order) do if k == key then from = i end end
+    if not from then return end
+    local to
+    if type(target) == "number" then
+        to = math.max(1, math.min(#order, from + target))
+    else
+        for i, k in ipairs(order) do if k == target then to = i end end
+        if not to then return end
+    end
+    if to == from then return end
+    table.remove(order, from)
+    table.insert(order, to, key)
+    for i, k in ipairs(order) do TG.db.threads[k].pinOrder = i end
+    self:RefreshList()
+end
 
 -- The All tab: Pinned (anything starred, and a dungeon's chat while you're inside), then each kind.
 function UI:BuildAllEntries(keys)
     local entries = {}
     if #keys == 0 then return entries end
     local threads = TG.db.threads
-    local buckets = { all_pinned = {}, all_dm = {}, all_groups = {}, all_channels = {} }
+    local buckets = { all_pinned = {}, all_dm = {}, all_groups = {}, all_channels = {}, all_archive = {} }
     for _, k in ipairs(keys) do
         local th = threads[k]
-        local id = (th.fav or th.tempPin) and "all_pinned" or th.kind == "GROUP" and "all_groups"
+        local id = (th.fav or th.tempPin) and "all_pinned" or TG:IsArchived(th) and "all_archive"
+            or th.kind == "GROUP" and "all_groups"
             or th.kind == "CHANNEL" and "all_channels" or "all_dm"
         local b = buckets[id]
         b[#b + 1] = k
     end
+    sortPinned(buckets.all_pinned, threads)
     local collapsed = TG.db.collapsed
     for _, sec in ipairs(ALL_SECTIONS) do
         local b = buckets[sec.id]
@@ -1157,11 +1277,13 @@ function UI:BuildEntries()
         return entries
     end
     local threads = TG.db.threads
-    local buckets = { fav = {}, friends = {}, others = {} }
+    local buckets = { fav = {}, friends = {}, others = {}, archive = {} }
     for _, k in ipairs(keys) do
-        local b = buckets[TG:SectionOf(threads[k])]
+        local th = threads[k]
+        local b = buckets[TG:IsArchived(th) and "archive" or TG:SectionOf(th)]
         b[#b + 1] = k
     end
+    sortPinned(buckets.fav, threads)
     local collapsed = TG.db.collapsed
     for _, sec in ipairs(SECTIONS) do
         local b = buckets[sec.id]
@@ -1233,6 +1355,20 @@ function UI:RefreshList()
         self.rows[i].key = nil
         self.rows[i].header = nil
         self.rows[i]:Hide()
+    end
+
+    -- the scroll indicator: how much of the list shows, and where
+    if self.track then
+        if maxOffset > 0 then
+            local trackH = num(self.track:GetHeight(), listH)
+            local h = math.max(16, trackH * used / math.max(1, #entries))
+            self.thumb:ClearAllPoints()
+            self.thumb:SetPoint("TOP", self.track, "TOP", 0, -(self.offset / maxOffset) * (trackH - h))
+            self.thumb:SetHeight(h)
+            self.track:Show()
+        else
+            self.track:Hide()
+        end
     end
 end
 

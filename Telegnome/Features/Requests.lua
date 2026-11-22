@@ -468,7 +468,6 @@ function R.Describe(th)
     else text = "Class and level unknown" end
     -- from a group finder application
     if ROLE_NAMES[th.role] then text = text .. " - " .. ROLE_NAMES[th.role] end
-    if th.ilvl then text = text .. (" - item level %d"):format(th.ilvl) end
     return text
 end
 
@@ -484,7 +483,6 @@ function R.DescribeColored(th)
     end
     local extra = {}
     if ROLE_NAMES[th.role] then extra[#extra + 1] = ROLE_NAMES[th.role] end
-    if th.ilvl then extra[#extra + 1] = ("item level %d"):format(th.ilvl) end
     if #extra > 0 then text = text .. "  |cffdddddd" .. table.concat(extra, ", ") .. "|r" end
     if th.applied then text = text .. "  |cff88aaff(applied)|r" end
     return text
@@ -761,7 +759,6 @@ local function extraText(th, key)
         extra[#extra + 1] = "|cffd9b56a" .. (short ~= note and short .. "..." or short):gsub("|", "||") .. "|r"
     end
     if ROLE_NAMES[th.role] then extra[#extra + 1] = ROLE_NAMES[th.role] end
-    if th.ilvl then extra[#extra + 1] = ("item level %d"):format(th.ilvl) end
     if th.applied then extra[#extra + 1] = "applied" end
     return table.concat(extra, "  \194\183  ")
 end
