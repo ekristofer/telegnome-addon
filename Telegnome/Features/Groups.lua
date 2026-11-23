@@ -388,7 +388,7 @@ end
 
 function G:OnlineChanged(key)
     local UI = TG.UI
-    if UI.selected == key and UI.whoBtn then UI.whoBtn:SetText(self:OnlineLabel(key)) end
+    if UI.selected == key and UI.whoBtn then UI:UpdateWhoButton(key) end
 end
 
 -- After logging in: asks for each group's list in turn (the game answers one at a time).

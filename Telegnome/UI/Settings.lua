@@ -12,7 +12,7 @@ local CATEGORIES = { "notify", "window", "chat", "requests", "data", "help" }
 -- Where the cog opens from each tab: page, and the section on it.
 local TAB_PAGE = {
     all = { "notify" }, dm = { "notify" }, channels = { "chat", "out" }, groups = { "notify", "groups" },
-    requests = { "requests" }, business = { "requests", "business" },
+    queue = { "requests" }, -- the LFM or Business section, whichever side is showing (O:Open)
 }
 local LIST_W = 216
 
@@ -548,7 +548,7 @@ function O:Create()
     check("Count people I grouped with in the last week as friends", 0,
         function() return s().groupedFriends ~= false end, function(v) s().groupedFriends = v; TG:QueueRefresh() end,
         "Grouped with", "Players you were in a group with in the last seven days are listed under Friends, and their "
-        .. "whispers don't go to Requests. The conversation says when you last grouped.")
+        .. "whispers don't go to the Queue. The conversation says when you last grouped.")
     local archTip = "Direct messages with no new messages for this many days move to Archive, a folded section at "
         .. "the bottom of the All and Direct tabs. A new message brings them back. Right-click any conversation "
         .. "to archive it yourself, or to move it out."
@@ -625,18 +625,18 @@ function O:Create()
         .. "The game allows 10.")
     y = y - 30
 
-    ---------------------------------------------------------------- Requests & Business
-    page("requests", "Requests & Business", "Collecting whispers from people you don't know: group finder or your ad.")
-    section("Requests")
-    check("Collect strangers' whispers under Requests while I'm listed", 0,
-        function() return s().requestsTab end, function(v) s().requestsTab = v end,
-        "Requests", "While you or your group are listed in the group finder, whispers from people who aren't "
-        .. "friends, guild members or favorites go to a Requests tab that shows their class and level and has an "
-        .. "Invite button. In a group, only the leader gets the tab. To collect at other times: /tg recruit")
-    check("Show the Requests tab", 0,
+    ---------------------------------------------------------------- Queue
+    page("requests", "Queue", "The Queue tab: whispers from people you don't know, for your group (LFM) or your ad (Business).")
+    check("Show the Queue tab", 0,
         function() return s().showRequestsTab ~= false end, function(v) s().showRequestsTab = v; UI:UpdateTabs() end,
-        "Requests tab", "On: the tab is always there, greyed out while it isn't collecting. Off: it only shows up "
-        .. "while you're listed (or using Collect now) and while requests are waiting on it.")
+        "Queue tab", "On: the tab is always there, greyed out while nothing is collecting. Off: it only shows up "
+        .. "while LFM or Business is collecting, and while requests are waiting on it.")
+    section("LFM")
+    check("Collect strangers' whispers in LFM while I'm listed", 0,
+        function() return s().requestsTab end, function(v) s().requestsTab = v end,
+        "LFM", "While you or your group are listed in the group finder, whispers from people who aren't "
+        .. "friends, guild members or favorites go to Queue > LFM, as cards with their class and level and an "
+        .. "Invite button. In a group, only the leader collects. To collect at other times: Collect now, or /tg lfm")
     gap(8)
     local qrHint = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     qrHint:SetPoint("TOPLEFT", 18, y)
@@ -656,11 +656,6 @@ function O:Create()
         .. "and Decline all sends it to everyone still waiting. Leave it empty to dismiss without a message.")
 
     section("Business", "business")
-    check("Show the Business tab", 0,
-        function() return s().businessTab ~= false end, function(v) s().businessTab = v; UI:UpdateTabs() end,
-        "Business tab", "Open for business: write an ad, post it, and collect the whispers in their own tab. "
-        .. "Untick to hide the tab while you're not using it.")
-    gap(6)
     local brHint = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     brHint:SetPoint("TOPLEFT", 18, y)
     brHint:SetText("Quick replies for whispers to your ad ({name}, {class}, {level} work here too):")
@@ -672,14 +667,14 @@ function O:Create()
     replyBox("Decline", function() return s().bizDecline or "" end, function(v) s().bizDecline = v end)
     local bdaBox = replyBox("Decline all", function() return s().bizDeclineAll or "" end,
         function(v) s().bizDeclineAll = v end)
-    S.Tooltip(bdaBox, "Decline all message", "The Decline all button in the Business tab sends this to everyone "
+    S.Tooltip(bdaBox, "Decline all message", "The Decline all button in Queue > Business sends this to everyone "
         .. "still waiting. Leave it empty to clear the list without a message.")
     gap(4)
     local bizNote = content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     bizNote:SetPoint("TOPLEFT", 18, y)
     bizNote:SetPoint("RIGHT", content, "RIGHT", -12, 0)
     bizNote:SetJustifyH("LEFT")
-    bizNote:SetText("Your ad, Start / Stop and how long it stays open are in the Business tab. Only one of Requests "
+    bizNote:SetText("Your ad, Start / Stop and how long it stays open are in Queue > Business. Only one of LFM "
         .. "and Business collects at a time, and the one started last wins: listing in the group finder or Collect "
         .. "now pauses Business, and starting Business pauses Collect now. Also: /tg business [minutes|off]")
     bizNote:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
@@ -715,7 +710,7 @@ function O:Create()
 
     ---------------------------------------------------------------- Help
     page("help", "Help", "What each tab is for. The ? next to the cog shows the same for the tab you're on.")
-    for _, tab in ipairs({ "all", "dm", "channels", "groups", "requests", "business" }) do
+    for _, tab in ipairs({ "all", "dm", "channels", "groups", "queue" }) do
         local h = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         h:SetPoint("TOPLEFT", 18, y)
         h:SetText(TG.Help.Title(tab))
@@ -985,9 +980,10 @@ function O:Open(page, section)
     if not page then
         local t = TAB_PAGE[UI.tab or "all"] or {}
         page, section = t[1], t[2]
+        if UI.tab == "queue" and TG.Requests:View() == "business" then section = "business" end
     end
     if TG.Help then TG.Help:Close() end
-    -- closing Settings goes back to the Requests or Business overview if that was open
+    -- closing Settings goes back to the Queue overview if that was open
     if not self:IsShown() then
         self.backTo = TG.Requests:IsPanelShown() and UI.tab or nil
     end

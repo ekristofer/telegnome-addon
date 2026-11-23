@@ -82,7 +82,12 @@ end
 ---------------------------------------------------------------------------
 
 local TABS = { { "all", "All" }, { "dm", "Direct" }, { "channels", "Channels" }, { "groups", "Groups" },
-    { "requests", "Requests" }, { "business", "Business" } }
+    { "queue", "Queue" } }
+
+-- The Queue tab (LFM and Business): while it's turned on in Settings, collecting, or has requests on it.
+function UI.QueueVisible()
+    return TG.Requests:TabVisible() or TG.Business:TabVisible() or TG.Requests.handOpen or false
+end
 
 local function makeTab(parent, id, label)
     -- a boxed tab like the game's own: lit in the theme colour when it's the one you're on
@@ -281,11 +286,22 @@ function UI:Create()
     self.settingsBtn = settingsBtn
 
     -- ? next to Settings: what the tab you're on is for
-    local helpBtn = S.Button(settingsBtn:GetParent(), "?", 22, 22)
-    helpBtn:SetPoint("RIGHT", settingsBtn, "LEFT", -6, 0)
+    -- the game's yellow question mark (as on quest givers)
+    local helpBtn = CreateFrame("Button", nil, settingsBtn:GetParent())
+    helpBtn:SetSize(24, 24)
+    helpBtn:SetPoint("RIGHT", settingsBtn, "LEFT", -4, 0)
     helpBtn:SetFrameLevel(settingsBtn:GetFrameLevel())
+    local qmark = helpBtn:CreateTexture(nil, "ARTWORK")
+    qmark:SetAllPoints()
+    qmark:SetTexture("Interface\\GossipFrame\\ActiveQuestIcon")
+    helpBtn.icon = qmark
+    local qhl = helpBtn:CreateTexture(nil, "HIGHLIGHT")
+    qhl:SetAllPoints()
+    qhl:SetTexture("Interface\\GossipFrame\\ActiveQuestIcon")
+    qhl:SetBlendMode("ADD")
+    qhl:SetAlpha(0.4)
     function helpBtn:SetLit(lit)
-        if lit then self.fs:SetTextColor(1, 0.95, 0.7) else self.fs:SetTextColor(S.BRASS[1], S.BRASS[2], S.BRASS[3]) end
+        if lit then self.icon:SetVertexColor(1, 1, 0.75) else self.icon:SetVertexColor(1, 1, 1) end
     end
     helpBtn:SetLit(false)
     helpBtn:SetScript("OnClick", function() TG.Help:Toggle() end)
@@ -300,27 +316,21 @@ function UI:Create()
         self.tabs[def[1]] = tab
         self.tabOrder[i] = tab
     end
-    -- Requests and Business: say whether they're collecting, since the tab is greyed out when not
-    self.tabs.requests:HookScript("OnEnter", function(s)
-        GameTooltip:SetOwner(s, "ANCHOR_BOTTOM")
-        GameTooltip:SetText("Requests")
-        if TG.Requests:Collecting() then
-            GameTooltip:AddLine("Collecting: whispers from people you don't know land here.", 1, 1, 1, true)
-        else
-            GameTooltip:AddLine("Not collecting right now. It starts by itself when you list a group in the group "
-                .. "finder, or click Collect now in the tab.", 1, 1, 1, true)
-        end
+    -- Queue: what it's for, and what is collecting right now (the tab is greyed out when nothing is)
+    self.tabs.queue:HookScript("OnEnter", function(t)
+        GameTooltip:SetOwner(t, "ANCHOR_BOTTOM")
+        GameTooltip:SetText("Queue")
+        GameTooltip:AddLine("Whispers from people you don't know, as cards: answers to your group finder "
+            .. "listing (LFM) or to your ad (Business).", 1, 1, 1, true)
+        local st = TG.db.settings
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(TG.Requests:Collecting() and "LFM: collecting" or "LFM: not collecting",
+            TG.Requests:Collecting() and 0.4 or 0.6, TG.Requests:Collecting() and 0.9 or 0.6, 0.4)
+        local biz = not st.business and "Business: closed" or st.businessPaused and "Business: paused" or "Business: open"
+        GameTooltip:AddLine(biz, TG.Business:IsOn() and 0.4 or 0.6, TG.Business:IsOn() and 0.9 or 0.6, 0.4)
         GameTooltip:Show()
     end)
-    self.tabs.requests:HookScript("OnLeave", function() GameTooltip:Hide() end)
-    self.tabs.business:HookScript("OnEnter", function(s)
-        GameTooltip:SetOwner(s, "ANCHOR_BOTTOM")
-        GameTooltip:SetText("Business")
-        GameTooltip:AddLine(TG.db.settings.business and "Open for business: whispers to your ad land here."
-            or "Closed. Open the tab to write your ad and press Start.", 1, 1, 1, true)
-        GameTooltip:Show()
-    end)
-    self.tabs.business:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    self.tabs.queue:HookScript("OnLeave", function() GameTooltip:Hide() end)
     -- How far the content keeps from the window's edge: the game's frame has a thicker border.
     local mx = native and 8 or 2
     local baseLevel = f:GetFrameLevel() + 3
@@ -373,7 +383,7 @@ function UI:Create()
     S.Tooltip(searchBtn, "Search", "Find a message in any conversation. Also: /tg search <text>")
     self.searchBtn = searchBtn
     newBtn:SetScript("OnClick", function()
-        if UI.tab == "requests" or UI.tab == "business" then
+        if UI.tab == "queue" then
             TG.Requests:TogglePanel()
         elseif UI.tab == "groups" then
             TG.Groups:TogglePanel()
@@ -385,7 +395,7 @@ function UI:Create()
                 root:CreateButton("New group chat", function() TG.Groups:OpenPanel() end)
                 root:CreateButton("Follow a channel", function() TG.Channels:OpenPanel("follow") end)
                 root:CreateButton("Add a filtered channel", function() TG.Channels:OpenPanel("filter") end)
-                root:CreateButton("Open for business", function() UI:SetTab("business") end)
+                root:CreateButton("Open for business", function() TG.Requests:OpenPanel(nil, "business") end)
             end)
         else
             TG.Picker:Toggle()
@@ -459,7 +469,7 @@ function UI:Create()
         local th = UI.selected and TG.db.threads[UI.selected]
         GameTooltip:SetOwner(s, "ANCHOR_BOTTOM")
         GameTooltip:SetText(th and th.fav and "Unpin" or "Pin to the top")
-        GameTooltip:AddLine(th and th.req and "Keeps this person: they move from Requests to your Direct messages."
+        GameTooltip:AddLine(th and th.req and "Keeps this person: they move from the Queue to your Direct messages."
             or "Pinned conversations stay at the top of the All tab (and of Direct messages, for people).", 1, 1, 1, true)
         GameTooltip:Show()
     end)
@@ -487,8 +497,21 @@ function UI:Create()
     self.renameBtn = renameBtn
 
     -- Groups: who's in the channel right now
-    local whoBtn = S.Button(conv, "Online", 84, 24)
+    local whoBtn = S.Button(conv, "Online", 104, 24)
     whoBtn:SetPoint("RIGHT", renameBtn, "LEFT", -6, 0)
+    whoBtn.fs:ClearAllPoints()
+    whoBtn.fs:SetPoint("LEFT", 24, 0)
+    whoBtn.fs:SetPoint("RIGHT", -20, 0)
+    whoBtn.fs:SetJustifyH("LEFT")
+    local whoDot = whoBtn:CreateTexture(nil, "OVERLAY")
+    whoDot:SetSize(14, 14)
+    whoDot:SetPoint("LEFT", 7, 0)
+    whoDot:SetTexture("Interface\\COMMON\\Indicator-Green")
+    whoBtn.dot = whoDot
+    local whoArrow = whoBtn:CreateTexture(nil, "OVERLAY")
+    whoArrow:SetSize(12, 12)
+    whoArrow:SetPoint("RIGHT", -6, 0)
+    whoArrow:SetTexture(S.CHEV_DOWN)
     whoBtn:SetScript("OnClick", function(s)
         if UI.selected then TG.Groups:OpenMembersMenu(UI.selected, s) end
     end)
@@ -1145,7 +1168,7 @@ function UI.UnreadOf(th)
 end
 
 function UI.TabOf(th)
-    if th.req then return th.biz and "business" or "requests" end
+    if th.req then return "queue" end
     if th.kind == "GROUP" then return "groups" end
     if th.kind == "CHANNEL" then return "channels" end
     return "dm"
@@ -1212,8 +1235,7 @@ function UI:OpenTabMenu(tab)
     MenuUtil.CreateContextMenu(tab, function(_, root)
         root:CreateTitle(tab.baseText)
         root:CreateButton("Mark all as read", function()
-            TG:MarkRead((tab.id == "requests" or tab.id == "business") and TG.Requests:Keys(tab.id)
-                or UI:SortedKeys(tab.id))
+            TG:MarkRead(tab.id == "queue" and TG.Requests:AllKeys() or UI:SortedKeys(tab.id))
         end)
     end)
 end
@@ -1482,6 +1504,14 @@ function UI:OnFavoriteChanged(key)
     self:RefreshList()
 end
 
+-- "3 online" with a green dot (grey when nobody is online).
+function UI:UpdateWhoButton(key)
+    if not self.whoBtn then return end
+    self.whoBtn:SetText(TG.Groups:OnlineLabel(key))
+    self.whoBtn.dot:SetTexture(TG.Groups:OnlineCount(key) > 0 and "Interface\\COMMON\\Indicator-Green"
+        or "Interface\\COMMON\\Indicator-Gray")
+end
+
 -- Buttons to the right of the conversation's name.
 function UI:UpdateHeaderButtons(th)
     local isGroup = th and th.kind == "GROUP" or false
@@ -1490,7 +1520,7 @@ function UI:UpdateHeaderButtons(th)
     self.moreBtn:SetShown(th ~= nil)
     self.renameBtn:SetShown(isGroup)
     self.whoBtn:SetShown(isGroup)
-    if isGroup and self.selected then self.whoBtn:SetText(TG.Groups:OnlineLabel(self.selected)) end
+    if isGroup and self.selected then self:UpdateWhoButton(self.selected) end
     self.favBtn:SetShown(th ~= nil)
     self.inviteBtn:SetShown(isReq)
     if th then
@@ -1503,7 +1533,7 @@ function UI:UpdateHeaderButtons(th)
         end
     end
     -- the name gets whatever the buttons leave
-    self.headerBtn:SetPoint("TOPRIGHT", -(isGroup and 246 or isReq and 148 or th and 78 or 48), -6)
+    self.headerBtn:SetPoint("TOPRIGHT", -(isGroup and 266 or isReq and 148 or th and 78 or 48), -6)
 end
 
 -- Closes whatever panel is open over the conversation.
@@ -1526,24 +1556,17 @@ end
 
 function UI:UpdateTabs()
     if not self.tabs then return end
-    local counts = { all = 0, dm = 0, groups = 0, channels = 0, requests = 0, business = 0 }
+    local counts = { all = 0, dm = 0, groups = 0, channels = 0, queue = 0 }
     for _, th in pairs(TG.db.threads) do
         local t = UI.TabOf(th)
         local n = UI.UnreadOf(th)
         counts[t] = counts[t] + n
         if UI.InAll(th) then counts.all = counts.all + n end
     end
-    -- The Requests tab only exists while you're recruiting or still have requests.
-    local showReq = TG.Requests:TabVisible()
-    self.tabs.requests:SetShown(showReq)
-    if self.tab == "requests" and not showReq then
-        TG.Requests:ClosePanel()
-        self:SetTab("all")
-        return
-    end
-    local showBiz = TG.Business:TabVisible()
-    self.tabs.business:SetShown(showBiz)
-    if self.tab == "business" and not showBiz then
+    -- The Queue tab: hidden only when turned off in Settings and nothing is collecting or waiting.
+    local showQ = UI.QueueVisible()
+    self.tabs.queue:SetShown(showQ)
+    if self.tab == "queue" and not showQ then
         TG.Requests:ClosePanel()
         self:SetTab("all")
         return
@@ -1563,8 +1586,7 @@ function UI:UpdateTabs()
             tab:SetBackdropColor(S.PANEL[1] * 0.9, S.PANEL[2] * 0.9, S.PANEL[3] * 0.9, 1)
             tab:SetBackdropBorderColor(e[1], e[2], e[3], 0.35)
             -- Requests and Business are greyed out while they aren't collecting
-            local idle = (tab.id == "requests" and not TG.Requests:Collecting())
-                or (tab.id == "business" and not TG.db.settings.business)
+            local idle = tab.id == "queue" and not TG.Requests:Collecting() and not TG.Business:IsOn()
             if idle then tab.fs:SetTextColor(0.42, 0.39, 0.33) else tab.fs:SetTextColor(0.62, 0.57, 0.48) end
         end
         tab:SetWidth(num(tab.fs:GetStringWidth(), 90) + 24
@@ -1585,7 +1607,7 @@ end
 function UI:UpdateNewButton()
     if not self.newBtn then return end
     local labels = { all = "+ New", dm = "+ New message", groups = "+ New group", channels = "+ Follow channel",
-        requests = "All requests", business = "All whispers" }
+        queue = "All requests" }
     self.newBtn:SetText(labels[self.tab] or "+ New message")
 end
 
@@ -1601,7 +1623,8 @@ function UI:SetTab(tab)
     end
     self.tab = tab
     self.offset = 0
-    if tab ~= "requests" then TG.db.lastTab = tab end
+    TG.db.lastTab = tab
+    if tab ~= "queue" then TG.Requests.handOpen = nil end
     self:UpdateNewButton()
     self:UpdateTabs()
     if self.tab ~= tab then return end -- the tab isn't available (no requests); UpdateTabs moved on
@@ -1616,7 +1639,7 @@ function UI:SetTab(tab)
     if key then self:Select(key) else self:ShowEmpty() end
     self.tab = tab
     self:RefreshList()
-    if tab == "requests" or tab == "business" then TG.Requests:OpenPanel(true, tab) end -- start on the overview
+    if tab == "queue" then TG.Requests:OpenPanel(true) end -- start on the overview
 end
 
 -- The window's name. Unread counts are on the tabs, so there is none here.
@@ -1805,9 +1828,10 @@ function UI:OnShow()
     if not self.tabRestored then
         self.tabRestored = true
         local last = TG.db.lastTab
-        if last == "business" and not TG.Business:TabVisible() then last = nil end
-        if last and last ~= "requests" and self.tabs and self.tabs[last] then self.tab = last end
-        if last == "business" then self.reopenOverview = true end
+        if last == "business" or last == "requests" then last = "queue" end -- the tabs before 0.9.2
+        if last == "queue" and not UI.QueueVisible() then last = nil end
+        if last and self.tabs and self.tabs[last] then self.tab = last end
+        if last == "queue" then self.reopenOverview = true end
     end
     -- the conversation you had open, if it's still in this tab; otherwise the top of the tab
     local key = self.selected
@@ -1818,8 +1842,8 @@ function UI:OnShow()
     self:RefreshList()
     TG:RefreshUnread()
     -- back where you were: the Requests or Business overview, if that was open
-    if self.reopenOverview and (self.tab == "requests" or self.tab == "business") then
-        TG.Requests:OpenPanel(true, self.tab)
+    if self.reopenOverview and self.tab == "queue" then
+        TG.Requests:OpenPanel(true)
     end
     self.reopenOverview = nil
 end

@@ -173,12 +173,12 @@ function T:ShowTooltip()
     local s = TG.db.settings
     if s.business then
         local left = TG.Business:MinutesLeft()
-        GameTooltip:AddLine(s.businessPaused and "Open for business: paused while Requests collects"
+        GameTooltip:AddLine(s.businessPaused and "Open for business: paused while LFM collects"
             or ("Open for business: " .. (left and (left .. " min left") or "until you stop it")), 1, 0.82, 0)
     end
     if TG.Requests and TG.Requests:Collecting() then
-        GameTooltip:AddLine(s.recruiting and "Collecting requests (Collect now)"
-            or "Collecting requests: you're listed in the group finder", 0.4, 0.9, 0.4)
+        GameTooltip:AddLine(s.recruiting and "LFM: collecting (Collect now)"
+            or "LFM: collecting, you're listed in the group finder", 0.4, 0.9, 0.4)
     end
     local unread = {}
     for key, th in pairs(TG.db.threads) do

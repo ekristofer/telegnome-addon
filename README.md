@@ -11,7 +11,7 @@ Telegnome moves your private messages out of the busy main chat and into a messe
 
 - **Direct messages**: every whisper and Battle.net whisper gets its own conversation with saved history. Reply from the window. The list is grouped into **Pinned**, **Friends** and **Others**, so a flood of strangers never buries your friends.
 - **All tab**: everything in one list - pinned conversations on top, then direct messages, group chats and channels. Pin anything with the star.
-- **Requests**: while you're listed in the group finder, whispers from strangers land in their own tab with class, level and an Invite button.
+- **Queue**: whispers from people you don't know, collected as cards in one tab with two sides - **LFM** (while you're listed in the group finder: class, level and an Invite button) and **Business** (answers to your ad).
 - **Search**: find any saved message, in all conversations or in one.
 - **Notes**: a short private note per person, shown under their name.
 - **Recently grouped with**: people you grouped with in the last week sort under Friends.
@@ -52,7 +52,7 @@ Open Telegnome with the minimap button, the addons button by the minimap, or `/t
 | `/tg new` | Start a new conversation |
 | `/tg group <name>` | Create a group chat |
 | `/tg join <code>` | Join a group chat |
-| `/tg test stranger` | A pretend whisper from a stranger, to try Requests and Open for business |
+| `/tg test stranger` | A pretend whisper from a stranger, to try the Queue tab (LFM and Business) |
 | `/tg channels` | Choose followed channels |
 | `/tg opacity <30-100>` | Main window opacity |
 | `/tg theme <name>` | Colour theme: brass, orange, horde, alliance, arcane, fel, steel |
@@ -61,7 +61,8 @@ Open Telegnome with the minimap button, the addons button by the minimap, or `/t
 | `/tg search <text>` | Search your saved messages |
 | `/tg sort recent\|name\|unread` | How the conversation list is sorted |
 | `/tg follow-instance` | Follow Party or Raid chat until you leave the dungeon or raid |
-| `/tg recruit` | Collect strangers' whispers under Requests (manual switch) |
+| `/tg queue` | Open the Queue tab |
+| `/tg lfm` | Collect now: strangers' whispers go to Queue > LFM even when you're not listed (also `/tg recruit`) |
 | `/tg dnd` | Toggle Do not disturb |
 | `/tg only` | Keep whispers, Battle.net whispers and followed channels out of the main chat |
 | `/tg hide` | Hide just whispers from the main chat |
@@ -105,9 +106,13 @@ Inside each section, conversations are sorted by most recent by default. Right-c
 
 The **?** next to the Settings cog explains the tab you're on. A tab with nothing in it shows the same help, so it explains itself the first time you open it. Settings > Help has all of it in one place.
 
-### Requests
+### Queue: LFM and Business
 
-The **Requests** tab is always there, greyed out while it isn't collecting. List yourself or your group in the group finder and it starts by itself: whispers from people who aren't friends, guild members or favorites are collected there, so they don't flood your Direct messages. To collect without being listed, click **Collect now** in the tab (or `/tg recruit`). You can hide the tab in Settings > Requests & Business; then it only shows up while it's collecting or has requests on it.
+The **Queue** tab collects whispers from people who aren't friends, guild members or favorites as cards, so they don't flood your Direct messages. It has two sides, switched at the top: **LFM** for your group finder listing and **Business** for your ad. Each side shows a green dot while it collects (grey when not, yellow while paused) and how many are waiting. Only one side collects at a time, and the one started last wins: listing in the group finder or Collect now pauses Business, and starting Business pauses Collect now; the paused one comes back by itself. The tab is greyed out while nothing collects; hover it to see what's going on. You can hide it in Settings > Queue; then it only shows up while something collects or requests are waiting.
+
+#### LFM
+
+List yourself or your group in the group finder (alone, or as the leader) and LFM starts by itself. To collect without being listed, for example while recruiting in a chat channel, click **Collect now** (or `/tg lfm`). **Collect whispers** at the top is ticked by default while you're listed; untick it to pause.
 
 - Each request shows the player's class, level and latest message.
 - The row at the top shows a class icon and a count for each class that's waiting - the class comes with the first whisper. Click an icon to show only that class, or All to see everyone. Each request has its class icon by the name.
@@ -116,9 +121,11 @@ The **Requests** tab is always there, greyed out while it isn't collecting. List
 - The level is read from the whisper ("70 mage", "lvl 45") or from their group finder application. **Check** looks the player up, also when a level looks wrong; the game only answers every few seconds, so the button counts down until you can ask again.
 - Click the star in a request's conversation to keep that person - they move to Direct messages.
 - **Decline all** sends your decline message to everyone still on the list and takes them off it. People you invited or who are in your group stay.
-- When you're done, **Clear all** removes the remaining requests and the tab disappears.
+- **Clear all** removes the remaining requests.
 
-The tab appears while you're listed alone, or listed in a group you lead. **Collect whispers** at the bottom of the Requests view is ticked by default; untick it to pause. Recruiting somewhere else, for example in a chat channel? `/tg recruit` collects whispers there at any time until you switch it off.
+#### Business
+
+For crafters, sellers and guild ads. Write your ad at the top (click in the box and shift-click your profession or an item to add the link), choose where it goes (Trade, Say, Guild or any channel you're in) and how long to stay open (15, 30, 60 or 120 minutes, or **Until I stop it**). The **Saved ads** button next to the ad keeps ads for another time (up to 15): save the one in the box, put a saved one back, or delete one. Press **Start**, then **Post** - the game needs a click for every post, so the ad never repeats on its own. While it's open, whispers from people you don't know land here as cards with Invite and Reply; the replies, decline and Decline all messages are in **Settings > Queue**. It tells you when it closes and how many whispers are waiting. Also `/tg business [minutes|off]`.
 
 ### Group chats
 
@@ -140,10 +147,6 @@ Right-click a followed channel for two options: **Count unread messages** gives 
 Followed channels tab > **+ Follow channel** > tick what you want. Messages are copied into the tab and you can reply from there. Followed channels don't count towards the missed-messages counter. Each channel has its own **Pop-up** tick (off by default). **Alert words** (Settings > Notifications) make a message pop up anyway when it contains one of your words, e.g. `LFM, tank`. A channel can also have its own alert words (right-click it > Alert words for this channel...).
 
 **Filtered copies:** Followed channels > **Filtered channels** page: choose a channel, type words, e.g. `enchant, ench`, and click **Add** (or right-click a followed channel > **New filtered copy...**). You get a separate conversation, "Trade [Enchant]", that keeps only the messages with those words and pops up when one arrives. Make as many as you like, with or without following the whole channel; the matching words are picked out in gold.
-
-### Open for business
-
-For crafters, sellers and recruiters, in the **Business** tab. Write your ad at the top (click in the box and shift-click your profession or an item to add the link), choose where it goes (Trade, Say, Guild or any channel you're in) and how long to stay open (15, 30, 60 or 120 minutes, or **Until I stop it**). The **Saved ads** button next to the ad keeps ads for another time (up to 15): save the one in the box, put a saved one back, or delete one. Press **Start**, then **Post** - the game needs a click for every post, so the ad never repeats on its own. While it's open, whispers from people you don't know land in the tab as cards with Invite and Reply; the replies and decline message are in **Settings > Requests & Business**. It tells you when it closes and how many whispers are waiting. Listing in the group finder pauses it; it opens again when you stop listing. Also `/tg business [minutes|off]`. Don't need it? Hide the tab in Settings > Requests & Business.
 
 ### Mail
 
@@ -224,7 +227,7 @@ Telegnome/               the addon folder (this is what goes into AddOns)
   UI/Help.lua            the ? help card for each tab
   Features/Groups.lua    group chats (invite codes, hashing, channels)
   Features/Channels.lua  followed channels
-  Features/Requests.lua  Requests tab (group finder whispers)
+  Features/Requests.lua  Queue tab (LFM and Business cards)
   Features/Social.lua    recently grouped with, notes, reply blanks, login summary
   Features/Instances.lua dungeon and raid chat, quiet in combat
   Media/                 icon and cog textures (.tga)

@@ -49,7 +49,7 @@ local DEFAULTS = {
         instancePopups = true, -- pop-ups for Party / Raid chat followed just for a dungeon or raid
         archiveOn = true,     -- direct messages with nothing new for archiveDays days go to Archive
         archiveDays = 7,
-        -- one-click answers for requests (Settings > Requests & Business)
+        -- one-click answers for requests (Settings > Queue)
         quickReplies = { "Inviting you now, {name}!", "What level and role are you?", "One moment, checking the group." },
         declineReply = "Sorry, the group is full.",
         requestsTab = true,   -- collect strangers' whispers under Requests while listed in the group finder
@@ -61,12 +61,12 @@ local DEFAULTS = {
         businessForever = false, -- ...or until you stop it
         businessTab = true,   -- show the Business tab
         ads = { "", "", "" },
-        savedAds = {},        -- ads saved for later (the Saved button in the Business tab)
+        savedAds = {},        -- ads saved for later (the Saved button in Queue > Business)
         adChannel = "Trade",
         bizReplies = { "Sure, {name}! Send me the mats and I'll open a trade.", "Meet me at the bank, I'll open a trade.",
             "One moment, I'm finishing another order." },
         bizDecline = "Sorry, I can't make that one.",
-        bizDeclineAll = "Sorry, I'm done for now.", -- sent by Decline all in the Business tab
+        bizDeclineAll = "Sorry, I'm done for now.", -- sent by Decline all in Queue > Business
     },
     collapsed = {}, -- folded sections of the Direct messages list
     minimap = { hide = false, angle = 200 },
@@ -1172,7 +1172,9 @@ SlashCmdList.TELEGNOME = function(input)
         if arg == "off" or arg == "stop" then TG.Business:Stop()
         elseif tonumber(arg) then TG.Business:Start(tonumber(arg))
         else TG.Business:Toggle() end
-    elseif cmd == "recruit" or cmd == "requests" then
+    elseif cmd == "queue" then
+        TG.Requests:OpenPanel()
+    elseif cmd == "lfm" or cmd == "recruit" or cmd == "requests" then
         TG.Requests:SetRecruiting(not s.recruiting)
         if s.recruiting then TG.Requests:OpenPanel(nil, "requests") end
     elseif cmd == "dnd" then
@@ -1240,8 +1242,9 @@ SlashCmdList.TELEGNOME = function(input)
         print("  /tg opacity <30-100> - main window opacity (" .. (s.opacity or 100) .. "%)")
         print("  /tg dnd - do not disturb (" .. onOff(s.dnd) .. ")")
         print("  /tg theme <name> - colour theme (" .. TG.Style.theme.label .. ")")
-        print("  /tg business [minutes|off] - Open for business: collect whispers to your ad in the Business tab")
-        print("  /tg recruit - collect strangers' whispers under Requests even when not listed (" .. onOff(s.recruiting) .. ")")
+        print("  /tg business [minutes|off] - Open for business: collect whispers to your ad in Queue > Business")
+        print("  /tg queue - open the Queue tab (LFM and Business)")
+        print("  /tg lfm - Collect now: strangers' whispers go to Queue > LFM even when not listed (" .. onOff(s.recruiting) .. ")")
         print("  /tg config - settings")
         print("  /tg counter - on-screen missed-messages counter (" .. onOff(s.counter) .. ")")
         print("  /tg hide - hide whispers from the main chat (" .. onOff(s.hideFromChat) .. ")")
@@ -1251,7 +1254,7 @@ SlashCmdList.TELEGNOME = function(input)
         print("  /tg minimap - minimap button (" .. onOff(not TG.db.minimap.hide) .. ")")
         print("  /tg clear - close the selected conversation")
         print("  /tg test - add a fake incoming whisper")
-        print("  /tg test stranger - a whisper from a made-up stranger, to try Requests and Open for business")
+        print("  /tg test stranger - a whisper from a made-up stranger, to try the Queue tab (LFM and Business)")
         print("  /tg debug - print raw event info (" .. onOff(s.debug) .. ")")
     end
 end

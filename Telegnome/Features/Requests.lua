@@ -37,9 +37,27 @@ function R:IsActive()
         or (TG.Business and TG.Business:IsOn()) or false
 end
 
--- Which list the panel shows: Requests (group finder) or Business (Open for business).
+-- Which side of the Queue tab is showing: "requests" (LFM: the group finder) or "business" (your ad).
+-- It's remembered between sessions.
 function R:View()
-    return (UI.tab == "business") and "business" or "requests"
+    local v = self.view or (TG.db and TG.db.queueView)
+    if v == "business" then return "business" end
+    return "requests"
+end
+
+function R:SetView(view)
+    if view ~= "business" then view = "requests" end
+    if self:View() ~= view then self.classFilter, self.offset = nil, 0 end
+    self.view = view
+    if TG.db then TG.db.queueView = view end
+    if self:IsPanelShown() then self:Refresh() end
+end
+
+-- Both lists, for Mark all as read on the tab.
+function R:AllKeys()
+    local keys = self:Keys("requests")
+    for _, k in ipairs(self:Keys("business")) do keys[#keys + 1] = k end
+    return keys
 end
 
 -- The requests in one list (default: the one on screen).
@@ -67,7 +85,7 @@ function R:SetRecruiting(on)
     if (s.recruiting and true or false) == on then return end
     s.recruiting = on
     s.recruitPausedByBiz = nil
-    TG:Print("Collecting strangers' whispers under Requests at any time, listed or not: " .. (on and "on" or "off"))
+    TG:Print("Collect now (Queue > LFM): collecting strangers' whispers at any time, listed or not: " .. (on and "on" or "off"))
     TG.Business:SyncPause()
     TG:RefreshUnread()
     if UI.frame then UI:UpdateTabs() end
@@ -360,7 +378,7 @@ local function repliesFor(key)
     return s.quickReplies or {}, s.declineReply, s.declineReply -- Requests: Decline all sends the same message
 end
 
--- all: sent by Decline all, which in the Business tab has its own message ("Sorry, I'm done for now.")
+-- all: sent by Decline all, which in Queue > Business has its own message ("Sorry, I'm done for now.")
 function R:Decline(key, all)
     local _, one, every = repliesFor(key)
     local text = all and every or one
@@ -615,14 +633,71 @@ function R:Create()
     UI:Create()
 
     -- covers the list and the conversation: the overview has the whole width
+    -- the two sides of the Queue tab, in a bar above the overview: LFM | Business
+    local SEG_H = 36
+    local seg = CreateFrame("Frame", nil, UI.right, "BackdropTemplate")
+    seg:SetPoint("TOPLEFT", UI.body, "TOPLEFT", 0, 0)
+    seg:SetPoint("TOPRIGHT", UI.body, "TOPRIGHT", 0, 0)
+    seg:SetHeight(SEG_H)
+    seg:SetFrameLevel(UI.right:GetFrameLevel() + 30)
+    S.Flat(seg)
+    S.Paint(seg, "cover")
+    seg:EnableMouse(true)
+    seg:Hide()
+    self.segBar = seg
+    local segLine = S.Line(seg)
+    segLine:SetPoint("BOTTOMLEFT", 8, 0)
+    segLine:SetPoint("BOTTOMRIGHT", -8, 0)
+    self.segs = {}
+    local SEG_TIPS = {
+        requests = { "LFM", "Whispers from people who want to join your group: collected while you're listed in the "
+            .. "group finder, or with Collect now." },
+        business = { "Business", "Whispers to your ad: for crafters, sellers and guild ads. Write it, press Start and "
+            .. "Post it." },
+    }
+    local prevSeg
+    for _, def in ipairs({ { "requests", "LFM" }, { "business", "Business" } }) do
+        local b = S.Button(seg, def[2], 150, 26)
+        if prevSeg then b:SetPoint("LEFT", prevSeg, "RIGHT", 6, 0) else b:SetPoint("TOPLEFT", 14, -5) end
+        b.fs:ClearAllPoints()
+        b.fs:SetPoint("LEFT", 26, 0)
+        b.fs:SetPoint("RIGHT", -8, 0)
+        b.fs:SetJustifyH("LEFT")
+        local dot = b:CreateTexture(nil, "OVERLAY")
+        dot:SetSize(14, 14)
+        dot:SetPoint("LEFT", 8, 0)
+        b.dot = dot
+        local bar = b:CreateTexture(nil, "OVERLAY")
+        bar:SetHeight(2)
+        bar:SetPoint("BOTTOMLEFT", 2, 2)
+        bar:SetPoint("BOTTOMRIGHT", -2, 2)
+        bar:SetColorTexture(1, 0.82, 0, 1)
+        b.bar = bar
+        b.view, b.label = def[1], def[2]
+        b:SetScript("OnClick", function() R:SetView(def[1]) end)
+        S.Tooltip(b, SEG_TIPS[def[1]][1], SEG_TIPS[def[1]][2])
+        self.segs[#self.segs + 1] = b
+        prevSeg = b
+    end
+    local segNote = seg:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    segNote:SetPoint("LEFT", prevSeg, "RIGHT", 12, 0)
+    segNote:SetPoint("RIGHT", seg, "RIGHT", -14, 0)
+    segNote:SetJustifyH("LEFT")
+    segNote:SetWordWrap(false)
+    segNote:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
+    segNote:SetText("Only one collects at a time.")
+
     local f = CreateFrame("Frame", nil, UI.right, "BackdropTemplate")
-    f:SetAllPoints(UI.body)
+    f:SetPoint("TOPLEFT", UI.body, "TOPLEFT", 0, -SEG_H)
+    f:SetPoint("BOTTOMRIGHT", UI.body, "BOTTOMRIGHT", 0, 0)
     f:SetFrameLevel(UI.right:GetFrameLevel() + 30)
     S.Flat(f)
     S.Paint(f, "cover")
     f:EnableMouse(true)
     f:EnableMouseWheel(true)
     f:Hide()
+    f:HookScript("OnShow", function() seg:Show() end)
+    f:HookScript("OnHide", function() seg:Hide() end)
     self.panel = f
 
     -- top: what is being collected, and the switch for it
@@ -665,7 +740,7 @@ function R:Create()
     start:SetPoint("TOPRIGHT", -14, -8)
     start:SetScript("OnClick", function() TG.Business:Toggle() end)
     S.Tooltip(start, "Open for business", "While it's open, whispers from people who aren't friends, guild members or "
-        .. "favorites are collected here, with the quick replies from Settings > Requests & Business.")
+        .. "favorites are collected here, with the quick replies from Settings > Queue.")
     biz.start = start
     local dur = S.Button(f, "", 140, 22)
     dur:SetPoint("RIGHT", start, "LEFT", -8, 0)
@@ -844,8 +919,8 @@ function R:Create()
     decline:SetPoint("BOTTOMRIGHT", -30, 9) -- clear of the window's resize corner
     decline:SetScript("OnClick", function() R:ConfirmDeclineAll() end)
     S.Tooltip(decline, "Decline all", "Sends your decline message to everyone still on the list and takes them off it. "
-        .. "People you invited or who are in your group stay. In the Business tab it sends the Decline all message "
-        .. "from Settings > Requests & Business instead.")
+        .. "People you invited or who are in your group stay. In Queue > Business it sends the Decline all message "
+        .. "from Settings > Queue instead.")
     self.declineBtn = decline
 
     local clear = S.Link(f, "Clear all", "GameFontNormal")
@@ -858,8 +933,8 @@ end
 function R:Refresh()
     if UI.frame and UI.tabs then
         -- keeps the tab in step when listing starts or stops
-        local shown = UI.tabs.requests:IsShown()
-        if shown ~= self:TabVisible() and not self.inRefresh then
+        local shown = UI.tabs.queue:IsShown()
+        if shown ~= UI.QueueVisible() and not self.inRefresh then
             self.inRefresh = true
             UI:UpdateTabs()
             self.inRefresh = false
@@ -872,6 +947,7 @@ function R:Refresh()
     end
     if not self:IsPanelShown() then return end
 
+    self:UpdateSegments()
     self:UpdateStatus()
     self.manual:SetChecked(TG.db.settings.requestsCollect ~= false)
     self:ApplyView()
@@ -935,7 +1011,7 @@ function R:UpdateStatus()
         if s.business and s.businessPaused then
             set({ 1, 0.67, 0.2 }, self:IsHosting()
                 and "Paused while you're listed in the group finder. It opens again when you stop listing."
-                or "Paused while Collect now is on in Requests. It opens again when you stop collecting.")
+                or "Paused while Collect now is on in LFM. It opens again when you stop collecting.")
         elseif s.business then
             set(S.ONLINE, ("Open %s. Whispers from people you don't know land here.")
                 :format(left and ("- " .. left .. " min left") or "until you stop it"))
@@ -1110,27 +1186,44 @@ function R:FillRows()
     self.clearBtn:SetEnabled(#keys > 0)
 end
 
+-- The two side buttons: a green dot while that side collects (grey when not, yellow while paused), how many
+-- are waiting, and a gold line under the one showing.
+function R:UpdateSegments()
+    if not self.segs then return end
+    local s = TG.db.settings
+    for _, b in ipairs(self.segs) do
+        local on, paused
+        if b.view == "business" then
+            on, paused = TG.Business:IsOn(), s.business and s.businessPaused
+        else
+            on = self:Collecting()
+        end
+        b.dot:SetTexture(on and "Interface\\COMMON\\Indicator-Green"
+            or paused and "Interface\\COMMON\\Indicator-Yellow" or "Interface\\COMMON\\Indicator-Gray")
+        local n = #self:OpenKeys(b.view)
+        b:SetText(b.label .. (n > 0 and ("  |cffffd100" .. n .. "|r") or ""))
+        local sel = self:View() == b.view
+        b.bar:SetShown(sel)
+        if sel then b.fs:SetTextColor(1, 0.95, 0.8) else b.fs:SetTextColor(0.62, 0.57, 0.48) end
+    end
+end
+
 function R:IsPanelShown()
     return self.panel and self.panel:IsShown() or false
 end
 
--- fromTab: called by UI:SetTab, which has already switched tabs. view: "requests" or "business"
--- (default: the tab you're on).
+-- fromTab: called by UI:SetTab, which has already switched to the Queue tab. view: "requests" (LFM) or
+-- "business" to switch sides; nil keeps the side you were on.
 function R:OpenPanel(fromTab, view)
-    view = view or (UI.tab == "business" and "business") or "requests"
-    if view ~= "business" then view = "requests" end
-    if view == "requests" and not self:TabVisible() then return end
-    if view == "business" and not TG.Business:TabVisible() then return end
+    if view == "requests" or view == "business" then self:SetView(view) end
+    if not fromTab then self.handOpen = true end -- asked for: the tab shows even when hidden in Settings
+    if not UI.QueueVisible() then return end
     UI:Show()
     self:Create()
-    if UI.tab ~= view then
+    if UI.tab ~= "queue" then
         if fromTab then return end -- never bounce back and forth with SetTab
-        UI:SetTab(view) -- which opens this panel
+        UI:SetTab("queue") -- which opens this panel
         return
-    end
-    if self.lastView ~= view then
-        self.lastView = view
-        self.classFilter, self.offset = nil, 0
     end
     TG.Settings:Close()
     TG.Picker:Close()
@@ -1147,7 +1240,7 @@ end
 function R:ClosePanel(quiet)
     if not self:IsPanelShown() then return end
     self.panel:Hide()
-    if not quiet and UI.frame:IsShown() and UI.selected and (UI.tab == "requests" or UI.tab == "business") then
+    if not quiet and UI.frame:IsShown() and UI.selected and UI.tab == "queue" then
         UI:Select(UI.selected)
     end
 end
@@ -1164,9 +1257,9 @@ function R:CheckHosting()
         bizHandled = TG.Business:OnHostingChanged(hosting)
     end
     if hosting and not self.wasHosting and self:IsActive() and not bizHandled then
-        TG:Print("You're listed in the group finder. Whispers from people you don't know go to Requests.")
+        TG:Print("You're listed in the group finder. Whispers from people you don't know go to Queue > LFM.")
         if TG.Toast then
-            TG.Toast:Notice("|cffffd100Requests are on|r", "Whispers from strangers go to Requests. Click to open.",
+            TG.Toast:Notice("|cffffd100LFM is collecting|r", "Whispers from strangers go to Queue > LFM. Click to open.",
                 function() R:OpenPanel(nil, "requests") end)
         end
     end

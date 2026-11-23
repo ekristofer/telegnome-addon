@@ -49,13 +49,13 @@ function B:Start(minutes)
     if s.recruiting then
         s.recruiting = false
         s.recruitPausedByBiz = true
-        TG:Print("Collect now (Requests) is paused while you're open for business. It comes back when you close.")
+        TG:Print("Collect now (LFM) is paused while you're open for business. It comes back when you close.")
     end
     s.businessPaused = TG.Requests:IsHosting() or nil -- a group finder listing still comes first
     if s.businessPaused then
         TG:Print("Open for business is on, but paused while you're listed in the group finder.")
     else
-        TG:Print(("Open for business%s. Whispers from people you don't know go to the Business tab.")
+        TG:Print(("Open for business%s. Whispers from people you don't know go to Queue > Business.")
             :format(s.businessUntil and (" for " .. minutes .. " minutes") or ""))
     end
     changed()
@@ -70,11 +70,11 @@ function B:Stop(reason)
     if s.recruitPausedByBiz then -- Collect now was on before Business started
         s.recruitPausedByBiz = nil
         s.recruiting = true
-        TG:Print("Collect now is back on: whispers from people you don't know go to Requests again.")
+        TG:Print("Collect now is back on: whispers from people you don't know go to LFM again.")
     end
     changed()
     local waiting = #TG.Requests:OpenKeys("business")
-    local body = waiting > 0 and (("%d whisper%s waiting in the Business tab."):format(waiting, waiting == 1 and "" or "s"))
+    local body = waiting > 0 and (("%d whisper%s waiting in Queue > Business."):format(waiting, waiting == 1 and "" or "s"))
         or "No whispers waiting."
     if reason == "time" then
         if TG.Toast then
@@ -106,7 +106,7 @@ function B:SyncPause()
         local why = hosting and "You're listed in the group finder" or "Collect now is on"
         if TG.Toast then
             TG.Toast:Notice("|cffffd100Open for business paused|r", why .. ", so whispers from people you don't "
-                .. "know go to Requests. Business comes back when " .. (hosting and "you stop listing." or "you stop collecting."),
+                .. "know go to LFM. Business comes back when " .. (hosting and "you stop listing." or "you stop collecting."),
                 function() TG.Requests:OpenPanel(nil, "requests") end)
         end
         TG:Print("Open for business is paused while " .. (hosting and "you're listed in the group finder." or "Collect now is on."))
@@ -119,7 +119,7 @@ function B:SyncPause()
             changed()
             if TG.Toast then
                 TG.Toast:Notice("|cffffd100Open for business is back on|r",
-                    "Whispers from people you don't know go to the Business tab again.",
+                    "Whispers from people you don't know go to Queue > Business again.",
                     function() TG.Requests:OpenPanel(nil, "business") end)
             end
             TG:Print("Open for business is back on.")
@@ -154,7 +154,7 @@ end
 function B:Post(i)
     local text = (S().ads or {})[i]
     if type(text) ~= "string" or not text:match("%S") then
-        TG:Print("Your ad is empty. Write it in the Business tab first.")
+        TG:Print("Your ad is empty. Write it in Queue > Business first.")
         return
     end
     local now = GetTime()
@@ -257,11 +257,11 @@ function B:OpenDurationMenu(anchor)
     end)
 end
 
--- The Business tab: shown unless you've hidden it (Settings > Requests & Business), and while it's in use.
+-- The Business tab: shown unless you've hidden it (Settings > Queue), and while it's in use.
 function B:TabVisible()
     if not TG.db then return false end
     local s = S()
-    if s.businessTab ~= false or s.business then return true end
+    if s.business then return true end -- (the Queue tab itself has its own Show tick)
     for _, th in pairs(TG.db.threads) do
         if th.req and th.biz then return true end
     end

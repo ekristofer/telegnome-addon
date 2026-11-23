@@ -224,7 +224,7 @@ function D:Requests()
     if not self.on then self:Start() end
     TG.Requests:OpenPanel(nil, "requests")
     if TG.Toast then
-        TG.Toast:Notice("|cffffd100Requests are on|r", "Whispers from strangers go to Requests. Click to open.",
+        TG.Toast:Notice("|cffffd100LFM is collecting|r", "Whispers from strangers go to Queue > LFM. Click to open.",
             function() TG.Requests:OpenPanel(nil, "requests") end)
     end
 end
@@ -232,7 +232,7 @@ end
 function D:Command(arg)
     if arg == "msg" or arg == "message" or arg == "ping" then
         self:Ping()
-    elseif arg == "requests" or arg == "request" or arg == "req" then
+    elseif arg == "requests" or arg == "request" or arg == "req" or arg == "lfm" or arg == "queue" then
         self:Requests()
     elseif arg == "off" or arg == "stop" then
         self:Stop()

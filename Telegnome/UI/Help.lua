@@ -34,22 +34,31 @@ H.TEXT = {
         .. "- Share the code in any chat, or right-click the group > Invite. Friends with Telegnome get a "
         .. "pop-up and join with one click.\n"
         .. "- Right-click a group for Who's online, renaming, notifications and leaving." },
-    requests = { "Requests", "Whispers from people you don't know, collected as cards while you're listed in "
+    requests = { "LFM", "Whispers from people you don't know, collected as cards while you're listed in "
         .. "the group finder, so they don't get lost among your friends' messages.\n\n"
         .. "- It starts by itself when you list a group (as its leader). Collect now collects at any time "
-        .. "(also /tg recruit).\n"
+        .. "(also /tg lfm).\n"
         .. "- Each card shows the class and level. Invite, Reply with a quick reply, or Decline.\n"
         .. "- Filter by class with the icons at the top. Decline all answers everyone still waiting.\n"
-        .. "- Quick replies and decline messages are in Settings > Requests & Business." },
-    business = { "Business", "For crafters, sellers and recruiters: post an ad and collect the whispers you "
+        .. "- Quick replies and decline messages are in Settings > Queue." },
+    business = { "Business", "For crafters, sellers and guild ads: post an ad and collect the whispers you "
         .. "get back.\n\n"
         .. "- Write your ad (shift-click a profession or an item to add its link), choose where it goes and for "
         .. "how long, then press Start and Post.\n"
         .. "- The game needs a click for every post, so Post never repeats on its own.\n"
         .. "- Whispers from people you don't know land here as cards, with their own quick replies "
-        .. "(Settings > Requests & Business).\n"
+        .. "(Settings > Queue).\n"
         .. "- Saved ads keeps ads you use again. Listing in the group finder pauses it." },
 }
+
+-- The Queue tab: both sides in one card.
+H.TEXT.queue = { "Queue", "Whispers from people you don't know, collected as cards so they don't get lost "
+    .. "among your friends' messages. Switch side at the top - only one collects at a time, the one started last.\n\n"
+    .. "LFM: while you're listed in the group finder (as the leader), or with Collect now. Each card shows the class "
+    .. "and level; Invite, Reply or Decline. Filter by class with the icons.\n\n"
+    .. "Business: write an ad (shift-click a profession or item to link it), choose where and how long, press Start "
+    .. "and Post. Saved ads keeps ads you use again.\n\n"
+    .. "Quick replies and decline messages for both are in Settings > Queue." }
 
 function H.Title(tab)
     local t = H.TEXT[tab]
