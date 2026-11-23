@@ -222,10 +222,10 @@ end
 -- The Requests tab, with the pop-up you get when your listing starts.
 function D:Requests()
     if not self.on then self:Start() end
-    TG.Requests:OpenPanel()
+    TG.Requests:OpenPanel(nil, "requests")
     if TG.Toast then
         TG.Toast:Notice("|cffffd100Requests are on|r", "Whispers from strangers go to Requests. Click to open.",
-            function() TG.Requests:OpenPanel() end)
+            function() TG.Requests:OpenPanel(nil, "requests") end)
     end
 end
 

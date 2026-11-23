@@ -54,6 +54,15 @@ local DEFAULTS = {
         requestsTab = true,   -- collect strangers' whispers under Requests while listed in the group finder
         requestsCollect = true, -- the tick in the Requests view: untick to pause collecting while listed
         recruiting = false,   -- collect at any time, listed or not (/tg recruit)
+        business = false,     -- Open for business: collecting whispers for your ad
+        businessMinutes = 30, -- how long it stays on
+        businessForever = false, -- ...or until you stop it
+        businessTab = true,   -- show the Business tab
+        ads = { "", "", "" },
+        adChannel = "Trade",
+        bizReplies = { "Sure, {name}! Send me the mats and I'll open a trade.", "Meet me at the bank, I'll open a trade.",
+            "One moment, I'm finishing another order." },
+        bizDecline = "Sorry, I can't make that one.",
     },
     collapsed = {}, -- folded sections of the Direct messages list
     minimap = { hide = false, angle = 200 },
@@ -269,8 +278,7 @@ function TG:DisplayFor(key, rec)
     end
     if rec.kind == "CHANNEL" then
         local name = rec.name or "Channel"
-        local label = rec.base and self.Channels.FilterLabel(rec)
-        if label then name = name .. " [" .. label .. "]" end
+        if rec.base then name = rec.customName or self.Channels.AutoName(rec) end
         return name, self.Channels.Color(rec), nil
     end
     if rec.kind == "BN" and rec.demo then
@@ -1084,11 +1092,16 @@ SlashCmdList.TELEGNOME = function(input)
             for _, th in ipairs(TG.Style.THEMES) do names[#names + 1] = th.id end
             TG:Print("Theme is " .. TG.Style.theme.label .. ". Choose with /tg theme " .. table.concat(names, " | "))
         end
+    elseif cmd == "business" or verb == "business" then
+        local arg = rest and rest:lower()
+        if arg == "off" or arg == "stop" then TG.Business:Stop()
+        elseif tonumber(arg) then TG.Business:Start(tonumber(arg))
+        else TG.Business:Toggle() end
     elseif cmd == "recruit" or cmd == "requests" then
         s.recruiting = not s.recruiting
         TG:Print("Collecting whispers under Requests at any time, listed or not: " .. onOff(s.recruiting))
         TG:RefreshUnread()
-        if s.recruiting then TG.Requests:OpenPanel() end
+        if s.recruiting then TG.Requests:OpenPanel(nil, "requests") end
     elseif cmd == "dnd" then
         TG:SetDND(not s.dnd)
     elseif cmd == "new" then
@@ -1152,6 +1165,7 @@ SlashCmdList.TELEGNOME = function(input)
         print("  /tg opacity <30-100> - main window opacity (" .. (s.opacity or 100) .. "%)")
         print("  /tg dnd - do not disturb (" .. onOff(s.dnd) .. ")")
         print("  /tg theme <name> - colour theme (" .. TG.Style.theme.label .. ")")
+        print("  /tg business [minutes|off] - Open for business: collect whispers to your ad in the Business tab")
         print("  /tg recruit - collect strangers' whispers under Requests even when not listed (" .. onOff(s.recruiting) .. ")")
         print("  /tg config - settings")
         print("  /tg counter - on-screen missed-messages counter (" .. onOff(s.counter) .. ")")

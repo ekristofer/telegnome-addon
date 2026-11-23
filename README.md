@@ -134,7 +134,11 @@ Right-click a followed channel for two options: **Count unread messages** gives 
 
 Followed channels tab > **+ Follow channel** > tick what you want. Messages are copied into the tab and you can reply from there. Followed channels don't count towards the missed-messages counter. Each channel has its own **Pop-up** tick (off by default). **Alert words** (Settings > Notifications) make a message pop up anyway when it contains one of your words, e.g. `LFM, tank`. A channel can also have its own alert words (right-click it > Alert words for this channel...).
 
-**Filtered copies:** right-click a followed channel > **New filtered copy...** and type words, e.g. `enchant, ench`. You get a separate conversation, "Trade [Enchant]", that keeps only the messages with those words and pops up when one arrives. Make as many as you like, with or without following the whole channel; the matching words are picked out in gold.
+**Filtered copies:** Followed channels > **Filtered channels** page: choose a channel, type words, e.g. `enchant, ench`, and click **Add** (or right-click a followed channel > **New filtered copy...**). You get a separate conversation, "Trade [Enchant]", that keeps only the messages with those words and pops up when one arrives. Make as many as you like, with or without following the whole channel; the matching words are picked out in gold.
+
+### Open for business
+
+For crafters, sellers and recruiters, in the **Business** tab. Write your ad at the top (click in the box and shift-click your profession or an item to add the link), choose where it goes (Trade, Say, Guild or any channel you're in) and how long to stay open (15, 30, 60 or 120 minutes, or **Until I stop it**). Press **Start**, then **Post** - the game needs a click for every post, so the ad never repeats on its own. While it's open, whispers from people you don't know land in the tab as cards with Invite and Reply; the replies and decline message are in **Settings > Open for business**. It tells you when it closes and how many whispers are waiting. Listing in the group finder pauses it; it opens again when you stop listing. Also `/tg business [minutes|off]`. Don't need it? Hide the tab in Settings > Open for business.
 
 ### Mail
 

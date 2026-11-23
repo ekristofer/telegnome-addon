@@ -82,7 +82,7 @@ end
 ---------------------------------------------------------------------------
 
 local TABS = { { "all", "All" }, { "dm", "Direct" }, { "channels", "Channels" }, { "groups", "Groups" },
-    { "requests", "Requests" } }
+    { "requests", "Requests" }, { "business", "Business" } }
 
 local function makeTab(parent, id, label)
     -- a boxed tab like the game's own: lit in the theme colour when it's the one you're on
@@ -340,7 +340,7 @@ function UI:Create()
     S.Tooltip(searchBtn, "Search", "Find a message in any conversation. Also: /tg search <text>")
     self.searchBtn = searchBtn
     newBtn:SetScript("OnClick", function()
-        if UI.tab == "requests" then
+        if UI.tab == "requests" or UI.tab == "business" then
             TG.Requests:TogglePanel()
         elseif UI.tab == "groups" then
             TG.Groups:TogglePanel()
@@ -350,7 +350,9 @@ function UI:Create()
             MenuUtil.CreateContextMenu(newBtn, function(_, root)
                 root:CreateButton("New message", function() TG.Picker:Open() end)
                 root:CreateButton("New group chat", function() TG.Groups:OpenPanel() end)
-                root:CreateButton("Follow a channel", function() TG.Channels:OpenPanel() end)
+                root:CreateButton("Follow a channel", function() TG.Channels:OpenPanel("follow") end)
+                root:CreateButton("Add a filtered channel", function() TG.Channels:OpenPanel("filter") end)
+                root:CreateButton("Open for business", function() UI:SetTab("business") end)
             end)
         else
             TG.Picker:Toggle()
@@ -1107,7 +1109,7 @@ function UI.UnreadOf(th)
 end
 
 function UI.TabOf(th)
-    if th.req then return "requests" end
+    if th.req then return th.biz and "business" or "requests" end
     if th.kind == "GROUP" then return "groups" end
     if th.kind == "CHANNEL" then return "channels" end
     return "dm"
@@ -1174,7 +1176,8 @@ function UI:OpenTabMenu(tab)
     MenuUtil.CreateContextMenu(tab, function(_, root)
         root:CreateTitle(tab.baseText)
         root:CreateButton("Mark all as read", function()
-            TG:MarkRead(tab.id == "requests" and TG.Requests:Keys() or UI:SortedKeys(tab.id))
+            TG:MarkRead((tab.id == "requests" or tab.id == "business") and TG.Requests:Keys(tab.id)
+                or UI:SortedKeys(tab.id))
         end)
     end)
 end
@@ -1486,7 +1489,7 @@ end
 
 function UI:UpdateTabs()
     if not self.tabs then return end
-    local counts = { all = 0, dm = 0, groups = 0, channels = 0, requests = 0 }
+    local counts = { all = 0, dm = 0, groups = 0, channels = 0, requests = 0, business = 0 }
     for _, th in pairs(TG.db.threads) do
         local t = UI.TabOf(th)
         local n = UI.UnreadOf(th)
@@ -1497,6 +1500,13 @@ function UI:UpdateTabs()
     local showReq = TG.Requests:TabVisible()
     self.tabs.requests:SetShown(showReq)
     if self.tab == "requests" and not showReq then
+        TG.Requests:ClosePanel()
+        self:SetTab("all")
+        return
+    end
+    local showBiz = TG.Business:TabVisible()
+    self.tabs.business:SetShown(showBiz)
+    if self.tab == "business" and not showBiz then
         TG.Requests:ClosePanel()
         self:SetTab("all")
         return
@@ -1519,21 +1529,23 @@ function UI:UpdateTabs()
         end
         tab:SetWidth(num(tab.fs:GetStringWidth(), 90) + 24
             + (tab.pill:IsShown() and num(tab.pill:GetWidth(), 16) + 6 or 0))
-        tab:ClearAllPoints()
-        if prev then
-            tab:SetPoint("LEFT", prev, "RIGHT", 4, 0)
-        else
-            -- next to the medallion in the game's frame
-            tab:SetPoint("TOPLEFT", self.frame, "TOPLEFT", self.native and 66 or 14, -(TOP - 28))
+        if tab:IsShown() then -- hidden tabs leave no gap
+            tab:ClearAllPoints()
+            if prev then
+                tab:SetPoint("LEFT", prev, "RIGHT", 4, 0)
+            else
+                -- next to the medallion in the game's frame
+                tab:SetPoint("TOPLEFT", self.frame, "TOPLEFT", self.native and 66 or 14, -(TOP - 28))
+            end
+            prev = tab
         end
-        prev = tab
     end
 end
 
 function UI:UpdateNewButton()
     if not self.newBtn then return end
     local labels = { all = "+ New", dm = "+ New message", groups = "+ New group", channels = "+ Follow channel",
-        requests = "All requests" }
+        requests = "All requests", business = "All whispers" }
     self.newBtn:SetText(labels[self.tab] or "+ New message")
 end
 
@@ -1548,7 +1560,7 @@ function UI:SetTab(tab)
     end
     self.tab = tab
     self.offset = 0
-    if tab ~= "requests" then TG.db.lastTab = tab end
+    if tab ~= "requests" and tab ~= "business" then TG.db.lastTab = tab end
     self:UpdateNewButton()
     self:UpdateTabs()
     if self.tab ~= tab then return end -- the tab isn't available (no requests); UpdateTabs moved on
@@ -1563,7 +1575,7 @@ function UI:SetTab(tab)
     if key then self:Select(key) else self:ShowEmpty() end
     self.tab = tab
     self:RefreshList()
-    if tab == "requests" then TG.Requests:OpenPanel(true) end -- start on the overview
+    if tab == "requests" or tab == "business" then TG.Requests:OpenPanel(true, tab) end -- start on the overview
 end
 
 -- The window's name. Unread counts are on the tabs, so there is none here.
@@ -1627,7 +1639,8 @@ local function subLine(th, key)
     elseif th.kind == "CHANNEL" then
         local C = TG.Channels
         if th.base then
-            parts[1] = "Filtered: only messages with " .. table.concat(C.Words(th.words), ", ")
+            parts[1] = (th.customName and (C.AutoName(th) .. ", ") or "Filtered: ")
+                .. "only messages with " .. table.concat(C.TypedWords(th.words), ", ")
         else
             parts[1] = "Followed channel"
             local own = C.Words(th.alertWords)

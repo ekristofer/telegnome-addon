@@ -33,23 +33,32 @@ end
 -- Collecting: hosting with the tick in the Requests view on (the default), or /tg recruit.
 function R:IsActive()
     local s = TG.db.settings
-    return s.recruiting or (s.requestsCollect ~= false and self:IsHosting()) or false
+    return s.recruiting or (s.requestsCollect ~= false and self:IsHosting())
+        or (TG.Business and TG.Business:IsOn()) or false
 end
 
-function R:Keys()
+-- Which list the panel shows: Requests (group finder) or Business (Open for business).
+function R:View()
+    return (UI.tab == "business") and "business" or "requests"
+end
+
+-- The requests in one list (default: the one on screen).
+function R:Keys(view)
+    local wantBiz = (view or self:View()) == "business"
     local threads, keys = TG.db.threads, {}
     for key, th in pairs(threads) do
-        if th.req then keys[#keys + 1] = key end
+        if th.req and (th.biz and true or false) == wantBiz then keys[#keys + 1] = key end
     end
     table.sort(keys, function(a, b) return (threads[a].order or 0) > (threads[b].order or 0) end)
     return keys
 end
 
+-- The Requests tab: while listed, collecting (/tg recruit), or with group requests still on it.
 function R:TabVisible()
     if not TG.db then return false end
-    if self:IsActive() or self:IsHosting() then return true end
+    if TG.db.settings.recruiting or self:IsHosting() then return true end
     for _, th in pairs(TG.db.threads) do
-        if th.req then return true end
+        if th.req and not th.biz then return true end
     end
     return false
 end
@@ -280,6 +289,8 @@ function R:OnWhisper(key, info, text)
         if th.fav or TG:IsFriendly(th) then return end -- people you know stay in Direct messages
         th.req = true
         th.invited, th.joined = nil, nil
+        -- an answer to your ad (not to a group listing): it gets the Open for business replies
+        th.biz = (TG.Business and TG.Business:IsOn() and not self:IsHosting()) or nil
     end
     if not th.level then th.level = R.ParseLevel(text) end
     if not th.level or not th.class then self:ScanApplicants() end
@@ -321,8 +332,14 @@ function R:Reply(key, text)
 end
 
 -- Sends the decline message, then dismisses the request.
+local function repliesFor(key)
+    local s, th = TG.db.settings, TG.db.threads[key]
+    if th and th.biz then return s.bizReplies or {}, s.bizDecline end
+    return s.quickReplies or {}, s.declineReply
+end
+
 function R:Decline(key)
-    local text = TG.db.settings.declineReply
+    local _, text = repliesFor(key)
     if type(text) == "string" and text:match("%S") and TG.db.threads[key] then
         TG:Send(key, TG.Social.Expand(text, key))
         if not (TG.Demo and TG.Demo.on) then self.declined[key] = GetTime() end
@@ -332,28 +349,28 @@ end
 
 function R:OpenReplyMenu(key, anchor)
     if not (MenuUtil and MenuUtil.CreateContextMenu) or not TG.db.threads[key] then return end
-    local s = TG.db.settings
+    local replies, decline = repliesFor(key)
     MenuUtil.CreateContextMenu(anchor, function(_, root)
         root:CreateTitle("Quick reply")
         local any = false
-        for _, text in ipairs(s.quickReplies or {}) do
+        for _, text in ipairs(replies) do
             if type(text) == "string" and text:match("%S") then
                 any = true
                 root:CreateButton(TG.Social.Expand(text, key), function() R:Reply(key, text) end)
             end
         end
         if not any then root:CreateTitle("|cff888888(none set - see Settings)|r") end
-        if type(s.declineReply) == "string" and s.declineReply:match("%S") then
+        if type(decline) == "string" and decline:match("%S") then
             root:CreateDivider()
-            root:CreateButton("Decline: " .. TG.Social.Expand(s.declineReply, key), function() R:Decline(key) end)
+            root:CreateButton("Decline: " .. TG.Social.Expand(decline, key), function() R:Decline(key) end)
         end
     end)
 end
 
 -- Requests still waiting for an answer: not invited, not in your group.
-function R:OpenKeys()
+function R:OpenKeys(view)
     local out = {}
-    for _, key in ipairs(self:Keys()) do
+    for _, key in ipairs(self:Keys(view)) do
         local th = TG.db.threads[key]
         if not th.invited and not th.joined then out[#out + 1] = key end
     end
@@ -594,6 +611,52 @@ function R:Create()
         .. "pause that and get them under Direct messages.")
     self.manual = manual
 
+    -- the Business tab's own controls: open/close and for how long, then the ad and where it goes
+    local biz = {}
+    local start = S.Button(f, "Start", 80, 22, true)
+    start:SetPoint("TOPRIGHT", -14, -8)
+    start:SetScript("OnClick", function() TG.Business:Toggle() end)
+    S.Tooltip(start, "Open for business", "While it's open, whispers from people who aren't friends, guild members or "
+        .. "favorites are collected here, with the quick replies from Settings > Open for business.")
+    biz.start = start
+    local dur = S.Button(f, "", 130, 22)
+    dur:SetPoint("RIGHT", start, "LEFT", -8, 0)
+    dur:SetScript("OnClick", function(s) TG.Business:OpenDurationMenu(s) end)
+    S.Tooltip(dur, "How long", "It closes by itself after this long - or choose Until I stop it.")
+    biz.dur = dur
+    local adL = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    adL:SetPoint("TOPLEFT", 16, -46)
+    adL:SetText("Ad")
+    biz.adLabel = adL
+    local post = S.Button(f, "Post", 70, 24, true)
+    post:SetPoint("TOPRIGHT", -14, -40)
+    post:SetScript("OnClick", function() TG.Business:Post(1) end)
+    S.Tooltip(post, "Post the ad", "Sends your ad once. The game needs a click for every post, so it never repeats on "
+        .. "its own.")
+    biz.post = post
+    local chan = S.Button(f, "", 120, 24)
+    chan:SetPoint("RIGHT", post, "LEFT", -6, 0)
+    chan:SetScript("OnClick", function(s) TG.Business:OpenChannelMenu(s, function() R:Refresh() end) end)
+    S.Tooltip(chan, "Where it goes", "Trade, Say, Yell, Guild or any channel you're in.")
+    biz.chan = chan
+    local ad = S.EditBox(f)
+    ad:SetPoint("TOPLEFT", 44, -40)
+    ad:SetPoint("RIGHT", chan, "LEFT", -6, 0)
+    ad:SetHeight(24)
+    ad:SetMaxLetters(255)
+    if ad.SetMaxBytes then ad:SetMaxBytes(255) end
+    ad:SetScript("OnTextChanged", function(b, userInput)
+        if not userInput then return end
+        local s = TG.db.settings
+        s.ads = s.ads or {}
+        s.ads[1] = b:GetText()
+    end)
+    ad:SetScript("OnEnterPressed", function(b) b:ClearFocus() end)
+    S.Tooltip(ad, "Your ad", "Click here and shift-click your profession or an item to add its link.")
+    TG.Business.linkBoxes[#TG.Business.linkBoxes + 1] = ad
+    biz.ad = ad
+    self.biz = biz
+
     local dot = S.Dot(f, 8)
     dot:SetPoint("TOPLEFT", 16, -18)
     self.statusDot = dot
@@ -739,7 +802,39 @@ function R:Refresh()
 
     self:UpdateStatus()
     self.manual:SetChecked(TG.db.settings.requestsCollect ~= false)
+    self:ApplyView()
     self:FillRows()
+end
+
+-- Requests or Business: which controls show at the top, and where the list starts.
+function R:ApplyView()
+    local isBiz = self:View() == "business"
+    local s = TG.db.settings
+    for _, w in pairs(self.biz) do w:SetShown(isBiz) end
+    local hosting = self:IsHosting() or (TG.Demo and TG.Demo.on) or false
+    self.manual:SetShown(not isBiz and hosting)
+    local top = isBiz and -76 or -38
+    self.chips[1]:ClearAllPoints()
+    self.chips[1]:SetPoint("TOPLEFT", 14, top)
+    self.list:ClearAllPoints()
+    self.list:SetPoint("TOPLEFT", 14, top - 26)
+    self.list:SetPoint("BOTTOMRIGHT", -20, 46)
+    self.track:ClearAllPoints()
+    self.track:SetPoint("TOPRIGHT", -9, top - 26)
+    self.track:SetPoint("BOTTOMRIGHT", -9, 52)
+    self.status:ClearAllPoints()
+    self.status:SetPoint("LEFT", self.statusDot, "RIGHT", 8, 0)
+    if isBiz then
+        self.status:SetPoint("RIGHT", self.biz.dur, "LEFT", -12, 0)
+        self.biz.start:SetText(s.business and "Stop" or "Start")
+        self.biz.dur:SetText(TG.Business.DurationLabel())
+        self.biz.chan:SetText("To " .. TG.Business.ChannelLabel())
+        if not self.biz.ad:HasFocus() then self.biz.ad:SetText((s.ads or {})[1] or "") end
+    elseif hosting then
+        self.status:SetPoint("RIGHT", self.manual, "LEFT", -12, 0)
+    else
+        self.status:SetPoint("RIGHT", self.panel, "RIGHT", -14, 0)
+    end
 end
 
 -- The line at the top: what is being collected - or, right after a Check, its result and the wait.
@@ -757,10 +852,23 @@ function R:UpdateStatus()
         return
     end
     local hosting = self:IsHosting() or (TG.Demo and TG.Demo.on) or false -- the samples look like a real listing
+    local paused = s.business and s.businessPaused and "  Open for business is paused." or ""
+    if self:View() == "business" then
+        local left = TG.Business:MinutesLeft()
+        if s.business and s.businessPaused then
+            set({ 1, 0.67, 0.2 }, "Paused while you're listed in the group finder. It opens again when you stop listing.")
+        elseif s.business then
+            set(S.ONLINE, ("Open %s. Whispers from people you don't know land here.")
+                :format(left and ("- " .. left .. " min left") or "until you stop it"))
+        else
+            set(S.OFFLINE, "Closed. Write your ad, press Start, then Post it.")
+        end
+        return
+    end
     if s.recruiting then
         set(S.ONLINE, "Collecting (/tg recruit). Whispers from people you don't know land here.")
     elseif hosting and s.requestsCollect ~= false then
-        set(S.ONLINE, "You're listed in the group finder. Whispers from people you don't know land here.")
+        set(S.ONLINE, "You're listed in the group finder. Whispers from people you don't know land here." .. paused)
     elseif hosting then
         set({ 1, 0.67, 0.2 }, "Paused. Tick Collect whispers to collect them here again.")
     else
@@ -910,9 +1018,14 @@ function R:FillRows()
     self.counts:SetShown(#keys > 0)
     self.declineBtn:SetEnabled(#self:OpenKeys() > 0)
     self.empty:SetShown(#keys == 0)
-    self.empty:SetText(self:IsActive() and "No requests yet. Whispers from people who aren't friends, guild members "
-        .. "or favorites will show up here with their class and level."
-        or "No requests.")
+    if self:View() == "business" then
+        self.empty:SetText(TG.db.settings.business and "No whispers yet. Post your ad - replies from people you don't "
+            .. "know show up here with their class and level." or "Nothing here yet. Press Start to collect whispers "
+            .. "to your ad.")
+    else
+        self.empty:SetText(self:IsActive() and "No requests yet. Whispers from people who aren't friends, guild "
+            .. "members or favorites will show up here with their class and level." or "No requests.")
+    end
     self.clearBtn:SetEnabled(#keys > 0)
 end
 
@@ -920,15 +1033,23 @@ function R:IsPanelShown()
     return self.panel and self.panel:IsShown() or false
 end
 
--- fromTab: called by UI:SetTab, which has already switched to the Requests tab.
-function R:OpenPanel(fromTab)
-    if not self:TabVisible() then return end
+-- fromTab: called by UI:SetTab, which has already switched tabs. view: "requests" or "business"
+-- (default: the tab you're on).
+function R:OpenPanel(fromTab, view)
+    view = view or (UI.tab == "business" and "business") or "requests"
+    if view ~= "business" then view = "requests" end
+    if view == "requests" and not self:TabVisible() then return end
+    if view == "business" and not TG.Business:TabVisible() then return end
     UI:Show()
     self:Create()
-    if UI.tab ~= "requests" then
+    if UI.tab ~= view then
         if fromTab then return end -- never bounce back and forth with SetTab
-        UI:SetTab("requests") -- which opens this panel
+        UI:SetTab(view) -- which opens this panel
         return
+    end
+    if self.lastView ~= view then
+        self.lastView = view
+        self.classFilter, self.offset = nil, 0
     end
     TG.Settings:Close()
     TG.Picker:Close()
@@ -945,7 +1066,9 @@ end
 function R:ClosePanel(quiet)
     if not self:IsPanelShown() then return end
     self.panel:Hide()
-    if not quiet and UI.frame:IsShown() and UI.selected and UI.tab == "requests" then UI:Select(UI.selected) end
+    if not quiet and UI.frame:IsShown() and UI.selected and (UI.tab == "requests" or UI.tab == "business") then
+        UI:Select(UI.selected)
+    end
 end
 
 function R:TogglePanel()
@@ -955,11 +1078,15 @@ end
 -- Tells you once when your listing starts (or you become the leader of a listed group).
 function R:CheckHosting()
     local hosting = self:IsHosting()
-    if hosting and not self.wasHosting and self:IsActive() then
+    local bizHandled = false
+    if hosting ~= (self.wasHosting or false) and self.checkedOnce then
+        bizHandled = TG.Business:OnHostingChanged(hosting)
+    end
+    if hosting and not self.wasHosting and self:IsActive() and not bizHandled then
         TG:Print("You're listed in the group finder. Whispers from people you don't know go to Requests.")
         if TG.Toast then
             TG.Toast:Notice("|cffffd100Requests are on|r", "Whispers from strangers go to Requests. Click to open.",
-                function() R:OpenPanel() end)
+                function() R:OpenPanel(nil, "requests") end)
         end
     end
     local changed = hosting ~= (self.wasHosting or false)

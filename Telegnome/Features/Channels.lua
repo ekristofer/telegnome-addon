@@ -166,12 +166,38 @@ function C.MatchKeyword(text, th)
     return (C.MatchWords(TG.db.settings.keywords, text) or (th and C.MatchWords(th.alertWords, text))) and true or false
 end
 
--- "Enchant" or "Enchant +1": the short label after a filtered channel's name.
+-- The words as you typed them (matching ignores upper and lower case; names keep yours).
+function C.TypedWords(src)
+    local list = {}
+    if type(src) ~= "string" then return list end
+    for part in src:gmatch("[^,;]+") do
+        local word = strtrim(part)
+        if #word >= 2 then list[#list + 1] = word end
+    end
+    return list
+end
+
+-- "LFW" or "enchant +1": the short label after a filtered channel's name.
 function C.FilterLabel(th)
-    local list = C.Words(th and th.words)
+    local list = C.TypedWords(th and th.words)
     if #list == 0 then return nil end
-    local first = list[1]:gsub("^%l", string.upper)
-    return #list > 1 and (first .. " +" .. (#list - 1)) or first
+    return #list > 1 and (list[1] .. " +" .. (#list - 1)) or list[1]
+end
+
+-- A filtered channel's own name: "Trade [LFW]", whatever you've renamed it to.
+function C.AutoName(th)
+    local label = C.FilterLabel(th)
+    return (th.name or "Channel") .. (label and (" [" .. label .. "]") or "")
+end
+
+function C:Rename(key, name)
+    local th = TG.db.threads[key]
+    if not (th and th.base) then return end
+    name = strtrim(name or "")
+    th.customName = name ~= "" and name or nil
+    UI:RefreshList()
+    if UI.selected == key then UI:Select(key) end
+    self:RefreshPanel()
 end
 
 -- The matching words picked out in gold in a channel message (not in messages with links or colours).
@@ -221,7 +247,7 @@ function C:ViewsOf(baseKey)
     return out
 end
 
-function C:AddView(from, words)
+function C:AddView(from, words, stay)
     if #C.Words(words) == 0 then
         TG:Print("Give at least one word of two letters or more.")
         return
@@ -235,10 +261,10 @@ function C:AddView(from, words)
     th.notify = true -- the point of a filter: tell me when it matches
     th.count = true
     th.msgs[#th.msgs + 1] = { t = time(), sys = true,
-        text = ("Showing only %s messages with: %s"):format(from.name or "channel", table.concat(C.Words(words), ", ")) }
+        text = ("Showing only %s messages with: %s"):format(from.name or "channel", table.concat(C.TypedWords(words), ", ")) }
     UI:RefreshList()
     TG:RefreshUnread()
-    if UI.frame and UI.frame:IsShown() then UI:Select(key) end
+    if not stay and UI.frame and UI.frame:IsShown() then UI:Select(key) end
     return key
 end
 
@@ -246,16 +272,18 @@ function C:SetViewWords(key, words)
     local th = TG.db.threads[key]
     if not (th and th.base) or #C.Words(words) == 0 then return end
     th.words = words
-    TG:AddSystemLine(key, "Now showing messages with: " .. table.concat(C.Words(words), ", "))
+    TG:AddSystemLine(key, "Now showing messages with: " .. table.concat(C.TypedWords(words), ", "))
     UI:RefreshList()
     if UI.selected == key then UI:Select(key) end
 end
 
 -- A small box for typing words.
-function C:AskWords(prompt, current, done)
+local WORDS_HINT = "\n|cff999999Separate words with commas, e.g. enchant, ench. Upper and lower case don't matter.|r"
+function C:AskWords(prompt, current, done, noHint)
+    if not noHint then prompt = prompt .. WORDS_HINT end
     if not StaticPopupDialogs.TELEGNOME_WORDS then
         StaticPopupDialogs.TELEGNOME_WORDS = {
-            text = "%s\n|cff999999Separate words with commas, e.g. enchant, ench|r",
+            text = "%s",
             button1 = OKAY or "OK",
             button2 = CANCEL or "Cancel",
             hasEditBox = true,
@@ -411,7 +439,7 @@ function C:OpenMenu(key, anchor)
     if not th then return end
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
     MenuUtil.CreateContextMenu(anchor, function(_, root)
-        root:CreateTitle(th.name)
+        root:CreateTitle(th.base and C.AutoName(th) or th.name)
         root:CreateButton(th.fav and "Unpin" or "Pin to the top", function() TG:SetFavorite(key, not th.fav) end)
         UI.AddPinMoveEntries(root, key)
         root:CreateCheckbox("Pop-up notifications",
@@ -428,6 +456,11 @@ function C:OpenMenu(key, anchor)
         end)
         root:CreateDivider()
         if th.base then
+            root:CreateButton("Rename...", function()
+                C:AskWords("Name for " .. C.AutoName(th)
+                    .. "\n|cff999999Empty: back to " .. C.AutoName(th) .. "|r", th.customName or "",
+                    function(name) C:Rename(key, name) end, true)
+            end)
             root:CreateButton("Change filter words...", function()
                 C:AskWords("Show only " .. (th.name or "channel") .. " messages with these words:", th.words,
                     function(words) C:SetViewWords(key, words) end)
@@ -435,8 +468,9 @@ function C:OpenMenu(key, anchor)
         else
             root:CreateButton("Alert words for this channel...", function()
                 C:AskWords("Alert words for " .. (th.name or "this channel")
-                    .. "\n|cff999999A message with one of them pops up, even with Pop-up off. Empty: none.|r",
-                    th.alertWords, function(words) th.alertWords = words ~= "" and words or nil; UI:RefreshList() end)
+                    .. "\n|cff999999A message with one of them pops up, even with Pop-up off. Empty: none.|r"
+                    .. WORDS_HINT,
+                    th.alertWords, function(words) th.alertWords = words ~= "" and words or nil; UI:RefreshList() end, true)
             end)
         end
         root:CreateButton("New filtered copy...", function()
@@ -447,7 +481,8 @@ function C:OpenMenu(key, anchor)
         root:CreateDivider()
         root:CreateButton("Clear history", function() TG:ConfirmClearHistory(key) end)
         root:CreateButton(th.base and "Remove this filtered copy" or "Unfollow channel", function() C:Unfollow(key) end)
-        root:CreateButton("Choose channels...", function() C:OpenPanel() end)
+        root:CreateButton("Choose channels...", function() C:OpenPanel("follow") end)
+        root:CreateButton("Filtered channels...", function() C:OpenPanel("filter") end)
     end)
 end
 
@@ -485,31 +520,63 @@ function C:CreatePanel()
     f:Hide()
     self.panel = f
 
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 14, -10)
-    title:SetText("Followed channels")
+    -- two pages: Followed channels and Filtered channels
+    self.subTabs = {}
+    local function subTab(text, id)
+        local b = CreateFrame("Button", nil, f)
+        b:SetHeight(24)
+        local fs = b:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        fs:SetPoint("LEFT", 0, 0)
+        fs:SetText(text)
+        b.fs = fs
+        b:SetWidth(S.Num(fs:GetStringWidth(), 150) + 4)
+        local under = b:CreateTexture(nil, "ARTWORK")
+        under:SetPoint("BOTTOMLEFT", 0, -4)
+        under:SetPoint("BOTTOMRIGHT", 0, -4)
+        under:SetHeight(2)
+        S.Paint(under, "hi", 1)
+        b.under = under
+        b.id = id
+        b:SetScript("OnClick", function() C:ShowSub(id) end)
+        self.subTabs[#self.subTabs + 1] = b
+        return b
+    end
+    local t1 = subTab("Followed channels", "follow")
+    t1:SetPoint("TOPLEFT", 14, -8)
+    local t2 = subTab("Filtered channels", "filter")
+    t2:SetPoint("LEFT", t1, "RIGHT", 22, 0)
     local cog = S.Cog(f, 18)
-    cog:SetPoint("LEFT", title, "RIGHT", 6, 0)
+    cog:SetPoint("LEFT", t2, "RIGHT", 8, 0)
     local line = S.Line(f)
-    line:SetPoint("TOPLEFT", 8, -34)
-    line:SetPoint("TOPRIGHT", -8, -34)
+    line:SetPoint("TOPLEFT", 8, -36)
+    line:SetPoint("TOPRIGHT", -8, -36)
 
-    local intro = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    intro:SetPoint("TOPLEFT", 14, -42)
+    local done = S.Button(f, "Close", 80, 24)
+    done:SetPoint("BOTTOMRIGHT", -10, 10)
+    done:SetScript("OnClick", function() C:ClosePanel() end)
+
+    ------------------------------------------------------------ Followed channels
+    local pa = CreateFrame("Frame", nil, f)
+    pa:SetAllPoints(f)
+    self.pageA = pa
+
+    local intro = pa:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    intro:SetPoint("TOPLEFT", 14, -46)
     intro:SetPoint("RIGHT", -14, 0)
     intro:SetJustifyH("LEFT")
-    intro:SetText("Tick a chat to follow it in this tab. Also tick Pop-up to get the notifier for it; otherwise it stays quiet. "
-        .. "Right-click a followed channel to choose whether it counts unread messages and shows in the All tab.")
+    intro:SetSpacing(2)
+    intro:SetText("Tick a chat to follow it here, and Pop-up to get the notifier for it.\n"
+        .. "Right-click a followed channel for more choices.")
 
     local function header(text, x, popX)
-        local h = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        h:SetPoint("TOPLEFT", x, -68)
+        local h = pa:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        h:SetPoint("TOPLEFT", x, -86)
         h:SetText(text)
-        local p = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local p = pa:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         if popX then
-            p:SetPoint("TOP", f, "TOPLEFT", popX + 12, -70)
+            p:SetPoint("TOP", pa, "TOPLEFT", popX + 12, -88)
         else
-            p:SetPoint("TOP", f, "TOPRIGHT", -(NOTIFY_INSET_RIGHT + 12), -70)
+            p:SetPoint("TOP", pa, "TOPRIGHT", -(NOTIFY_INSET_RIGHT + 12), -88)
         end
         p:SetText("Pop-up")
     end
@@ -517,8 +584,8 @@ function C:CreatePanel()
     header("Your channels", 230)
 
     for i, b in ipairs(BUILTIN) do
-        local y = -86 - (i - 1) * ROW
-        local c = S.Check(f, b.name)
+        local y = -106 - (i - 1) * ROW
+        local c = S.Check(pa, b.name)
         c:SetPoint("TOPLEFT", 12, y)
         c.ctype = b.id
         c:SetScript("OnClick", function(s)
@@ -528,36 +595,164 @@ function C:CreatePanel()
         end)
         self.builtinChecks[i] = c
 
-        local n = notifyCheck(f, NOTIFY_X_LEFT, y)
+        local n = notifyCheck(pa, NOTIFY_X_LEFT, y)
         n:SetScript("OnClick", function(s) setNotify(C.KeyForType(b.id), s:GetChecked()) end)
         self.builtinNotify[i] = n
     end
 
-    local none = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    none:SetPoint("TOPLEFT", 232, -90)
+    local none = pa:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    none:SetPoint("TOPLEFT", 232, -110)
     none:SetText("You're not in any channels.")
     self.noneText = none
 
     -- Pinned to the bottom so a long "Your channels" column can't run into it.
-    local h3 = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    h3:SetPoint("BOTTOMLEFT", 14, 90)
+    local h3 = pa:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    h3:SetPoint("BOTTOMLEFT", 14, 96)
     h3:SetText("Options")
-    local clear = S.Check(f, "Clear Party, Raid and Instance chat when I join a new group")
-    clear:SetPoint("BOTTOMLEFT", 12, 38)
+    local clear = S.Check(pa, "Clear Party, Raid and Instance chat when I join a new group")
+    clear:SetPoint("BOTTOMLEFT", 12, 42)
     clear:SetScript("OnClick", function(s) TG.db.settings.clearGroupChat = s:GetChecked() and true or false end)
     S.Tooltip(clear, "New group, clean chat", "Off: joining a new group adds a \"New group\" line to followed Party, "
         .. "Raid and Instance chat, and the older messages stay. On: those conversations are emptied instead.")
     self.clearCheck = clear
-    local hide = S.Check(f, "Hide followed channels from the main chat")
-    hide:SetPoint("BOTTOMLEFT", 12, 62)
+    local hide = S.Check(pa, "Hide followed channels from the main chat")
+    hide:SetPoint("BOTTOMLEFT", 12, 68)
     hide:SetScript("OnClick", function(s) TG.db.settings.hideChannels = s:GetChecked() and true or false end)
     S.Tooltip(hide, "Hide from main chat", "Messages in followed channels only show up in Telegnome. "
         .. "Followed channels never count towards the missed-messages counter.")
     self.hideCheck = hide
 
-    local done = S.Button(f, "Close", 80, 24)
-    done:SetPoint("BOTTOMRIGHT", -10, 10)
-    done:SetScript("OnClick", function() C:ClosePanel() end)
+    ------------------------------------------------------------ Filtered channels
+    local pb = CreateFrame("Frame", nil, f)
+    pb:SetAllPoints(f)
+    pb:Hide()
+    self.pageB = pb
+
+    local fIntro = pb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    fIntro:SetPoint("TOPLEFT", 14, -46)
+    fIntro:SetPoint("RIGHT", -14, 0)
+    fIntro:SetJustifyH("LEFT")
+    fIntro:SetSpacing(2)
+    fIntro:SetText("A filtered channel keeps only the messages with your words, e.g. Trade with enchant, ench.\n"
+        .. "It's its own conversation - you don't need to follow the whole channel.")
+
+    local addH = pb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    addH:SetPoint("TOPLEFT", 14, -86)
+    addH:SetText("Add a filtered channel")
+
+    local chanL = pb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    chanL:SetPoint("TOPLEFT", 16, -118)
+    chanL:SetText("Channel")
+    local pick = S.Button(pb, "", 200, 24)
+    pick:SetPoint("TOPLEFT", 80, -111)
+    pick.fs:ClearAllPoints()
+    pick.fs:SetPoint("LEFT", 10, 0)
+    pick.fs:SetPoint("RIGHT", -22, 0)
+    pick.fs:SetJustifyH("LEFT")
+    local arrow = pick:CreateTexture(nil, "OVERLAY")
+    arrow:SetSize(12, 12)
+    arrow:SetPoint("RIGHT", -8, 0)
+    arrow:SetTexture(S.CHEV_DOWN)
+    pick:SetScript("OnMouseDown", nil)
+    pick:SetScript("OnMouseUp", nil)
+    pick:SetScript("OnClick", function(s) C:OpenFilterChannelMenu(s) end)
+    self.filterPick = pick
+
+    local wordsL = pb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    wordsL:SetPoint("TOPLEFT", 16, -150)
+    wordsL:SetText("Words")
+    local add = S.Button(pb, "Add", 70, 24, true)
+    add:SetPoint("TOPRIGHT", -14, -143)
+    local words = S.EditBox(pb)
+    words:SetPoint("TOPLEFT", 80, -143)
+    words:SetPoint("RIGHT", add, "LEFT", -8, 0)
+    words:SetHeight(24)
+    words:SetMaxLetters(200)
+    S.Tooltip(words, "Words", "Separate them with commas, e.g. enchant, ench. A word also matches inside longer "
+        .. "words, so ench finds enchanter.")
+    self.filterWords = words
+    local function doAdd()
+        local opt = C.filterChoice
+        local text = strtrim(words:GetText() or "")
+        if not opt then
+            TG:Print("Choose a channel first.")
+            return
+        end
+        if #C.Words(text) == 0 then
+            TG:Print("Type at least one word of two letters or more.")
+            return
+        end
+        C:AddView({ key = opt.key, name = opt.name, ctype = opt.ctype, cname = opt.cname }, text, true)
+        words:SetText("")
+        words:ClearFocus()
+        C:RefreshPanel()
+    end
+    add:SetScript("OnClick", doAdd)
+    words:SetScript("OnEnterPressed", doAdd)
+
+    local listH = pb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    listH:SetPoint("TOPLEFT", 14, -190)
+    listH:SetText("Your filtered channels")
+    self.filterListTop = -212
+    local noneF = pb:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    noneF:SetPoint("TOPLEFT", 16, -214)
+    noneF:SetText("None yet.")
+    self.filterNone = noneF
+    self.filterRows = {}
+
+    self:ShowSub(self.sub or "follow")
+end
+
+-- Switches between the Followed channels and Filtered channels pages.
+function C:ShowSub(id)
+    self.sub = id
+    if not self.panel then return end
+    self.pageA:SetShown(id == "follow")
+    self.pageB:SetShown(id == "filter")
+    for _, b in ipairs(self.subTabs) do
+        local on = b.id == id
+        b.under:SetShown(on)
+        if on then b.fs:SetTextColor(1, 0.82, 0) else b.fs:SetTextColor(0.6, 0.55, 0.45) end
+    end
+    self:RefreshPanel()
+end
+
+-- Every chat a filter can watch: the chat types, then the channels you're in.
+function C:FilterOptions()
+    local out = {}
+    for _, b in ipairs(BUILTIN) do
+        out[#out + 1] = { key = C.KeyForType(b.id), name = b.name, ctype = b.id }
+    end
+    local list = { GetChannelList() }
+    for i = 1, #list, 3 do
+        local name = list[i + 1]
+        if type(name) == "string" and not TG.Groups.IsTelegnomeChannel(name) then
+            local n = baseName(name)
+            out[#out + 1] = { key = C.KeyForChannel(n), name = n, ctype = "CHANNEL", cname = n }
+        end
+    end
+    return out
+end
+
+function C:OpenFilterChannelMenu(anchor)
+    local opts = self:FilterOptions()
+    if not (MenuUtil and MenuUtil.CreateContextMenu) then
+        -- no menus: step through the choices
+        local cur = 0
+        for i, o in ipairs(opts) do if self.filterChoice and o.key == self.filterChoice.key then cur = i end end
+        self.filterChoice = opts[cur % #opts + 1]
+        self:RefreshPanel()
+        return
+    end
+    MenuUtil.CreateContextMenu(anchor, function(_, root)
+        root:CreateTitle("Chat types")
+        for i, o in ipairs(opts) do
+            if i == #BUILTIN + 1 then root:CreateTitle("Your channels") end
+            root:CreateRadio(o.name,
+                function() return C.filterChoice and C.filterChoice.key == o.key end,
+                function() C.filterChoice = o; C:RefreshPanel() end)
+        end
+    end)
 end
 
 local function setNotifyState(n, followed, key)
@@ -567,8 +762,87 @@ local function setNotifyState(n, followed, key)
     n:SetAlpha(followed and 1 or 0.4)
 end
 
+function C:RefreshFilterPage()
+    -- the channel choice: Trade if you're in it, else the first channel, else Guild
+    if not self.filterChoice then
+        local opts = self:FilterOptions()
+        for _, o in ipairs(opts) do
+            if o.cname and o.cname:lower() == "trade" then self.filterChoice = o end
+        end
+        self.filterChoice = self.filterChoice or opts[#BUILTIN + 1] or opts[1]
+    end
+    self.filterPick:SetText(self.filterChoice and self.filterChoice.name or "Choose...")
+
+    local keys = {}
+    for k, th in pairs(TG.db.threads) do
+        if th.kind == "CHANNEL" and th.base then keys[#keys + 1] = k end
+    end
+    table.sort(keys, function(a, b) return (TG:ThreadDisplay(a)):lower() < (TG:ThreadDisplay(b)):lower() end)
+    local pb = self.pageB
+    for i, key in ipairs(keys) do
+        local row = self.filterRows[i]
+        if not row then
+            row = CreateFrame("Button", nil, pb)
+            row:SetHeight(22)
+            row:SetPoint("TOPLEFT", 12, self.filterListTop - (i - 1) * 24)
+            row:SetPoint("RIGHT", -14, 0)
+            local hl = row:CreateTexture(nil, "HIGHLIGHT")
+            hl:SetAllPoints()
+            hl:SetColorTexture(1, 1, 1, 0.05)
+            row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            row.name:SetPoint("LEFT", 4, 0)
+            row.words = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+            row.words:SetPoint("LEFT", row.name, "RIGHT", 10, 0)
+            row.words:SetWordWrap(false)
+            row.remove = S.Link(row, "Remove")
+            row.remove:SetPoint("RIGHT", -2, 0)
+            row.words:SetPoint("RIGHT", row.remove, "LEFT", -10, 0)
+            row.words:SetJustifyH("LEFT")
+            row.remove:SetScript("OnClick", function()
+                C:Unfollow(row.key)
+                C:RefreshPanel()
+            end)
+            row:SetScript("OnClick", function()
+                local k = row.key
+                C:ClosePanel()
+                if TG.db.threads[k] then UI:Select(k) end
+            end)
+            S.Tooltip(row, "Open", "Click to open this filtered channel.")
+            self.filterRows[i] = row
+        end
+        row.key = key
+        local name, color = TG:ThreadDisplay(key)
+        row.name:SetText(name)
+        row.name:SetTextColor(color[1], color[2], color[3])
+        local vt = TG.db.threads[key]
+        row.words:SetText((vt.customName and (C.AutoName(vt) .. "  \194\183  ") or "")
+            .. table.concat(C.TypedWords(vt.words), ", "))
+        row:Show()
+    end
+    -- as many rows as fit above the Close button; the rest are in the conversation list anyway
+    local fit = math.max(1, math.floor((S.Num(pb:GetHeight(), 430) + self.filterListTop - 44) / 24))
+    for i = 1, #keys do self.filterRows[i]:SetShown(i <= fit) end
+    for i = #keys + 1, #self.filterRows do self.filterRows[i]:Hide() end
+    self.filterNone:ClearAllPoints()
+    if #keys == 0 then
+        self.filterNone:SetPoint("TOPLEFT", 16, self.filterListTop - 2)
+        self.filterNone:SetText("None yet.")
+        self.filterNone:Show()
+    elseif #keys > fit then
+        self.filterNone:SetPoint("TOPLEFT", 16, self.filterListTop - fit * 24 - 2)
+        self.filterNone:SetText(("And %d more in the Channels tab."):format(#keys - fit))
+        self.filterNone:Show()
+    else
+        self.filterNone:Hide()
+    end
+end
+
 function C:RefreshPanel()
     if not self.panel then return end
+    if self.sub == "filter" then
+        self:RefreshFilterPage()
+        return
+    end
     for i, c in ipairs(self.builtinChecks) do
         local key = C.KeyForType(c.ctype)
         local followed = self:IsFollowedKey(key)
@@ -595,11 +869,12 @@ function C:RefreshPanel()
         end
     end
 
+    local pa = self.pageA
     for i, name in ipairs(names) do
         local c = self.channelChecks[i]
         if not c then
-            local y = -86 - (i - 1) * ROW
-            c = S.Check(self.panel, "")
+            local y = -106 - (i - 1) * ROW
+            c = S.Check(pa, "")
             c:SetPoint("TOPLEFT", 228, y)
             c.label:SetJustifyH("LEFT")
             c.label:SetWordWrap(false)
@@ -609,7 +884,7 @@ function C:RefreshPanel()
             end)
             self.channelChecks[i] = c
 
-            local n = notifyCheck(self.panel, 0, y)
+            local n = notifyCheck(pa, 0, y)
             n:ClearAllPoints()
             n:SetPoint("TOPRIGHT", -NOTIFY_INSET_RIGHT, y)
             c.label:SetPoint("RIGHT", n, "LEFT", -8, 0) -- long channel names are cut off before the Pop-up tick
@@ -639,7 +914,8 @@ function C:IsPanelShown()
     return self.panel and self.panel:IsShown() or false
 end
 
-function C:OpenPanel()
+function C:OpenPanel(sub)
+    if sub then self.sub = sub end
     UI:Show()
     if UI.tab ~= "all" then UI:SetTab("channels") end
     self:CreatePanel()
@@ -648,7 +924,7 @@ function C:OpenPanel()
     TG.Groups:ClosePanel()
     TG.ChannelList:Close()
     TG.Requests:ClosePanel()
-    self:RefreshPanel()
+    self:ShowSub(self.sub or "follow")
     self.panel:Show()
     UI.newBtn:SetText("Cancel")
 end

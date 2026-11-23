@@ -8,7 +8,7 @@ local O = { checks = {}, radios = {}, pages = {}, catButtons = {} }
 TG.Settings = O
 
 -- The order of the categories on the left.
-local CATEGORIES = { "notify", "dnd", "window", "chat", "requests", "mail", "data" }
+local CATEGORIES = { "notify", "dnd", "window", "chat", "requests", "business", "mail", "data" }
 local LIST_W = 216
 
 local NOTIFY_FROM = {
@@ -540,6 +540,33 @@ function O:Create()
     S.Tooltip(dBox, "Decline message", "\"Decline\" in the Reply menu sends this and dismisses the request. "
         .. "Leave it empty to dismiss without a message.")
 
+    ---------------------------------------------------------------- Open for business
+    gap(4)
+    page("business", "Open for business", "Replies for the Business tab, where you post your ad and collect whispers.")
+    check("Show the Business tab", 0,
+        function() return s().businessTab ~= false end, function(v) s().businessTab = v; UI:UpdateTabs() end,
+        "Business tab", "Open for business: write an ad, post it, and collect the whispers in their own tab. "
+        .. "Untick to hide the tab while you're not using it.")
+    gap(6)
+    local brHint = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    brHint:SetPoint("TOPLEFT", 18, y)
+    brHint:SetText("Quick replies for whispers to your ad ({name}, {class}, {level} work here too):")
+    y = y - 20
+    for i = 1, 3 do
+        replyBox("Reply " .. i, function() return (s().bizReplies or {})[i] or "" end,
+            function(v) s().bizReplies = s().bizReplies or {}; s().bizReplies[i] = v end)
+    end
+    replyBox("Decline", function() return s().bizDecline or "" end, function(v) s().bizDecline = v end)
+    gap(4)
+    local bizNote = content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    bizNote:SetPoint("TOPLEFT", 18, y)
+    bizNote:SetPoint("RIGHT", content, "RIGHT", -12, 0)
+    bizNote:SetJustifyH("LEFT")
+    bizNote:SetText("Your ad, Start / Stop and how long it stays open are in the Business tab. Listing in the group "
+        .. "finder pauses it; it opens again when you stop listing. Also: /tg business [minutes|off]")
+    bizNote:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
+    y = y - 30
+
     ---------------------------------------------------------------- Mail
     gap(4)
     page("mail", "Mail", "A pop-up when new mail arrives in your mailbox.")
@@ -718,7 +745,7 @@ function O:IsShown()
     return self.frame and self.frame:IsShown() or false
 end
 
-function O:Open()
+function O:Open(page)
     UI:Show()
     self:Create()
     TG.Picker:Close()
@@ -728,7 +755,7 @@ function O:Open()
     TG.Requests:ClosePanel()
     self:Refresh()
     self.frame:Show()
-    self:ShowPage(CATEGORIES[1]) -- always start on the first page
+    self:ShowPage(page or CATEGORIES[1]) -- always start on the first page, unless asked for another
 end
 
 function O:Close()
