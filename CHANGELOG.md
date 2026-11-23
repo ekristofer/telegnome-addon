@@ -4,6 +4,7 @@
 - **Filtered channels:** right-click a followed channel > New filtered copy... and give it words, e.g. `enchant, ench`. You get a separate conversation like "Trade [Enchant]" that keeps only the messages with those words, and pops up when one comes in. Make as many as you like ("Trade [Enchant]", "Trade [Boost]"...), with or without following the whole channel. Change the words later from the same menu.
 - Alert words per channel: right-click a followed channel > Alert words for this channel... (the words in Settings still count everywhere).
 - Matching words are picked out in gold in channel messages.
+- **New mail:** a pop-up when mail arrives, and when you log in with unread mail, saying who sent it ("New mail from Thrall and Stormwind Auction House (2)"). Change the text or turn it off in the new Settings > Mail page. The game names the latest three senders only; open a mailbox to read the mail.
 - `/tg demo`: the window stays solid while the sample conversations are shown, whatever your opacity setting, so screenshots come out clean. Your opacity is back as soon as the demo is off.
 
 ## 0.9.1

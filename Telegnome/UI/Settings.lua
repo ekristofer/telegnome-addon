@@ -8,7 +8,7 @@ local O = { checks = {}, radios = {}, pages = {}, catButtons = {} }
 TG.Settings = O
 
 -- The order of the categories on the left.
-local CATEGORIES = { "notify", "dnd", "window", "chat", "requests", "data" }
+local CATEGORIES = { "notify", "dnd", "window", "chat", "requests", "mail", "data" }
 local LIST_W = 216
 
 local NOTIFY_FROM = {
@@ -539,6 +539,32 @@ function O:Create()
     local dBox = replyBox("Decline", function() return s().declineReply or "" end, function(v) s().declineReply = v end)
     S.Tooltip(dBox, "Decline message", "\"Decline\" in the Reply menu sends this and dismisses the request. "
         .. "Leave it empty to dismiss without a message.")
+
+    ---------------------------------------------------------------- Mail
+    gap(4)
+    page("mail", "Mail", "A pop-up when new mail arrives in your mailbox.")
+    check("Tell me when new mail arrives", 0,
+        function() return s().mailNotify ~= false end, function(v) s().mailNotify = v end,
+        "New mail", "A pop-up (and your sound, if sounds are on) when mail arrives, and when you log in with "
+        .. "unread mail. The game only says who sent the latest three; open a mailbox to read them. Follows "
+        .. "Do not disturb and the In combat choice under Notifications.")
+    gap(8)
+    local mailHint = content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    mailHint:SetPoint("TOPLEFT", 18, y)
+    mailHint:SetText("{from} is filled in with who sent it, e.g. \"Thrall and Stormwind Auction House (2)\".")
+    mailHint:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
+    y = y - 18
+    local mailBox = replyBox("Text", function() return s().mailText or TG.Mail.DEFAULT_TEXT end,
+        function(v) s().mailText = v end)
+    S.Tooltip(mailBox, "Notification text", "What the pop-up says. Leave it empty for the standard text: "
+        .. TG.Mail.DEFAULT_TEXT)
+    gap(4)
+    local mailTest = S.Link(content, "Show an example")
+    mailTest:SetPoint("TOPLEFT", 18, y)
+    mailTest:SetScript("OnClick", function()
+        TG.Mail:Notify({ { name = "Stormwind Auction House", n = 2 }, { name = "Thrall", n = 1 } }, true)
+    end)
+    y = y - 24
 
     ---------------------------------------------------------------- Your data
     gap(4)

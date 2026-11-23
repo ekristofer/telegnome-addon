@@ -25,6 +25,7 @@ UI\Search.lua
 Features\Requests.lua
 Features\Social.lua
 Features\Instances.lua
+Features\Mail.lua
 
 # Settings, notifier, minimap button
 UI\Settings.lua

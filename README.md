@@ -136,6 +136,10 @@ Followed channels tab > **+ Follow channel** > tick what you want. Messages are 
 
 **Filtered copies:** right-click a followed channel > **New filtered copy...** and type words, e.g. `enchant, ench`. You get a separate conversation, "Trade [Enchant]", that keeps only the messages with those words and pops up when one arrives. Make as many as you like, with or without following the whole channel; the matching words are picked out in gold.
 
+### Mail
+
+When mail arrives (or you log in with unread mail), a pop-up says who sent it, e.g. "New mail from Thrall and Stormwind Auction House (2)". Settings > Mail turns it off or changes the text; `{from}` is filled in with the senders. The game only names the latest three senders and only lets addons read mail at a mailbox, so it's a notification, not a conversation.
+
 ### Dungeons, raids and combat
 
 When you enter a dungeon, Telegnome offers to follow Party chat until you leave; in a raid, Raid chat. Instance chat (used by group finder groups) is followed too. While you're inside it's pinned at the top of the All tab, with an "Entered ..." line where the run starts. Choose **Ask**, **Always follow** or **Never** in Settings > Chat, or type `/tg follow-instance`.
