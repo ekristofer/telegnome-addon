@@ -451,9 +451,9 @@ function C:OpenMenu(key, anchor)
         root:CreateCheckbox("Show in the All tab",
             function() return th.inAll ~= false end,
             function() th.inAll = (th.inAll == false) and nil or false; TG:RefreshUnread(); UI:RefreshList() end)
-        root:CreateButton(th.muted and "Unmute" or "Mute (no pop-ups or sound, alert words included)", function()
-            TG:SetMuted(key, not th.muted)
-        end)
+        root:CreateCheckbox("Mute everything (alert words too)",
+            function() return th.muted and true or false end,
+            function() TG:SetMuted(key, not th.muted) end)
         root:CreateDivider()
         if th.base then
             root:CreateButton("Rename...", function()

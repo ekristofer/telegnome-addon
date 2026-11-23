@@ -22,7 +22,7 @@ Telegnome moves your private messages out of the busy main chat and into a messe
 - **Right-click a name** for the game's normal player menu (invite, add friend, ignore...).
 - **New message** picker with your Battle.net friends, friends list and everyone you've talked to.
 - **Do not disturb** with an optional auto-reply message.
-- **Only in Telegnome**: optionally keep whispers, Battle.net whispers and followed channels out of the main chat (group chats always are).
+- **Only in Telegnome**: optionally keep whispers, Battle.net whispers and followed channels out of the main chat (group chats are too, unless you turn on Show in the WoW chat window for one).
 - Sound for new messages, with a choice of sounds.
 - Adjustable window opacity, so you can keep it open over the game. It turns solid when you hover or type.
 - Delivery feedback in the conversation (offline, away, ignoring you), shift-click links, key bindings, alert words for followed channels.
@@ -52,6 +52,7 @@ Open Telegnome with the minimap button, the addons button by the minimap, or `/t
 | `/tg new` | Start a new conversation |
 | `/tg group <name>` | Create a group chat |
 | `/tg join <code>` | Join a group chat |
+| `/tg test stranger` | A pretend whisper from a stranger, to try Requests and Open for business |
 | `/tg channels` | Choose followed channels |
 | `/tg opacity <30-100>` | Main window opacity |
 | `/tg theme <name>` | Colour theme: brass, orange, horde, alliance, arcane, fel, steel |
@@ -125,6 +126,8 @@ A group chat is a hidden, password-protected custom chat channel. Telegnome give
 4. **Rename**: right-click the group > Rename group, or use the Rename button.
 
 Everyone in the group needs Telegnome. The **Online** button lists who is in the group right now, and grey lines show when someone joins (comes online) or leaves.
+
+To see a group's messages in the normal WoW chat window as well, right-click it > **Show in the WoW chat window**. They show up there under the group's name, and you can reply with that channel's number (for example `/8`). Right-click again to turn it off.
 
 **Your chat channels** (Settings, the Group chats panel or `/tg mychannels`) lists every channel your character is in - General, Trade, custom channels and group chats - shows how many of the game's 10 slots are used, and lets you leave any of them. If Telegnome finds one of its group channels it has no record of, it's listed under Group chats as "Unknown group": rename it, enter its code (right-click), or leave it.
 
