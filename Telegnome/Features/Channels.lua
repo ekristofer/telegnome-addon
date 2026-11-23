@@ -131,24 +131,156 @@ end
 -- Events, sending, filtering
 ---------------------------------------------------------------------------
 
--- Alert words (Settings): a followed-channel message containing one pops up and plays the
--- sound even when that channel's Pop-up tick is off.
-local kwSource, kwList
-function C.MatchKeyword(text)
-    local src = TG.db.settings.keywords or ""
-    if src ~= kwSource then
-        kwSource, kwList = src, {}
+-- Word lists ("enchant, ench") for alert words and filtered channels. A word also matches inside longer
+-- words, so "ench" finds "enchanter".
+local wordCache = {}
+function C.Words(src)
+    if type(src) ~= "string" or src == "" then return {} end
+    local list = wordCache[src]
+    if not list then
+        list = {}
         for part in src:gmatch("[^,;]+") do
             local word = strtrim(part):lower()
-            if #word >= 2 then kwList[#kwList + 1] = word end
+            if #word >= 2 then list[#list + 1] = word end
+        end
+        wordCache[src] = list
+    end
+    return list
+end
+
+-- The first word of the list found in the text, or nil.
+function C.MatchWords(src, text)
+    if type(text) ~= "string" then return nil end
+    local list = C.Words(src)
+    if #list == 0 then return nil end
+    local lower = text:lower()
+    for _, word in ipairs(list) do
+        if lower:find(word, 1, true) then return word end
+    end
+    return nil
+end
+
+-- Alert words: a followed-channel message containing one pops up and plays the sound even when that
+-- channel's Pop-up tick is off. The words in Settings count for every channel; a channel can have its own too.
+function C.MatchKeyword(text, th)
+    return (C.MatchWords(TG.db.settings.keywords, text) or (th and C.MatchWords(th.alertWords, text))) and true or false
+end
+
+-- "Enchant" or "Enchant +1": the short label after a filtered channel's name.
+function C.FilterLabel(th)
+    local list = C.Words(th and th.words)
+    if #list == 0 then return nil end
+    local first = list[1]:gsub("^%l", string.upper)
+    return #list > 1 and (first .. " +" .. (#list - 1)) or first
+end
+
+-- The matching words picked out in gold in a channel message (not in messages with links or colours).
+function C.Highlight(th, text)
+    if type(text) ~= "string" or text:find("|", 1, true) then return text end
+    local words = {}
+    for _, src in ipairs({ th.words or "", th.alertWords or "", TG.db.settings.keywords or "" }) do
+        for _, w in ipairs(C.Words(src)) do words[#words + 1] = w end
+    end
+    if #words == 0 then return text end
+    local lower, marks = text:lower(), {}
+    for _, w in ipairs(words) do
+        local from = 1
+        while true do
+            local a, b = lower:find(w, from, true)
+            if not a then break end
+            marks[#marks + 1] = { a, b }
+            from = b + 1
         end
     end
-    if #kwList == 0 or type(text) ~= "string" then return false end
-    local lower = text:lower()
-    for _, word in ipairs(kwList) do
-        if lower:find(word, 1, true) then return true end
+    if #marks == 0 then return text end
+    table.sort(marks, function(x, y) return x[1] < y[1] end)
+    local out, pos = {}, 1
+    for _, m in ipairs(marks) do
+        local a, b = math.max(m[1], pos), m[2]
+        if b >= a then
+            out[#out + 1] = text:sub(pos, a - 1)
+            out[#out + 1] = "|cffffd100" .. text:sub(a, b) .. "|r"
+            pos = b + 1
+        end
     end
-    return false
+    out[#out + 1] = text:sub(pos)
+    return table.concat(out)
+end
+
+---------------------------------------------------------------------------
+-- Filtered channels: a copy of a channel that keeps only the messages with your words,
+-- e.g. "Trade [Enchant]" next to "Trade [Boost]". Each is its own conversation.
+---------------------------------------------------------------------------
+
+-- The filtered copies of a channel (by the channel's own key).
+function C:ViewsOf(baseKey)
+    local out = {}
+    for k, th in pairs(TG.db.threads) do
+        if th.base == baseKey and th.kind == "CHANNEL" then out[#out + 1] = k end
+    end
+    return out
+end
+
+function C:AddView(from, words)
+    if #C.Words(words) == 0 then
+        TG:Print("Give at least one word of two letters or more.")
+        return
+    end
+    local base = from.base or from.key
+    local n = 1
+    while TG.db.threads[base .. "|f" .. n] do n = n + 1 end
+    local key = base .. "|f" .. n
+    local th = TG:EnsureThread(key, { kind = "CHANNEL", name = from.name })
+    th.ctype, th.cname, th.base, th.words = from.ctype, from.cname, base, words
+    th.notify = true -- the point of a filter: tell me when it matches
+    th.count = true
+    th.msgs[#th.msgs + 1] = { t = time(), sys = true,
+        text = ("Showing only %s messages with: %s"):format(from.name or "channel", table.concat(C.Words(words), ", ")) }
+    UI:RefreshList()
+    TG:RefreshUnread()
+    if UI.frame and UI.frame:IsShown() then UI:Select(key) end
+    return key
+end
+
+function C:SetViewWords(key, words)
+    local th = TG.db.threads[key]
+    if not (th and th.base) or #C.Words(words) == 0 then return end
+    th.words = words
+    TG:AddSystemLine(key, "Now showing messages with: " .. table.concat(C.Words(words), ", "))
+    UI:RefreshList()
+    if UI.selected == key then UI:Select(key) end
+end
+
+-- A small box for typing words.
+function C:AskWords(prompt, current, done)
+    if not StaticPopupDialogs.TELEGNOME_WORDS then
+        StaticPopupDialogs.TELEGNOME_WORDS = {
+            text = "%s\n|cff999999Separate words with commas, e.g. enchant, ench|r",
+            button1 = OKAY or "OK",
+            button2 = CANCEL or "Cancel",
+            hasEditBox = true,
+            maxLetters = 200,
+            OnShow = function(self, data)
+                local box = self.editBox or self.EditBox
+                if box then
+                    box:SetText((data or self.data).current or "")
+                    box:HighlightText()
+                end
+            end,
+            OnAccept = function(self, data)
+                local box = self.editBox or self.EditBox
+                if box then (data or self.data).done(strtrim(box:GetText())) end
+            end,
+            EditBoxOnEnterPressed = function(box)
+                local p = box:GetParent()
+                p.data.done(strtrim(box:GetText()))
+                p:Hide()
+            end,
+            EditBoxOnEscapePressed = function(box) box:GetParent():Hide() end,
+            timeout = 0, whileDead = true, hideOnEscape = true,
+        }
+    end
+    StaticPopup_Show("TELEGNOME_WORDS", prompt, nil, { current = current, done = done })
 end
 
 -- Joining a new group: followed Party, Raid and Instance chat get a divider line, or are emptied (setting).
@@ -199,19 +331,34 @@ function C:OnEvent(event, ...)
     else
         key = C.KeyForType(EVENT_TYPE[event])
     end
-    if not self:IsFollowedKey(key) then return end
+    local followed = self:IsFollowedKey(key)
+    local views = self:ViewsOf(key)
+    if not followed and #views == 0 then return end
     if TG.isSecret(text) or TG.isSecret(sender) or TG.isSecret(guid) then return end
 
     local outgoing = guid and guid == UnitGUID("player") or false
     local from = Ambiguate and Ambiguate(sender or "?", "short") or sender
+    local cls = TG:ClassFromGUID(guid)
     if event == "CHAT_MSG_RAID_WARNING" then text = "[Raid Warning] " .. text end
-    TG:AddMessage(key, { kind = "CHANNEL" }, outgoing, text, {
-        from = from, cls = TG:ClassFromGUID(guid), alert = (not outgoing) and C.MatchKeyword(text) or nil,
-    })
+    if followed then
+        TG:AddMessage(key, { kind = "CHANNEL" }, outgoing, text, {
+            from = from, cls = cls, alert = (not outgoing) and C.MatchKeyword(text, TG.db.threads[key]) or nil,
+        })
+    end
+    -- filtered copies: messages with their words, and what you sent from that copy
+    local sent = self.sent
+    for _, vk in ipairs(views) do
+        local vt = TG.db.threads[vk]
+        local mine = outgoing and sent and sent.th == vt and sent.text == text
+        if mine or (not outgoing and C.MatchWords(vt.words, text)) then
+            TG:AddMessage(vk, { kind = "CHANNEL" }, outgoing, text, { from = from, cls = cls })
+        end
+    end
 end
 
 function C:Send(th, text)
     local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
+    self.sent = { th = th, text = text } -- so a filtered copy shows what you wrote from it
     local t = th.ctype
     if t == "CHANNEL" then
         local id = channelID(th.cname or "")
@@ -279,8 +426,27 @@ function C:OpenMenu(key, anchor)
         root:CreateButton(th.muted and "Unmute" or "Mute (no pop-ups or sound, alert words included)", function()
             TG:SetMuted(key, not th.muted)
         end)
+        root:CreateDivider()
+        if th.base then
+            root:CreateButton("Change filter words...", function()
+                C:AskWords("Show only " .. (th.name or "channel") .. " messages with these words:", th.words,
+                    function(words) C:SetViewWords(key, words) end)
+            end)
+        else
+            root:CreateButton("Alert words for this channel...", function()
+                C:AskWords("Alert words for " .. (th.name or "this channel")
+                    .. "\n|cff999999A message with one of them pops up, even with Pop-up off. Empty: none.|r",
+                    th.alertWords, function(words) th.alertWords = words ~= "" and words or nil; UI:RefreshList() end)
+            end)
+        end
+        root:CreateButton("New filtered copy...", function()
+            C:AskWords("New filtered copy of " .. (th.name or "this channel")
+                .. "\n|cff999999It keeps only the messages with these words.|r", "",
+                function(words) C:AddView({ key = key, base = th.base, name = th.name, ctype = th.ctype, cname = th.cname }, words) end)
+        end)
+        root:CreateDivider()
         root:CreateButton("Clear history", function() TG:ConfirmClearHistory(key) end)
-        root:CreateButton("Unfollow channel", function() C:Unfollow(key) end)
+        root:CreateButton(th.base and "Remove this filtered copy" or "Unfollow channel", function() C:Unfollow(key) end)
         root:CreateButton("Choose channels...", function() C:OpenPanel() end)
     end)
 end
@@ -423,7 +589,7 @@ function C:RefreshPanel()
     local seen = {}
     for _, n in ipairs(names) do seen[n:lower()] = true end
     for _, th in pairs(TG.db.threads) do
-        if th.kind == "CHANNEL" and th.ctype == "CHANNEL" and th.cname and not seen[th.cname:lower()] then
+        if th.kind == "CHANNEL" and th.ctype == "CHANNEL" and th.cname and not th.base and not seen[th.cname:lower()] then
             names[#names + 1] = th.cname
             seen[th.cname:lower()] = true
         end

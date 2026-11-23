@@ -266,7 +266,10 @@ function TG:DisplayFor(key, rec)
         return rec.name or "Group", { 1.0, 0.72, 0.42 }, nil
     end
     if rec.kind == "CHANNEL" then
-        return rec.name or "Channel", self.Channels.Color(rec), nil
+        local name = rec.name or "Channel"
+        local label = rec.base and self.Channels.FilterLabel(rec)
+        if label then name = name .. " [" .. label .. "]" end
+        return name, self.Channels.Color(rec), nil
     end
     if rec.kind == "BN" and rec.demo then
         return rec.name or "Friend", { 0.51, 0.77, 1.0 }, rec.demoOnline or false

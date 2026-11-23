@@ -132,7 +132,9 @@ Everyone in the group needs Telegnome. The **Online** button lists who is in the
 
 Right-click a followed channel for two options: **Count unread messages** gives it a red badge that adds to the totals (on for Party, Raid and Instance; other channels show a quiet dot instead), and **Show in the All tab**.
 
-Followed channels tab > **+ Follow channel** > tick what you want. Messages are copied into the tab and you can reply from there. Followed channels don't count towards the missed-messages counter. Each channel has its own **Pop-up** tick (off by default). **Alert words** (Settings > Notifications) make a message pop up anyway when it contains one of your words, e.g. `LFM, tank`.
+Followed channels tab > **+ Follow channel** > tick what you want. Messages are copied into the tab and you can reply from there. Followed channels don't count towards the missed-messages counter. Each channel has its own **Pop-up** tick (off by default). **Alert words** (Settings > Notifications) make a message pop up anyway when it contains one of your words, e.g. `LFM, tank`. A channel can also have its own alert words (right-click it > Alert words for this channel...).
+
+**Filtered copies:** right-click a followed channel > **New filtered copy...** and type words, e.g. `enchant, ench`. You get a separate conversation, "Trade [Enchant]", that keeps only the messages with those words and pops up when one arrives. Make as many as you like, with or without following the whole channel; the matching words are picked out in gold.
 
 ### Dungeons, raids and combat
 

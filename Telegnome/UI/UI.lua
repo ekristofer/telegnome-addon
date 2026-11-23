@@ -1607,7 +1607,8 @@ function UI:RenderMessage(th, m, name, color, idx)
         local c = m.cls and RAID_CLASS_COLORS and RAID_CLASS_COLORS[m.cls]
         view:AddMessage({ sender = m.from or "?", who = m.from or "?", t = m.t, idx = idx,
             color = c and { c.r, c.g, c.b } or OTHER,
-            text = (m.hl and "|cffffd100>>|r " or "") .. m.text })
+            text = (m.hl and "|cffffd100>>|r " or "")
+                .. (th.kind == "CHANNEL" and TG.Channels.Highlight(th, m.text) or m.text) })
         return
     end
     local text = m.text
@@ -1624,7 +1625,14 @@ local function subLine(th, key)
     if th.kind == "GROUP" then
         parts[1] = th.code and ("Code: " .. th.code) or "Invite code unknown"
     elseif th.kind == "CHANNEL" then
-        parts[1] = "Followed channel"
+        local C = TG.Channels
+        if th.base then
+            parts[1] = "Filtered: only messages with " .. table.concat(C.Words(th.words), ", ")
+        else
+            parts[1] = "Followed channel"
+            local own = C.Words(th.alertWords)
+            if #own > 0 then parts[2] = "Alert words: " .. table.concat(own, ", ") end
+        end
     elseif th.kind == "BN" then
         parts[1] = th.battleTag or "Battle.net"
     elseif th.kind == "WHISPER" then
@@ -1792,6 +1800,7 @@ function UI:TargetAlpha()
     local s = TG.db and TG.db.settings
     if not s then return 1 end
     local base = math.max(self.MIN_OPACITY, math.min(100, s.opacity or 100)) / 100
+    if TG.Demo and TG.Demo.on then return 1 end -- sample conversations are for screenshots: always solid
     if base >= 1 or not s.opacityHover or TG.Settings.dragging then return base end
     if self.frame:IsMouseOver() or (self.input and self.input:HasFocus()) then return 1 end
     return base
