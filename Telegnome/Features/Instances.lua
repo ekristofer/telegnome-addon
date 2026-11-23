@@ -101,6 +101,7 @@ function D:Start()
             local th = TG.db.threads[key]
             if th then
                 th.tempPin = true
+                th.notify = TG.db.settings.instancePopups ~= false -- Settings > Chat
                 TG:AddSystemLine(key, enteredLine(inst))
                 first = first or key
             end

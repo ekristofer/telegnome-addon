@@ -147,32 +147,6 @@ local function channelID(channel)
     return tonumber(id) or 0
 end
 
--- The chat window that shows a group when "Show in the WoW chat window" is on.
-local function mainFrame()
-    return DEFAULT_CHAT_FRAME or ChatFrame1
-end
-
-function G:ShowInChatFrame(channel)
-    local add = ChatFrame_AddChannel or (ChatFrameUtil and ChatFrameUtil.AddChannel)
-    local cf = mainFrame()
-    if add and cf then pcall(add, cf, channel) end
-end
-
--- Puts the group's channel in (or takes it out of) the main chat window, as the group's setting says.
-function G:ApplyChatFrame(th)
-    if not (th and th.channel) then return end
-    if th.showInChat then self:ShowInChatFrame(th.channel) else self:HideFromChatFrames(th.channel) end
-end
-
-function G:SetShowInChat(key, on)
-    local th = TG.db.threads[key]
-    if not (th and th.channel) then return end
-    th.showInChat = on and true or nil
-    self:ApplyChatFrame(th)
-    TG:Print(on and ("\"%s\" now also shows in the WoW chat window."):format(th.name)
-        or ("\"%s\" no longer shows in the WoW chat window."):format(th.name))
-end
-
 function G:HideFromChatFrames(channel)
     local remove = ChatFrame_RemoveChannel or (ChatFrameUtil and ChatFrameUtil.RemoveChannel)
     if not remove then return end
@@ -183,12 +157,16 @@ function G:HideFromChatFrames(channel)
 end
 
 function G:JoinChannel(th)
+    if th.showInChat then -- left over from a test version that could show a group in the main chat
+        th.showInChat = nil
+        if th.channel then self:HideFromChatFrames(th.channel) end
+    end
     if not th.channel or not th.pass or channelID(th.channel) > 0 then return end
     -- Temporary: left automatically at logout, so nothing lingers if Telegnome is disabled.
     local join = JoinTemporaryChannel or JoinChannelByName
     if not join then return end
     join(th.channel, th.pass)
-    C_Timer.After(1, function() G:ApplyChatFrame(th) end)
+    C_Timer.After(1, function() G:HideFromChatFrames(th.channel) end)
     C_Timer.After(4, function()
         if TG.db.threads[G.KeyFor(th.channel)] and channelID(th.channel) == 0 then
             TG:Print(("Couldn't join the group \"%s\". You might be in too many chat channels (the game allows 10)."):format(th.name))
@@ -275,29 +253,13 @@ function G:OnEvent(event, ...)
     TG:AddMessage(key, { kind = "GROUP" }, outgoing, text, { from = from, cls = TG:ClassFromGUID(guid) })
 end
 
--- Same message, but labelled with the group's name instead of its hidden channel code:
--- "[8. Raid team]" rather than "[8. tgx7k2...]".
-function G.ChatArgs(th, ...)
-    local n = select("#", ...)
-    local args = { ... }
-    local num = args[8]
-    if type(num) == "number" or (type(num) == "string" and not TG.isSecret(num) and num ~= "") then
-        args[4] = ("%s. %s"):format(num, th.name or "Group")
-    end
-    return unpack(args, 1, n)
-end
-
 function G:InstallChatFilter(add)
-    local function filter(_, event, ...)
+    local function filter(_, _, ...)
         local msg, sender = ...
         local base = select(9, ...)
         if TG.isSecret(msg) or TG.isSecret(sender) or TG.isSecret((select(12, ...))) then return false end
         if type(base) == "string" and not TG.isSecret(base) and TG.db
             and (TG.db.threads[G.KeyFor(base)] or G.IsTelegnomeChannel(base)) then
-            local th = TG.db.threads[G.KeyFor(base)]
-            if event == "CHAT_MSG_CHANNEL" and th and th.showInChat then
-                return false, G.ChatArgs(th, ...)
-            end
             return true
         end
         return false
@@ -573,8 +535,15 @@ function G:OnScanEvent(event, ...)
         code = code, name = name, from = from, where = SCAN_WHERE[event], t = time(), public = public or nil,
     }
     if isNew and not public then
-        TG:Print(("%s sent a group chat code%s. Open Group chats > + New group in Telegnome - it's filled in for you.")
-            :format(from or "Someone", name and (' ("' .. name .. '")') or ""))
+        local what = name and ('"' .. name .. '"') or "a group chat"
+        -- a pop-up that opens the join panel with the code filled in: one click on Join after that
+        local shown = TG.Toast and TG.Toast:Notice("|cffffd100Group chat invite|r",
+            ("%s invited you to %s. Click to join."):format(from or "Someone", what),
+            function() G:OpenPanel() end)
+        if not shown then
+            TG:Print(("%s sent a group chat code%s. Open Group chats > + New group in Telegnome - it's filled in for you.")
+                :format(from or "Someone", name and (' ("' .. name .. '")') or ""))
+        end
     end
     if self:IsPanelShown() then self:FillPending() end
 end
@@ -771,8 +740,6 @@ function G:OpenMenu(key, anchor)
         root:CreateButton(th.fav and "Unpin" or "Pin to the top", function() TG:SetFavorite(key, not th.fav) end)
         UI.AddPinMoveEntries(root, key)
         root:CreateButton("Who's online", function() G:RequestMembers(key) end)
-        root:CreateCheckbox("Show in the WoW chat window", function() return th.showInChat end,
-            function() G:SetShowInChat(key, not th.showInChat) end)
         root:CreateCheckbox("Pop-up notifications and sound",
             function() return not th.muted end,
             function() TG:SetMuted(key, not th.muted) end)

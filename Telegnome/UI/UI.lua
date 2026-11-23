@@ -280,6 +280,18 @@ function UI:Create()
     settingsBtn:SetScript("OnClick", function() TG.Settings:Toggle() end)
     self.settingsBtn = settingsBtn
 
+    -- ? next to Settings: what the tab you're on is for
+    local helpBtn = S.Button(settingsBtn:GetParent(), "?", 22, 22)
+    helpBtn:SetPoint("RIGHT", settingsBtn, "LEFT", -6, 0)
+    helpBtn:SetFrameLevel(settingsBtn:GetFrameLevel())
+    function helpBtn:SetLit(lit)
+        if lit then self.fs:SetTextColor(1, 0.95, 0.7) else self.fs:SetTextColor(S.BRASS[1], S.BRASS[2], S.BRASS[3]) end
+    end
+    helpBtn:SetLit(false)
+    helpBtn:SetScript("OnClick", function() TG.Help:Toggle() end)
+    S.Tooltip(helpBtn, "Help", "What this tab is for and how to use it.")
+    self.helpBtn = helpBtn
+
     -- Tabs: plain labels, an unread badge, and a line under the one you're on.
     self.tabs = {}
     self.tabOrder = {}
@@ -288,6 +300,27 @@ function UI:Create()
         self.tabs[def[1]] = tab
         self.tabOrder[i] = tab
     end
+    -- Requests and Business: say whether they're collecting, since the tab is greyed out when not
+    self.tabs.requests:HookScript("OnEnter", function(s)
+        GameTooltip:SetOwner(s, "ANCHOR_BOTTOM")
+        GameTooltip:SetText("Requests")
+        if TG.Requests:Collecting() then
+            GameTooltip:AddLine("Collecting: whispers from people you don't know land here.", 1, 1, 1, true)
+        else
+            GameTooltip:AddLine("Not collecting right now. It starts by itself when you list a group in the group "
+                .. "finder, or click Collect now in the tab.", 1, 1, 1, true)
+        end
+        GameTooltip:Show()
+    end)
+    self.tabs.requests:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    self.tabs.business:HookScript("OnEnter", function(s)
+        GameTooltip:SetOwner(s, "ANCHOR_BOTTOM")
+        GameTooltip:SetText("Business")
+        GameTooltip:AddLine(TG.db.settings.business and "Open for business: whispers to your ad land here."
+            or "Closed. Open the tab to write your ad and press Start.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    self.tabs.business:HookScript("OnLeave", function() GameTooltip:Hide() end)
     -- How far the content keeps from the window's edge: the game's frame has a thicker border.
     local mx = native and 8 or 2
     local baseLevel = f:GetFrameLevel() + 3
@@ -1527,7 +1560,10 @@ function UI:UpdateTabs()
         else
             tab:SetBackdropColor(S.PANEL[1] * 0.9, S.PANEL[2] * 0.9, S.PANEL[3] * 0.9, 1)
             tab:SetBackdropBorderColor(e[1], e[2], e[3], 0.35)
-            tab.fs:SetTextColor(0.62, 0.57, 0.48)
+            -- Requests and Business are greyed out while they aren't collecting
+            local idle = (tab.id == "requests" and not TG.Requests:Collecting())
+                or (tab.id == "business" and not TG.db.settings.business)
+            if idle then tab.fs:SetTextColor(0.42, 0.39, 0.33) else tab.fs:SetTextColor(0.62, 0.57, 0.48) end
         end
         tab:SetWidth(num(tab.fs:GetStringWidth(), 90) + 24
             + (tab.pill:IsShown() and num(tab.pill:GetWidth(), 16) + 6 or 0))
@@ -1553,6 +1589,7 @@ end
 
 function UI:SetTab(tab)
     self:Create()
+    if TG.Help then TG.Help:Close() end
     if self.tab ~= tab then
         TG.Picker:Close()
         TG.Groups:ClosePanel()
@@ -1710,13 +1747,12 @@ function UI:ShowEmpty()
     self:UpdateHeaderButtons(nil)
     self.msgs:Clear()
     self.lastDay = nil
-    local hints = {
-        all = "Click + New to start a conversation, make a group chat or follow a channel.",
-        dm = "Click + New message to start a conversation.",
-        groups = "Click + New group to create a group chat or join one with an invite code.",
-        channels = "Click + Follow channel to bring guild, party or other channels into Telegnome.",
-    }
-    self.msgs:AddNote(hints[self.tab] or "", nil, nil, nil, true)
+    -- nothing here yet: the tab explains itself (the same text as its ? card)
+    local help = TG.Help and TG.Help.TEXT[self.tab]
+    if help then
+        self.header:SetText(help[1])
+        self.msgs:AddNote(help[2])
+    end
     self:UpdatePlaceholder()
 end
 

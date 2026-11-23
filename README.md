@@ -22,7 +22,7 @@ Telegnome moves your private messages out of the busy main chat and into a messe
 - **Right-click a name** for the game's normal player menu (invite, add friend, ignore...).
 - **New message** picker with your Battle.net friends, friends list and everyone you've talked to.
 - **Do not disturb** with an optional auto-reply message.
-- **Only in Telegnome**: optionally keep whispers, Battle.net whispers and followed channels out of the main chat (group chats are too, unless you turn on Show in the WoW chat window for one).
+- **Only in Telegnome**: optionally keep whispers, Battle.net whispers and followed channels out of the main chat (group chats always are).
 - Sound for new messages, with a choice of sounds.
 - Adjustable window opacity, so you can keep it open over the game. It turns solid when you hover or type.
 - Delivery feedback in the conversation (offline, away, ignoring you), shift-click links, key bindings, alert words for followed channels.
@@ -101,9 +101,13 @@ Inside each section, conversations are sorted by most recent by default. Right-c
 - The magnifier next to **+ New message** searches every saved message (or type `/tg search <text>`). Click a result to open the conversation at that message.
 - **Search in this conversation** and **Add note...** are in the **...** menu next to a person's name. Notes are private and show under the name and on their request card.
 
+### Help
+
+The **?** next to the Settings cog explains the tab you're on. A tab with nothing in it shows the same help, so it explains itself the first time you open it.
+
 ### Requests
 
-List yourself or your group in the group finder and a **Requests** tab appears. Whispers from people who aren't friends, guild members or favorites are collected there, so they don't flood your Direct messages.
+The **Requests** tab is always there, greyed out while it isn't collecting. List yourself or your group in the group finder and it starts by itself: whispers from people who aren't friends, guild members or favorites are collected there, so they don't flood your Direct messages. To collect without being listed, click **Collect now** in the tab (or `/tg recruit`). You can hide the tab in Settings > Requests; then it only shows up while it's collecting or has requests on it.
 
 - Each request shows the player's class, level and latest message.
 - The row at the top shows a class icon and a count for each class that's waiting - the class comes with the first whisper. Click an icon to show only that class, or All to see everyone. Each request has its class icon by the name.
@@ -111,7 +115,7 @@ List yourself or your group in the group finder and a **Requests** tab appears. 
 - **Invite** invites them to your group; **x** dismisses the request; clicking the row opens the conversation.
 - The level is read from the whisper ("70 mage", "lvl 45") or from their group finder application. **Check** looks the player up, also when a level looks wrong; the game only answers every few seconds, so the button counts down until you can ask again.
 - Click the star in a request's conversation to keep that person - they move to Direct messages.
-- **Decline all** sends your decline message to everyone still on the list and takes them off it. People you invited or who are in your group stay.
+- **Decline all** sends its own message ("Sorry, we're done for now." - change it in Settings) to everyone still on the list and takes them off it. People you invited or who are in your group stay.
 - When you're done, **Clear all** removes the remaining requests and the tab disappears.
 
 The tab appears while you're listed alone, or listed in a group you lead. **Collect whispers** at the bottom of the Requests view is ticked by default; untick it to pause. Recruiting somewhere else, for example in a chat channel? `/tg recruit` collects whispers there at any time until you switch it off.
@@ -122,12 +126,10 @@ A group chat is a hidden, password-protected custom chat channel. Telegnome give
 
 1. **Create**: Group chats tab > **+ New group** > name it > Create. A line like `Telegnome code: sprocket-whistle-gizmo-427` pops up ready to copy (Ctrl+C).
 2. **Share**: paste it in a whisper, party, guild or any other chat. Or right-click the group name > Invite > pick a friend to whisper it for you.
-3. **Join**: your friend's Telegnome picks up the code. They click **+ New group** and it's already filled in - just press Join. (Typing or pasting the code, or `/tg join <code>`, also works.)
+3. **Join**: your friend's Telegnome picks up the code and shows a pop-up ("Thrall invited you to \"Raid team\". Click to join."). Clicking it opens the join panel with everything filled in - just press Join. Without the pop-up, **+ New group** is filled in the same way. (Typing or pasting the code, or `/tg join <code>`, also works.)
 4. **Rename**: right-click the group > Rename group, or use the Rename button.
 
 Everyone in the group needs Telegnome. The **Online** button lists who is in the group right now, and grey lines show when someone joins (comes online) or leaves.
-
-To see a group's messages in the normal WoW chat window as well, right-click it > **Show in the WoW chat window**. They show up there under the group's name, and you can reply with that channel's number (for example `/8`). Right-click again to turn it off.
 
 **Your chat channels** (Settings, the Group chats panel or `/tg mychannels`) lists every channel your character is in - General, Trade, custom channels and group chats - shows how many of the game's 10 slots are used, and lets you leave any of them. If Telegnome finds one of its group channels it has no record of, it's listed under Group chats as "Unknown group": rename it, enter its code (right-click), or leave it.
 
@@ -149,7 +151,7 @@ When mail arrives (or you log in with unread mail), a pop-up says who sent it, e
 
 ### Dungeons, raids and combat
 
-When you enter a dungeon, Telegnome offers to follow Party chat until you leave; in a raid, Raid chat. Instance chat (used by group finder groups) is followed too. While you're inside it's pinned at the top of the All tab, with an "Entered ..." line where the run starts. Choose **Ask**, **Always follow** or **Never** in Settings > Chat, or type `/tg follow-instance`.
+When you enter a dungeon, Telegnome offers to follow Party chat until you leave; in a raid, Raid chat. Instance chat (used by group finder groups) is followed too. While you're inside it's pinned at the top of the All tab, with an "Entered ..." line where the run starts. Choose **Ask**, **Always follow** or **Never** in Settings > Chat, or type `/tg follow-instance`. A chat followed just for the run has pop-up notifications on (untick **Pop-up notifications for the dungeon or raid chat** in Settings > Chat to only count messages); a chat you already follow keeps its own settings.
 
 In combat, pop-ups and sounds wait until the fight is over; then one pop-up says what came in. Settings > Notifications > In combat has two other choices: **Show everything** (pop-ups and sounds as usual) or **Only the count** (no pop-ups or summary; the notifier, minimap button and badges still count up).
 
@@ -219,6 +221,7 @@ Telegnome/               the addon folder (this is what goes into AddOns)
   UI/Settings.lua        settings panel
   UI/Notifier.lua        on-screen counter / notification
   UI/Minimap.lua         minimap button
+  UI/Help.lua            the ? help card for each tab
   Features/Groups.lua    group chats (invite codes, hashing, channels)
   Features/Channels.lua  followed channels
   Features/Requests.lua  Requests tab (group finder whispers)

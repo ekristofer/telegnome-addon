@@ -53,9 +53,17 @@ function R:Keys(view)
     return keys
 end
 
--- The Requests tab: while listed, collecting (/tg recruit), or with group requests still on it.
+-- Collecting group requests right now: /tg recruit (Collect now), or listed with Collect whispers ticked.
+function R:Collecting()
+    local s = TG.db and TG.db.settings
+    if not s then return false end
+    return s.recruiting or (s.requestsTab and s.requestsCollect ~= false and self:IsHosting()) or false
+end
+
+-- The Requests tab: always, unless hidden in Settings - then while listed, collecting, or with requests on it.
 function R:TabVisible()
     if not TG.db then return false end
+    if TG.db.settings.showRequestsTab ~= false then return true end
     if TG.db.settings.recruiting or self:IsHosting() then return true end
     for _, th in pairs(TG.db.threads) do
         if th.req and not th.biz then return true end
@@ -334,12 +342,14 @@ end
 -- Sends the decline message, then dismisses the request.
 local function repliesFor(key)
     local s, th = TG.db.settings, TG.db.threads[key]
-    if th and th.biz then return s.bizReplies or {}, s.bizDecline end
-    return s.quickReplies or {}, s.declineReply
+    if th and th.biz then return s.bizReplies or {}, s.bizDecline, s.bizDeclineAll end
+    return s.quickReplies or {}, s.declineReply, s.declineAllReply
 end
 
-function R:Decline(key)
-    local _, text = repliesFor(key)
+-- all: sent by Decline all, which has its own message ("Sorry, we're done for now.")
+function R:Decline(key, all)
+    local _, one, every = repliesFor(key)
+    local text = all and every or one
     if type(text) == "string" and text:match("%S") and TG.db.threads[key] then
         TG:Send(key, TG.Social.Expand(text, key))
         if not (TG.Demo and TG.Demo.on) then self.declined[key] = GetTime() end
@@ -382,7 +392,7 @@ function R:DeclineAll()
     for i, key in ipairs(self:OpenKeys()) do
         C_Timer.After((i - 1) * 0.4, function()
             local th = TG.db.threads[key]
-            if th and th.req and not th.invited and not th.joined then R:Decline(key) end
+            if th and th.req and not th.invited and not th.joined then R:Decline(key, true) end
         end)
     end
 end
@@ -390,22 +400,25 @@ end
 function R:ConfirmDeclineAll()
     local n = #self:OpenKeys()
     if n == 0 then return end
-    local text = TG.db.settings.declineReply
-    if type(text) ~= "string" or not text:match("%S") then
-        TG:Print("There's no decline message. Write one in Settings > Requests first.")
-        return
+    local s = TG.db.settings
+    local text
+    if self:View() == "business" then text = s.bizDeclineAll else text = s.declineAllReply end
+    local what
+    if type(text) == "string" and text:match("%S") then
+        what = ("Each of them is sent \"%s\" and taken off the list."):format(text)
+    else
+        what = "They're taken off the list without a message."
     end
     if not StaticPopupDialogs.TELEGNOME_DECLINE_ALL then
         StaticPopupDialogs.TELEGNOME_DECLINE_ALL = {
-            text = "Decline %s requests?\n\nEach of them is sent \"%s\" and taken off the list. "
-                .. "People you invited or who are in your group stay.",
+            text = "Decline %s requests?\n\n%s People you invited or who are in your group stay.",
             button1 = "Decline all",
             button2 = CANCEL or "Cancel",
             OnAccept = function() R:DeclineAll() end,
             timeout = 0, whileDead = true, hideOnEscape = true,
         }
     end
-    StaticPopup_Show("TELEGNOME_DECLINE_ALL", n, text)
+    StaticPopup_Show("TELEGNOME_DECLINE_ALL", n, what)
 end
 
 -- Declined: the conversation and the remembered contact go.
@@ -611,6 +624,21 @@ function R:Create()
         .. "pause that and get them under Direct messages.")
     self.manual = manual
 
+    -- when not listed: collect anyway (the same as /tg recruit)
+    local collect = S.Button(f, "Collect now", 120, 22, true)
+    collect:SetPoint("TOPRIGHT", -14, -8)
+    collect:SetScript("OnClick", function()
+        local s = TG.db.settings
+        s.recruiting = not s.recruiting
+        TG:Print("Collecting strangers' whispers under Requests: " .. (s.recruiting and "on" or "off"))
+        TG:RefreshUnread()
+        UI:UpdateTabs()
+        R:Refresh()
+    end)
+    S.Tooltip(collect, "Collect now", "Collects whispers from people who aren't friends, guild members or favorites "
+        .. "here even when you're not listed in the group finder (the same as /tg recruit). Press again to stop.")
+    self.collectBtn = collect
+
     -- the Business tab's own controls: open/close and for how long, then the ad and where it goes
     local biz = {}
     -- a down arrow on the buttons that open a list
@@ -791,6 +819,8 @@ function R:Create()
     empty:SetPoint("TOPLEFT", 4, -10)
     empty:SetPoint("RIGHT", -8, 0)
     empty:SetJustifyH("LEFT")
+    empty:SetJustifyV("TOP")
+    if empty.SetSpacing then empty:SetSpacing(3) end
     self.empty = empty
 
     -- bottom: how many, and the two ways to empty the list
@@ -806,8 +836,8 @@ function R:Create()
     local decline = S.Button(f, "Decline all", 90, 24)
     decline:SetPoint("BOTTOMRIGHT", -30, 9) -- clear of the window's resize corner
     decline:SetScript("OnClick", function() R:ConfirmDeclineAll() end)
-    S.Tooltip(decline, "Decline all", "Sends your decline message to everyone still on the list and takes them off "
-        .. "it. People you invited or who are in your group stay. The message is in Settings > Requests.")
+    S.Tooltip(decline, "Decline all", "Sends your Decline all message (\"Sorry, we're done for now.\") to everyone still on "
+        .. "the list and takes them off it. People you invited or who are in your group stay. Change the message in Settings.")
     self.declineBtn = decline
 
     local clear = S.Link(f, "Clear all", "GameFontNormal")
@@ -842,6 +872,11 @@ function R:ApplyView()
     for _, w in pairs(self.biz) do w:SetShown(isBiz) end
     local hosting = self:IsHosting() or (TG.Demo and TG.Demo.on) or false
     self.manual:SetShown(not isBiz and hosting)
+    self.collectBtn:SetShown(not isBiz and not hosting)
+    if not isBiz and not hosting then
+        local on = s.recruiting
+        self.collectBtn:SetText(on and "Stop collecting" or "Collect now")
+    end
     local top = isBiz and -76 or -38
     self.chips[1]:ClearAllPoints()
     self.chips[1]:SetPoint("TOPLEFT", 14, top)
@@ -862,7 +897,7 @@ function R:ApplyView()
     elseif hosting then
         self.status:SetPoint("RIGHT", self.manual, "LEFT", -12, 0)
     else
-        self.status:SetPoint("RIGHT", self.panel, "RIGHT", -14, 0)
+        self.status:SetPoint("RIGHT", self.collectBtn, "LEFT", -12, 0)
     end
 end
 
@@ -1047,13 +1082,13 @@ function R:FillRows()
     self.counts:SetShown(#keys > 0)
     self.declineBtn:SetEnabled(#self:OpenKeys() > 0)
     self.empty:SetShown(#keys == 0)
+    -- an empty list that isn't collecting explains the tab instead (the same text as its ? card)
     if self:View() == "business" then
         self.empty:SetText(TG.db.settings.business and "No whispers yet. Post your ad - replies from people you don't "
-            .. "know show up here with their class and level." or "Nothing here yet. Press Start to collect whispers "
-            .. "to your ad.")
+            .. "know show up here with their class and level." or TG.Help.Body("business"))
     else
-        self.empty:SetText(self:IsActive() and "No requests yet. Whispers from people who aren't friends, guild "
-            .. "members or favorites will show up here with their class and level." or "No requests.")
+        self.empty:SetText(self:Collecting() and "No requests yet. Whispers from people who aren't friends, guild "
+            .. "members or favorites will show up here with their class and level." or TG.Help.Body("requests"))
     end
     self.clearBtn:SetEnabled(#keys > 0)
 end

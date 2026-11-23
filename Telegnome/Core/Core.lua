@@ -46,14 +46,17 @@ local DEFAULTS = {
         listSort = "recent",  -- conversation list: recent / name / unread (unread first, then recent)
         combatNotify = "summary", -- in combat: "all" pop-ups and sounds as usual, "summary" afterwards, "count" only
         instanceChat = "ask", -- dungeons and raids: ask / always / never follow Party or Raid chat
+        instancePopups = true, -- pop-ups for Party / Raid chat followed just for a dungeon or raid
         archiveOn = true,     -- direct messages with nothing new for archiveDays days go to Archive
         archiveDays = 7,
         -- one-click answers for requests (Settings > Requests)
         quickReplies = { "Inviting you now, {name}!", "What level and role are you?", "One moment, checking the group." },
         declineReply = "Sorry, the group is full.",
+        declineAllReply = "Sorry, we're done for now.", -- sent by Decline all in the Requests tab
         requestsTab = true,   -- collect strangers' whispers under Requests while listed in the group finder
         requestsCollect = true, -- the tick in the Requests view: untick to pause collecting while listed
         recruiting = false,   -- collect at any time, listed or not (/tg recruit)
+        showRequestsTab = true, -- the Requests tab is always there; off: only while collecting or with requests
         business = false,     -- Open for business: collecting whispers for your ad
         businessMinutes = 30, -- how long it stays on
         businessForever = false, -- ...or until you stop it
@@ -64,6 +67,7 @@ local DEFAULTS = {
         bizReplies = { "Sure, {name}! Send me the mats and I'll open a trade.", "Meet me at the bank, I'll open a trade.",
             "One moment, I'm finishing another order." },
         bizDecline = "Sorry, I can't make that one.",
+        bizDeclineAll = "Sorry, I'm done for now.", -- sent by Decline all in the Business tab
     },
     collapsed = {}, -- folded sections of the Direct messages list
     minimap = { hide = false, angle = 200 },

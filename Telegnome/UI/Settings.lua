@@ -412,7 +412,12 @@ function O:Create()
         "Hide followed channels", "Messages in followed channels (Guild, Party, Trade...) only show up in Telegnome.")
     self.groupsHidden = check("Group chats (always)", 30,
         function() return true end, function() end,
-        "Group chats", "Group chats are hidden channels, so they always stay in Telegnome.")
+        "Group chats (always)", "Can't be turned off. A group chat is a hidden channel with a scrambled name and "
+        .. "password worked out from its invite code, so in the main chat it would show up as something like "
+        .. "[8. tg4f9k2x] instead of the group's name. Its messages only show up in Telegnome.")
+    if self.groupsHidden.SetMotionScriptsWhileDisabled then
+        self.groupsHidden:SetMotionScriptsWhileDisabled(true) -- so the explanation shows even though it's greyed out
+    end
     check("Enter types in Telegnome while its window is open", 0,
         function() return s().enterToTelegnome end, function(v) s().enterToTelegnome = v end,
         "Enter key", "With a conversation open, pressing Enter puts the cursor in Telegnome's message box "
@@ -442,6 +447,10 @@ function O:Create()
         self.instRadios[#self.instRadios + 1] = r
     end
     y = y - 28
+    check("Pop-up notifications for the dungeon or raid chat", 30,
+        function() return s().instancePopups ~= false end, function(v) s().instancePopups = v end,
+        "Dungeon and raid chat", "For Party or Raid chat that Telegnome follows just while you're inside. "
+        .. "Off: it still counts unread messages. A chat you already follow keeps its own settings.")
     check("Count people I grouped with in the last week as friends", 0,
         function() return s().groupedFriends ~= false end, function(v) s().groupedFriends = v; TG:QueueRefresh() end,
         "Grouped with", "Players you were in a group with in the last seven days are listed under Friends, and their "
@@ -502,6 +511,10 @@ function O:Create()
         "Requests", "While you or your group are listed in the group finder, whispers from people who aren't "
         .. "friends, guild members or favorites go to a Requests tab that shows their class and level and has an "
         .. "Invite button. In a group, only the leader gets the tab. To collect at other times: /tg recruit")
+    check("Show the Requests tab", 0,
+        function() return s().showRequestsTab ~= false end, function(v) s().showRequestsTab = v; UI:UpdateTabs() end,
+        "Requests tab", "On: the tab is always there, greyed out while it isn't collecting. Off: it only shows up "
+        .. "while you're listed (or using Collect now) and while requests are waiting on it.")
     gap(8)
     local qrHint = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     qrHint:SetPoint("TOPLEFT", 18, y)
@@ -516,11 +529,11 @@ function O:Create()
     local function replyBox(label, get, set)
         local l = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         l:SetPoint("TOPLEFT", 18, y - 7)
-        l:SetWidth(56)
+        l:SetWidth(62)
         l:SetJustifyH("LEFT")
         l:SetText(label)
         local box = S.EditBox(content)
-        box:SetPoint("TOPLEFT", 78, y)
+        box:SetPoint("TOPLEFT", 84, y)
         box:SetPoint("RIGHT", content, "RIGHT", -12, 0)
         box:SetHeight(24)
         box:SetMaxLetters(120)
@@ -539,6 +552,10 @@ function O:Create()
     local dBox = replyBox("Decline", function() return s().declineReply or "" end, function(v) s().declineReply = v end)
     S.Tooltip(dBox, "Decline message", "\"Decline\" in the Reply menu sends this and dismisses the request. "
         .. "Leave it empty to dismiss without a message.")
+    local daBox = replyBox("Decline all", function() return s().declineAllReply or "" end,
+        function(v) s().declineAllReply = v end)
+    S.Tooltip(daBox, "Decline all message", "The Decline all button sends this to everyone still waiting. "
+        .. "Leave it empty to clear the list without a message.")
 
     ---------------------------------------------------------------- Open for business
     gap(4)
@@ -557,6 +574,10 @@ function O:Create()
             function(v) s().bizReplies = s().bizReplies or {}; s().bizReplies[i] = v end)
     end
     replyBox("Decline", function() return s().bizDecline or "" end, function(v) s().bizDecline = v end)
+    local bdaBox = replyBox("Decline all", function() return s().bizDeclineAll or "" end,
+        function(v) s().bizDeclineAll = v end)
+    S.Tooltip(bdaBox, "Decline all message", "The Decline all button in the Business tab sends this to everyone "
+        .. "still waiting. Leave it empty to clear the list without a message.")
     gap(4)
     local bizNote = content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     bizNote:SetPoint("TOPLEFT", 18, y)
@@ -748,6 +769,7 @@ end
 function O:Open(page)
     UI:Show()
     self:Create()
+    if TG.Help then TG.Help:Close() end
     -- closing Settings goes back to the Requests or Business overview if that was open
     if not self:IsShown() then
         self.backTo = TG.Requests:IsPanelShown() and UI.tab or nil
