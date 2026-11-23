@@ -115,7 +115,7 @@ The **Requests** tab is always there, greyed out while it isn't collecting. List
 - **Invite** invites them to your group; **x** dismisses the request; clicking the row opens the conversation.
 - The level is read from the whisper ("70 mage", "lvl 45") or from their group finder application. **Check** looks the player up, also when a level looks wrong; the game only answers every few seconds, so the button counts down until you can ask again.
 - Click the star in a request's conversation to keep that person - they move to Direct messages.
-- **Decline all** sends its own message ("Sorry, we're done for now." - change it in Settings) to everyone still on the list and takes them off it. People you invited or who are in your group stay.
+- **Decline all** sends your decline message to everyone still on the list and takes them off it. People you invited or who are in your group stay.
 - When you're done, **Clear all** removes the remaining requests and the tab disappears.
 
 The tab appears while you're listed alone, or listed in a group you lead. **Collect whispers** at the bottom of the Requests view is ticked by default; untick it to pause. Recruiting somewhere else, for example in a chat channel? `/tg recruit` collects whispers there at any time until you switch it off.

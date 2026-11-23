@@ -52,7 +52,6 @@ local DEFAULTS = {
         -- one-click answers for requests (Settings > Requests)
         quickReplies = { "Inviting you now, {name}!", "What level and role are you?", "One moment, checking the group." },
         declineReply = "Sorry, the group is full.",
-        declineAllReply = "Sorry, we're done for now.", -- sent by Decline all in the Requests tab
         requestsTab = true,   -- collect strangers' whispers under Requests while listed in the group finder
         requestsCollect = true, -- the tick in the Requests view: untick to pause collecting while listed
         recruiting = false,   -- collect at any time, listed or not (/tg recruit)

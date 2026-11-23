@@ -343,10 +343,10 @@ end
 local function repliesFor(key)
     local s, th = TG.db.settings, TG.db.threads[key]
     if th and th.biz then return s.bizReplies or {}, s.bizDecline, s.bizDeclineAll end
-    return s.quickReplies or {}, s.declineReply, s.declineAllReply
+    return s.quickReplies or {}, s.declineReply, s.declineReply -- Requests: Decline all sends the same message
 end
 
--- all: sent by Decline all, which has its own message ("Sorry, we're done for now.")
+-- all: sent by Decline all, which in the Business tab has its own message ("Sorry, I'm done for now.")
 function R:Decline(key, all)
     local _, one, every = repliesFor(key)
     local text = all and every or one
@@ -402,7 +402,7 @@ function R:ConfirmDeclineAll()
     if n == 0 then return end
     local s = TG.db.settings
     local text
-    if self:View() == "business" then text = s.bizDeclineAll else text = s.declineAllReply end
+    if self:View() == "business" then text = s.bizDeclineAll else text = s.declineReply end
     local what
     if type(text) == "string" and text:match("%S") then
         what = ("Each of them is sent \"%s\" and taken off the list."):format(text)
@@ -836,8 +836,9 @@ function R:Create()
     local decline = S.Button(f, "Decline all", 90, 24)
     decline:SetPoint("BOTTOMRIGHT", -30, 9) -- clear of the window's resize corner
     decline:SetScript("OnClick", function() R:ConfirmDeclineAll() end)
-    S.Tooltip(decline, "Decline all", "Sends your Decline all message (\"Sorry, we're done for now.\") to everyone still on "
-        .. "the list and takes them off it. People you invited or who are in your group stay. Change the message in Settings.")
+    S.Tooltip(decline, "Decline all", "Sends your decline message to everyone still on the list and takes them off it. "
+        .. "People you invited or who are in your group stay. In the Business tab it sends the Decline all message "
+        .. "from Settings > Open for business instead.")
     self.declineBtn = decline
 
     local clear = S.Link(f, "Clear all", "GameFontNormal")

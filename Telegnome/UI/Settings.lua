@@ -550,12 +550,8 @@ function O:Create()
             function(v) s().quickReplies = s().quickReplies or {}; s().quickReplies[i] = v end)
     end
     local dBox = replyBox("Decline", function() return s().declineReply or "" end, function(v) s().declineReply = v end)
-    S.Tooltip(dBox, "Decline message", "\"Decline\" in the Reply menu sends this and dismisses the request. "
-        .. "Leave it empty to dismiss without a message.")
-    local daBox = replyBox("Decline all", function() return s().declineAllReply or "" end,
-        function(v) s().declineAllReply = v end)
-    S.Tooltip(daBox, "Decline all message", "The Decline all button sends this to everyone still waiting. "
-        .. "Leave it empty to clear the list without a message.")
+    S.Tooltip(dBox, "Decline message", "\"Decline\" in the Reply menu sends this and dismisses the request, "
+        .. "and Decline all sends it to everyone still waiting. Leave it empty to dismiss without a message.")
 
     ---------------------------------------------------------------- Open for business
     gap(4)
