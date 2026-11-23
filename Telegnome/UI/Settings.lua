@@ -748,6 +748,10 @@ end
 function O:Open(page)
     UI:Show()
     self:Create()
+    -- closing Settings goes back to the Requests or Business overview if that was open
+    if not self:IsShown() then
+        self.backTo = TG.Requests:IsPanelShown() and UI.tab or nil
+    end
     TG.Picker:Close()
     TG.Groups:ClosePanel()
     TG.Channels:ClosePanel()
@@ -761,6 +765,12 @@ end
 function O:Close()
     if not self:IsShown() then return end
     self.frame:Hide()
+    local back = self.backTo
+    self.backTo = nil
+    if back and back == UI.tab and UI.frame:IsShown() then
+        TG.Requests:OpenPanel(true, back)
+        return
+    end
     -- Messages that arrived while settings covered the conversation are now seen.
     if UI.frame:IsShown() and UI.selected then UI:Select(UI.selected) end
 end

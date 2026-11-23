@@ -613,14 +613,28 @@ function R:Create()
 
     -- the Business tab's own controls: open/close and for how long, then the ad and where it goes
     local biz = {}
+    -- a down arrow on the buttons that open a list
+    local function dropdown(b)
+        b.fs:ClearAllPoints()
+        b.fs:SetPoint("LEFT", 10, 0)
+        b.fs:SetPoint("RIGHT", -22, 0)
+        b.fs:SetJustifyH("LEFT")
+        b.fs:SetWordWrap(false)
+        local arrow = b:CreateTexture(nil, "OVERLAY")
+        arrow:SetSize(12, 12)
+        arrow:SetPoint("RIGHT", -8, 0)
+        arrow:SetTexture(S.CHEV_DOWN)
+        b.arrow = arrow
+    end
     local start = S.Button(f, "Start", 80, 22, true)
     start:SetPoint("TOPRIGHT", -14, -8)
     start:SetScript("OnClick", function() TG.Business:Toggle() end)
     S.Tooltip(start, "Open for business", "While it's open, whispers from people who aren't friends, guild members or "
         .. "favorites are collected here, with the quick replies from Settings > Open for business.")
     biz.start = start
-    local dur = S.Button(f, "", 130, 22)
+    local dur = S.Button(f, "", 140, 22)
     dur:SetPoint("RIGHT", start, "LEFT", -8, 0)
+    dropdown(dur)
     dur:SetScript("OnClick", function(s) TG.Business:OpenDurationMenu(s) end)
     S.Tooltip(dur, "How long", "It closes by itself after this long - or choose Until I stop it.")
     biz.dur = dur
@@ -634,13 +648,15 @@ function R:Create()
     S.Tooltip(post, "Post the ad", "Sends your ad once. The game needs a click for every post, so it never repeats on "
         .. "its own.")
     biz.post = post
-    local chan = S.Button(f, "", 120, 24)
+    local chan = S.Button(f, "", 130, 24)
     chan:SetPoint("RIGHT", post, "LEFT", -6, 0)
+    dropdown(chan)
     chan:SetScript("OnClick", function(s) TG.Business:OpenChannelMenu(s, function() R:Refresh() end) end)
     S.Tooltip(chan, "Where it goes", "Trade, Say, Yell, Guild or any channel you're in.")
     biz.chan = chan
-    local saved = S.Button(f, "Saved", 70, 24)
+    local saved = S.Button(f, "Saved ads", 100, 24)
     saved:SetPoint("RIGHT", chan, "LEFT", -6, 0)
+    dropdown(saved)
     S.Tooltip(saved, "Saved ads", "Save this ad for another time, or put a saved one in the box.")
     biz.saved = saved
     local ad = S.EditBox(f)
