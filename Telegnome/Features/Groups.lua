@@ -202,6 +202,7 @@ function G:OnEvent(event, ...)
         -- Wait so General/Trade get their usual channel numbers first.
         if initial or reload then
             C_Timer.After(initial and 10 or 3, function() G:RejoinAll() end)
+            C_Timer.After(initial and 22 or 12, function() G:RefreshAllOnline() end)
             C_Timer.After(initial and 16 or 8, function() G:ScanChannels(true) end)
         end
         return
@@ -230,6 +231,10 @@ function G:OnEvent(event, ...)
     if event == "CHAT_MSG_CHANNEL_JOIN" or event == "CHAT_MSG_CHANNEL_LEAVE" then
         -- Group channels are left at logout, so this is also "came online" / "went offline".
         local jkey = G.KeyFor(base)
+        if TG.db.threads[jkey] and type(sender) == "string" and sender ~= ""
+            and not (type(guid) == "string" and guid == UnitGUID("player")) then
+            self:NoteMember(jkey, sender, event == "CHAT_MSG_CHANNEL_JOIN")
+        end
         if TG.db.threads[jkey] and TG.db.settings.groupJoinLeave and type(sender) == "string" and sender ~= "" then
             local who = Ambiguate and Ambiguate(sender, "short") or sender
             if not (type(guid) == "string" and guid == UnitGUID("player")) and who ~= UnitName("player") then
@@ -250,6 +255,7 @@ function G:OnEvent(event, ...)
         outgoing = Ambiguate and Ambiguate(sender or "", "short") == UnitName("player") or false
     end
     local from = Ambiguate and Ambiguate(sender or "?", "short") or sender
+    if not outgoing then self:NoteMember(key, sender, true) end -- someone who writes is online
     TG:AddMessage(key, { kind = "GROUP" }, outgoing, text, { from = from, cls = TG:ClassFromGUID(guid) })
 end
 
@@ -281,19 +287,21 @@ end
 
 -- Asks the game who is in the group's channel. Members are only in it while they're
 -- online, so this is the list of who is around right now.
-function G:RequestMembers(key)
+-- quiet: only updates the online list (the "N online" button), no note in the conversation.
+function G:RequestMembers(key, quiet)
     local th = TG.db.threads[key]
     if not th or not th.channel then return end
     if channelID(th.channel) == 0 then
-        TG:Print("You're not connected to that group right now.")
+        if not quiet then TG:Print("You're not connected to that group right now.") end
         return
     end
     local list = ListChannelByName or (C_ChatInfo and C_ChatInfo.ListChannelByName)
     if not list then
-        TG:Print("This version of the game can't list who is in a channel.")
+        if not quiet then TG:Print("This version of the game can't list who is in a channel.") end
         return
     end
-    local pending = { key = key, t = GetTime(), names = {}, seen = {} }
+    if quiet and self.listPending and GetTime() - self.listPending.t < 2 then return end -- one at a time
+    local pending = { key = key, t = GetTime(), names = {}, seen = {}, full = {}, quiet = quiet }
     self.listPending = pending
     list(th.channel)
     C_Timer.After(1.2, function()
@@ -312,6 +320,8 @@ function G:OnMemberList(text)
         if name ~= "" and not name:find("[%[%]%.:]") and not lp.seen[name] then
             lp.seen[name] = true
             lp.names[#lp.names + 1] = name
+            lp.full = lp.full or {}
+            lp.full[#lp.full + 1] = token:gsub("^%s+", ""):gsub("%s+$", ""):gsub("^[%*@%+]+", "")
         end
     end
 end
@@ -320,6 +330,14 @@ function G:ShowMembers()
     local lp = self.listPending
     self.listPending = nil
     if not lp then return end
+    -- the answer is the whole list of who's online now
+    if lp.full and #lp.full > 0 and TG.db.threads[lp.key] then
+        self.online[lp.key] = {}
+        for _, name in ipairs(lp.full) do self:NoteMember(lp.key, name, true, true) end
+        self.onlineKnown[lp.key] = true
+        self:OnlineChanged(lp.key)
+    end
+    if lp.quiet then return end
     local text
     if #lp.names == 0 then
         text = "Couldn't get the list of who is online."
@@ -328,6 +346,105 @@ function G:ShowMembers()
         text = ("Online now (%d): %s"):format(#lp.names, table.concat(lp.names, ", "))
     end
     if not UI:ShowNote(lp.key, text) then TG:Print(text) end
+end
+
+---------------------------------------------------------------------------
+-- Members: everyone Telegnome has seen in a group, and who's online right now. Group channels are
+-- left at logout, so joining and leaving the channel is coming online and going offline.
+---------------------------------------------------------------------------
+
+G.online = {}      -- [group key] = { [Name-Realm] = true }, for this session
+G.onlineKnown = {} -- [group key] = true once the game has listed the channel
+
+local function fullOf(name)
+    if type(name) ~= "string" or name == "" or TG.isSecret(name) then return nil end
+    return TG.FullName(name) or name
+end
+
+-- online: true / false, or nil to only remember the name. quiet: the caller updates the button.
+function G:NoteMember(key, name, online, quiet)
+    local th = TG.db.threads[key]
+    local full = fullOf(name)
+    if not (th and full) or full == fullOf(UnitName("player")) then return end
+    th.members = th.members or {}
+    th.members[full] = time()
+    local set = self.online[key] or {}
+    self.online[key] = set
+    if online == true then set[full] = true elseif online == false then set[full] = nil end
+    if not quiet then self:OnlineChanged(key) end
+end
+
+function G:OnlineCount(key)
+    local n = 0
+    for _ in pairs(self.online[key] or {}) do n = n + 1 end
+    return n
+end
+
+-- "3 online" on the group's button, or just "Online" before Telegnome knows.
+function G:OnlineLabel(key)
+    if not self.onlineKnown[key] and self:OnlineCount(key) == 0 then return "Online" end
+    return self:OnlineCount(key) .. " online"
+end
+
+function G:OnlineChanged(key)
+    local UI = TG.UI
+    if UI.selected == key and UI.whoBtn then UI.whoBtn:SetText(self:OnlineLabel(key)) end
+end
+
+-- After logging in: asks for each group's list in turn (the game answers one at a time).
+function G:RefreshAllOnline()
+    local keys = {}
+    for key, th in pairs(TG.db.threads) do
+        if th.kind == "GROUP" and th.channel then keys[#keys + 1] = key end
+    end
+    for i, key in ipairs(keys) do
+        C_Timer.After((i - 1) * 2.5, function() G:RequestMembers(key, true) end)
+    end
+end
+
+-- Members seen in the last month, online first.
+function G:MemberList(key)
+    local th = TG.db.threads[key]
+    local set = self.online[key] or {}
+    local list, cutoff = {}, time() - 30 * 86400
+    for full, t in pairs(th and th.members or {}) do
+        if set[full] or (type(t) == "number" and t > cutoff) then list[#list + 1] = full end
+    end
+    table.sort(list, function(a, b)
+        if (set[a] and true or false) ~= (set[b] and true or false) then return set[a] and true or false end
+        return a:lower() < b:lower()
+    end)
+    return list, set
+end
+
+-- The drop-down under the group's "N online" button: green dot online, grey dot not.
+function G:OpenMembersMenu(key, anchor)
+    local th = TG.db.threads[key]
+    if not th then return end
+    self:RequestMembers(key, true) -- fresh numbers on the button in a moment
+    if not (MenuUtil and MenuUtil.CreateContextMenu) then
+        self:RequestMembers(key)
+        return
+    end
+    local list, set = self:MemberList(key)
+    local ON = "|TInterface\\COMMON\\Indicator-Green:14:14|t "
+    local OFF = "|TInterface\\COMMON\\Indicator-Gray:14:14|t "
+    MenuUtil.CreateContextMenu(anchor, function(_, root)
+        root:CreateTitle(("%s - %d online"):format(th.name or "Group", self:OnlineCount(key)))
+        if #list == 0 then
+            root:CreateTitle("|cff888888Nobody seen yet. Members show up once they're online or write.|r")
+        end
+        for _, full in ipairs(list) do
+            local short = Ambiguate and Ambiguate(full, "short") or full
+            local text = set[full] and (ON .. short) or (OFF .. "|cff999999" .. short .. "|r")
+            root:CreateButton(text, function()
+                local wkey, info = TG:WhisperInfo(full)
+                if wkey then TG:OpenConversation(wkey, info) end
+            end)
+        end
+        root:CreateDivider()
+        root:CreateTitle("|cff888888Click a name to whisper them.|r")
+    end)
 end
 
 ---------------------------------------------------------------------------
@@ -739,7 +856,7 @@ function G:OpenMenu(key, anchor)
         root:CreateTitle(th.name)
         root:CreateButton(th.fav and "Unpin" or "Pin to the top", function() TG:SetFavorite(key, not th.fav) end)
         UI.AddPinMoveEntries(root, key)
-        root:CreateButton("Who's online", function() G:RequestMembers(key) end)
+        root:CreateButton("Who's online", function() G:RequestMembers(key) end) -- as a line in the conversation
         root:CreateCheckbox("Pop-up notifications and sound",
             function() return not th.muted end,
             function() TG:SetMuted(key, not th.muted) end)

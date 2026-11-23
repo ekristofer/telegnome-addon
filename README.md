@@ -68,7 +68,7 @@ Open Telegnome with the minimap button, the addons button by the minimap, or `/t
 | `/tg test` | Add a fake incoming whisper |
 | `/tg help` | List all commands |
 
-**Enter key:** while the Telegnome window is open on a conversation, Enter puts the cursor in Telegnome's message box. Press Enter again on the empty box to get the game's own chat. (Can be switched off in Settings > Chat.)
+**Enter key:** while the Telegnome window is open on a conversation, Enter puts the cursor in Telegnome's message box. Press Enter again on the empty box to get the game's own chat. (Can be switched off in Settings > Chats.)
 
 **Minimap button:** left-click opens, right-click starts a new message, Shift-click opens settings, Ctrl-click toggles Do not disturb, drag to move.
 
@@ -80,7 +80,7 @@ The **All** tab shows everything in one list: **Pinned** on top, then Direct mes
 
 Click the star next to a conversation's name to pin it - a person, a group chat or a channel. Drag a pinned conversation onto another to reorder Pinned, or use Move up / Move down in its right-click menu.
 
-**Archive** is a folded section at the bottom of the All and Direct tabs. Direct messages with nothing new for a week move there by themselves (set the number of days, or turn it off, in Settings > Chat), and you can right-click one to archive it. A new message brings it straight back. Hover the Archive header for Close all. Group chats and channels are never archived.
+**Archive** is a folded section at the bottom of the All and Direct tabs. Direct messages with nothing new for a week move there by themselves (set the number of days, or turn it off, in Settings > Chats), and you can right-click one to archive it. A new message brings it straight back. Hover the Archive header for Close all. Group chats and channels are never archived.
 
 Right-click a section header or a tab to mark everything in it as read.
 
@@ -94,7 +94,7 @@ The Direct list has three sections:
 
 Right-click someone in **+ New message** and choose **Forget contact** to take them off that list.
 
-Inside each section, conversations are sorted by most recent by default. Right-click a section header (or go to Settings > Window) to sort by name or put unread conversations first.
+Inside each section, conversations are sorted by most recent by default. Right-click a section header (or go to Settings > Look) to sort by name or put unread conversations first.
 
 ### Search and notes
 
@@ -103,11 +103,11 @@ Inside each section, conversations are sorted by most recent by default. Right-c
 
 ### Help
 
-The **?** next to the Settings cog explains the tab you're on. A tab with nothing in it shows the same help, so it explains itself the first time you open it.
+The **?** next to the Settings cog explains the tab you're on. A tab with nothing in it shows the same help, so it explains itself the first time you open it. Settings > Help has all of it in one place.
 
 ### Requests
 
-The **Requests** tab is always there, greyed out while it isn't collecting. List yourself or your group in the group finder and it starts by itself: whispers from people who aren't friends, guild members or favorites are collected there, so they don't flood your Direct messages. To collect without being listed, click **Collect now** in the tab (or `/tg recruit`). You can hide the tab in Settings > Requests; then it only shows up while it's collecting or has requests on it.
+The **Requests** tab is always there, greyed out while it isn't collecting. List yourself or your group in the group finder and it starts by itself: whispers from people who aren't friends, guild members or favorites are collected there, so they don't flood your Direct messages. To collect without being listed, click **Collect now** in the tab (or `/tg recruit`). You can hide the tab in Settings > Requests & Business; then it only shows up while it's collecting or has requests on it.
 
 - Each request shows the player's class, level and latest message.
 - The row at the top shows a class icon and a count for each class that's waiting - the class comes with the first whisper. Click an icon to show only that class, or All to see everyone. Each request has its class icon by the name.
@@ -129,7 +129,7 @@ A group chat is a hidden, password-protected custom chat channel. Telegnome give
 3. **Join**: your friend's Telegnome picks up the code and shows a pop-up ("Thrall invited you to \"Raid team\". Click to join."). Clicking it opens the join panel with everything filled in - just press Join. Without the pop-up, **+ New group** is filled in the same way. (Typing or pasting the code, or `/tg join <code>`, also works.)
 4. **Rename**: right-click the group > Rename group, or use the Rename button.
 
-Everyone in the group needs Telegnome. The **Online** button lists who is in the group right now, and grey lines show when someone joins (comes online) or leaves.
+Everyone in the group needs Telegnome. The **N online** button at the top of a group opens a list of its members: a green dot for who's online now, a grey dot for members seen before who aren't. Click a name to whisper them. (The old "X joined / left" lines are off by default; turn them back on in Settings > Notifications.)
 
 **Your chat channels** (Settings, the Group chats panel or `/tg mychannels`) lists every channel your character is in - General, Trade, custom channels and group chats - shows how many of the game's 10 slots are used, and lets you leave any of them. If Telegnome finds one of its group channels it has no record of, it's listed under Group chats as "Unknown group": rename it, enter its code (right-click), or leave it.
 
@@ -143,21 +143,21 @@ Followed channels tab > **+ Follow channel** > tick what you want. Messages are 
 
 ### Open for business
 
-For crafters, sellers and recruiters, in the **Business** tab. Write your ad at the top (click in the box and shift-click your profession or an item to add the link), choose where it goes (Trade, Say, Guild or any channel you're in) and how long to stay open (15, 30, 60 or 120 minutes, or **Until I stop it**). The **Saved ads** button next to the ad keeps ads for another time (up to 15): save the one in the box, put a saved one back, or delete one. Press **Start**, then **Post** - the game needs a click for every post, so the ad never repeats on its own. While it's open, whispers from people you don't know land in the tab as cards with Invite and Reply; the replies and decline message are in **Settings > Open for business**. It tells you when it closes and how many whispers are waiting. Listing in the group finder pauses it; it opens again when you stop listing. Also `/tg business [minutes|off]`. Don't need it? Hide the tab in Settings > Open for business.
+For crafters, sellers and recruiters, in the **Business** tab. Write your ad at the top (click in the box and shift-click your profession or an item to add the link), choose where it goes (Trade, Say, Guild or any channel you're in) and how long to stay open (15, 30, 60 or 120 minutes, or **Until I stop it**). The **Saved ads** button next to the ad keeps ads for another time (up to 15): save the one in the box, put a saved one back, or delete one. Press **Start**, then **Post** - the game needs a click for every post, so the ad never repeats on its own. While it's open, whispers from people you don't know land in the tab as cards with Invite and Reply; the replies and decline message are in **Settings > Requests & Business**. It tells you when it closes and how many whispers are waiting. Listing in the group finder pauses it; it opens again when you stop listing. Also `/tg business [minutes|off]`. Don't need it? Hide the tab in Settings > Requests & Business.
 
 ### Mail
 
-When mail arrives (or you log in with unread mail), a pop-up says who sent it, e.g. "New mail from Thrall and Stormwind Auction House (2)". Settings > Mail turns it off or changes the text; `{from}` is filled in with the senders. The game only names the latest three senders and only lets addons read mail at a mailbox, so it's a notification, not a conversation.
+When mail arrives (or you log in with unread mail), a pop-up says who sent it, e.g. "New mail from Thrall and Stormwind Auction House (2)". Settings > Notifications turns it off or changes the text; `{from}` is filled in with the senders. The game only names the latest three senders and only lets addons read mail at a mailbox, so it's a notification, not a conversation.
 
 ### Dungeons, raids and combat
 
-When you enter a dungeon, Telegnome offers to follow Party chat until you leave; in a raid, Raid chat. Instance chat (used by group finder groups) is followed too. While you're inside it's pinned at the top of the All tab, with an "Entered ..." line where the run starts. Choose **Ask**, **Always follow** or **Never** in Settings > Chat, or type `/tg follow-instance`. A chat followed just for the run has pop-up notifications on (untick **Pop-up notifications for the dungeon or raid chat** in Settings > Chat to only count messages); a chat you already follow keeps its own settings.
+When you enter a dungeon, Telegnome offers to follow Party chat until you leave; in a raid, Raid chat. Instance chat (used by group finder groups) is followed too. While you're inside it's pinned at the top of the All tab, with an "Entered ..." line where the run starts. Choose **Ask**, **Always follow** or **Never** in Settings > Chats, or type `/tg follow-instance`. A chat followed just for the run has pop-up notifications on (untick **Pop-up notifications for the dungeon or raid chat** in Settings > Chats to only count messages); a chat you already follow keeps its own settings.
 
 In combat, pop-ups and sounds wait until the fight is over; then one pop-up says what came in. Settings > Notifications > In combat has two other choices: **Show everything** (pop-ups and sounds as usual) or **Only the count** (no pop-ups or summary; the notifier, minimap button and badges still count up).
 
 ### Do not disturb
 
-Settings > Do not disturb (or `/tg dnd`, or Ctrl-click the notifier). No pop-ups or sounds; messages still arrive and are counted. Optionally auto-reply to whispers with your own text (prefixed `[Auto-reply]`, once per person per 30 minutes).
+Settings > Notifications (or `/tg dnd`, or Ctrl-click the notifier). No pop-ups or sounds; messages still arrive and are counted. Optionally auto-reply to whispers with your own text (prefixed `[Auto-reply]`, once per person per 30 minutes).
 
 ### Key bindings and links
 

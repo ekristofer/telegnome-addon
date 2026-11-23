@@ -8,7 +8,12 @@ local O = { checks = {}, radios = {}, pages = {}, catButtons = {} }
 TG.Settings = O
 
 -- The order of the categories on the left.
-local CATEGORIES = { "notify", "dnd", "window", "chat", "requests", "business", "mail", "data" }
+local CATEGORIES = { "notify", "window", "chat", "requests", "data", "help" }
+-- Where the cog opens from each tab: page, and the section on it.
+local TAB_PAGE = {
+    all = { "notify" }, dm = { "notify" }, channels = { "chat", "out" }, groups = { "notify", "groups" },
+    requests = { "requests" }, business = { "requests", "business" },
+}
 local LIST_W = 216
 
 local NOTIFY_FROM = {
@@ -53,6 +58,25 @@ function O:Create()
     ver:SetPoint("BOTTOMLEFT", 16, 12)
     ver:SetText("Telegnome v" .. TG.version)
 
+    -- Search: type a word and every matching setting is listed, whatever page it's on.
+    local search = S.EditBox(side, true)
+    search:SetPoint("TOPLEFT", 12, -40)
+    search:SetPoint("RIGHT", -12, 0)
+    search:SetHeight(24)
+    search:SetMaxLetters(40)
+    local ph = search:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+    ph:SetPoint("LEFT", 24, 0)
+    ph:SetText("Search settings")
+    search:SetScript("OnTextChanged", function(box)
+        ph:SetShown(box:GetText() == "")
+        if not O.jumping then O:Search(box:GetText()) end
+    end)
+    search:SetScript("OnEnterPressed", function(box) box:ClearFocus() end)
+    search:SetScript("OnEscapePressed", function(box) box:SetText(""); box:ClearFocus() end)
+    S.Tooltip(search, "Search settings", "Type a word - sound, archive, combat, reply... - to list every setting "
+        .. "that has it, whatever page it's on. Click one to go there.")
+    self.search = search
+
     -- Right: the chosen page. It scrolls (mouse wheel) when it doesn't fit, with a thin scroll indicator.
     local clip = CreateFrame("ScrollFrame", nil, f)
     clip:SetPoint("TOPLEFT", LIST_W + 10, -8)
@@ -94,15 +118,21 @@ function O:Create()
         s:SetVerticalScroll(math.max(0, math.min(range, s:GetVerticalScroll() - delta * 36)))
     end)
 
-    -- Everything below is built onto `content`, which is the page being filled; page() starts the next one.
+
+    -- Everything below is built onto `content`, which is the page being filled; page() starts the next one,
+    -- section() a heading on it. Every setting is also added to the search index.
     local content
     local y = -8
+    local curPage, curLabel, curSection
+    self.index, self.sections = {}, {}
     local function page(id, label, blurb)
         if content then content:SetHeight(-y + 8) end
         content = CreateFrame("Frame", nil, clip)
         content:SetSize(440, 400)
         content:Hide()
         self.pages[#self.pages + 1] = { id = id, label = label, frame = content }
+        curPage, curLabel, curSection = id, label, nil
+        self.sections[id] = {}
         y = -10
         local fs = content:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         fs:SetPoint("TOPLEFT", 14, y)
@@ -112,10 +142,28 @@ function O:Create()
         sub:SetPoint("TOPLEFT", 14, y)
         sub:SetText(blurb or "")
         sub:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
-        y = y - 26
+        y = y - 22
     end
     local function gap(n) y = y - n end
+    local function section(title, key)
+        gap(8)
+        local fs = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        fs:SetPoint("TOPLEFT", 14, y)
+        fs:SetText(title)
+        local line = S.Line(content)
+        line:SetPoint("LEFT", fs, "RIGHT", 8, 0)
+        line:SetPoint("RIGHT", content, "RIGHT", -12, 0)
+        self.sections[curPage][key or title] = y
+        curSection = title
+        y = y - 22
+    end
+    -- text: what the setting is called; tip: its longer explanation (also searched)
+    local function index(text, tip, at)
+        self.index[#self.index + 1] = { text = text, tip = tip, page = curPage, pageLabel = curLabel,
+            section = curSection, y = at or y }
+    end
     local function check(label, indent, get, set, tipTitle, tip)
+        index(label, tip, y)
         local c = S.Check(content, label)
         c:SetPoint("TOPLEFT", 12 + indent, y)
         y = y - 24
@@ -130,40 +178,36 @@ function O:Create()
         return c
     end
     local s = function() return TG.db.settings end
-
-    ---------------------------------------------------------------- Do not disturb
-    page("dnd", "Do not disturb", "Quiet when you need it: no pop-ups, no sounds.")
-    self.dnd = check("Do not disturb", 0,
-        function() return s().dnd end, function(v) TG:SetDND(v, true) end,
-        "Do not disturb",
-        "No pop-up previews and no sounds. Messages still arrive in Telegnome and the counter keeps counting. "
-        .. "Also: /tg dnd, or Ctrl-click the notifier or minimap button.")
-    self.dndReply = check("Auto-reply to whispers while it's on", 30,
-        function() return s().dndReply end, function(v) s().dndReply = v end,
-        "Auto-reply",
-        "Answers whispers and Battle.net whispers with the message below, at most once per person every 30 minutes. "
-        .. "Replies start with [Auto-reply] so two Telegnome users never answer each other forever.")
-
-    local msgBox = S.EditBox(content)
-    msgBox:SetPoint("TOPLEFT", 44, y - 2)
-    msgBox:SetPoint("TOPRIGHT", -12, y - 2)
-    msgBox:SetHeight(26)
-    msgBox:SetMaxLetters(200)
-    if msgBox.SetMaxBytes then msgBox:SetMaxBytes(240) end -- chat messages hold 255 bytes, prefix included
-    msgBox:SetScript("OnTextChanged", function(box, userInput)
-        if userInput then TG.db.settings.dndMessage = box:GetText() end
-    end)
-    msgBox:SetScript("OnEnterPressed", function(box) box:ClearFocus() end)
-    S.Tooltip(msgBox, "Auto-reply message", "Sent as \"[Auto-reply] <your message>\".")
-    self.dndMessage = msgBox
-    y = y - 36
+    self.replyBoxes = {}
+    local function replyBox(label, get, set, what)
+        index(label .. " (" .. (curSection or curLabel) .. ")", what, y)
+        local l = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        l:SetPoint("TOPLEFT", 18, y - 7)
+        l:SetWidth(62)
+        l:SetJustifyH("LEFT")
+        l:SetText(label)
+        local box = S.EditBox(content)
+        box:SetPoint("TOPLEFT", 84, y)
+        box:SetPoint("RIGHT", content, "RIGHT", -12, 0)
+        box:SetHeight(24)
+        box:SetMaxLetters(120)
+        if box.SetMaxBytes then box:SetMaxBytes(240) end
+        box.get = get
+        box:SetScript("OnTextChanged", function(b, userInput) if userInput then set(b:GetText()) end end)
+        box:SetScript("OnEnterPressed", function(b) b:ClearFocus() end)
+        self.replyBoxes[#self.replyBoxes + 1] = box
+        y = y - 28
+        return box
+    end
 
     ---------------------------------------------------------------- Notifications
-    page("notify", "Notifications", "How Telegnome tells you about new messages.")
+    page("notify", "Notifications", "How Telegnome tells you about new messages, mail and more.")
+    section("Pop-ups")
     self.notify = check("Show a pop-up for new messages", 0,
         function() return s().notify end, function(v) s().notify = v end,
         "Pop-up", "The notifier grows to show who wrote and the start of the message, then shrinks back.")
 
+    index("Pop-ups from: Everyone, Friends & guild, Friends only", "Who can make a pop-up and a sound.")
     local from = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     from:SetPoint("TOPLEFT", 44, y - 3)
     from:SetText("From:")
@@ -182,90 +226,24 @@ function O:Create()
     end
     S.Tooltip(self.radios[3], "Friends only", "Battle.net friends and your in-game friends list.")
     y = y - 24
-    self.notifyGroups = check("Also pop up for group chat messages", 30,
-        function() return s().notifyGroups end, function(v) s().notifyGroups = v end,
-        "Group chats", "Followed channels have their own Pop-up tick in the Followed channels tab.")
-
-    check("Show who joins and leaves group chats", 30,
-        function() return s().groupJoinLeave end, function(v) s().groupJoinLeave = v end,
-        "Joined / left", "A grey line in the group when a member comes online (joins) or goes offline (leaves).")
-    local cbLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    cbLabel:SetPoint("TOPLEFT", 44, y - 3)
-    cbLabel:SetText("In combat:")
-    local prevC = cbLabel
-    self.combatRadios = {}
-    local combatTips = {
-        all = "Pop-ups and sounds as usual, also in the middle of a fight.",
-        summary = "No pop-ups or sounds during the fight. When it's over, one pop-up says what came in.",
-        count = "No pop-ups or sounds, and no summary. The notifier, the minimap button and the badges still count "
-            .. "the new messages.",
-    }
-    for _, opt in ipairs({ { "all", "Show everything" }, { "summary", "Summary afterwards" }, { "count", "Only the count" } }) do
-        local r = S.Radio(content, opt[2])
-        r:SetPoint("LEFT", prevC, "RIGHT", prevC == cbLabel and 8 or 12, prevC == cbLabel and 0 or -1)
-        r.value = opt[1]
-        r:SetScript("OnClick", function()
-            TG.db.settings.combatNotify = opt[1]
-            O:Refresh()
-        end)
-        S.Tooltip(r, opt[2], combatTips[opt[1]])
-        prevC = r.label
-        self.combatRadios[#self.combatRadios + 1] = r
-    end
-    y = y - 24
     check("Tell me about unread messages when I log in", 30,
         function() return s().loginSummary ~= false end, function(v) s().loginSummary = v end,
         "On login", "A line in chat a few seconds after you log in, when messages from last time are still unread.")
+    index("Preview the pop-up", "Shows a sample pop-up.")
+    local preview = S.Button(content, "Preview", 90, 22)
+    preview:SetPoint("TOPLEFT", 16, y - 2)
+    preview:SetScript("OnClick", function() TG.Toast:Preview() end)
+    self.preview = preview
+    y = y - 30
 
-    local kwLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    kwLabel:SetPoint("TOPLEFT", 44, y - 8)
-    kwLabel:SetText("Alert words:")
-    local kwBox = S.EditBox(content)
-    kwBox:SetPoint("LEFT", kwLabel, "RIGHT", 8, 0)
-    kwBox:SetPoint("RIGHT", content, "RIGHT", -12, 0)
-    kwBox:SetHeight(24)
-    kwBox:SetMaxLetters(200)
-    kwBox:SetScript("OnTextChanged", function(box, userInput)
-        if userInput then TG.db.settings.keywords = box:GetText() end
-    end)
-    kwBox:SetScript("OnEnterPressed", function(box) box:ClearFocus() end)
-    S.Tooltip(kwBox, "Alert words for followed channels",
-        "Words separated by commas, e.g. LFM, tank, your name. A message in a followed channel that contains one "
-        .. "pops up (and plays the sound) even if that channel's Pop-up box isn't ticked.")
-    self.keywords = kwBox
-    y = y - 32
-
-    self.counter = check("Show the missed-messages counter on screen", 0,
-        function() return s().counter end, function(v) s().counter = v end,
-        "Counter", "A small cog with the number of unread messages. Click it to open Telegnome.")
-    self.hideEmpty = check("Only when there are unread messages", 30,
-        function() return s().counterHideEmpty end, function(v) s().counterHideEmpty = v end)
-
-    local grow = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    grow:SetPoint("TOPLEFT", 44, y - 3)
-    grow:SetText("Grows to the:")
-    local prevG = grow
-    self.growRadios = {}
-    for _, opt in ipairs({ { "right", "Right" }, { "left", "Left" } }) do
-        local r = S.Radio(content, opt[2])
-        r:SetPoint("LEFT", prevG, "RIGHT", prevG == grow and 8 or 12, prevG == grow and 0 or -1)
-        r.value = opt[1]
-        r:SetScript("OnClick", function()
-            TG.db.settings.toastGrow = opt[1]
-            TG.Toast:ApplyAnchor()
-            O:Refresh()
-        end)
-        prevG = r.label
-        self.growRadios[#self.growRadios + 1] = r
-    end
-    S.Tooltip(self.growRadios[2], "Grow to the left", "Handy if the counter sits near the right edge of the screen.")
-    y = y - 24
+    section("Sound")
     self.sound = check("Play a sound for new messages", 0,
         function() return s().sound end, function(v) s().sound = v end,
         "Sound", "For the same messages that can pop up: whispers from the people chosen under From, group chats "
         .. "(if they pop up) and followed channels with their Pop-up tick. Works with pop-ups switched off, and "
         .. "plays even when game sound effects are off. If whispers also show in the main chat you may hear the "
         .. "game's own whisper sound too.")
+    index("Sound to play: choose and test", "Pick the sound for new messages and test it.")
     local sndLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sndLabel:SetPoint("TOPLEFT", 44, y - 3)
     sndLabel:SetText("Sound:")
@@ -290,18 +268,116 @@ function O:Create()
     self.soundTest = test
     y = y - 26
 
-    local preview = S.Button(content, "Preview", 90, 22)
-    preview:SetPoint("TOPLEFT", 44, y - 2)
-    preview:SetScript("OnClick", function() TG.Toast:Preview() end)
-    self.preview = preview
-    local reset = S.Button(content, "Reset position", 120, 22)
-    reset:SetPoint("LEFT", preview, "RIGHT", 8, 0)
-    reset:SetScript("OnClick", function() TG.Toast:ResetPosition() end)
-    S.Tooltip(reset, "Reset position", "Moves the notifier back to the top of the screen. Shift-drag it to move it yourself.")
-    y = y - 34
+    section("In combat")
+    index("In combat: show everything, summary afterwards, only the count",
+        "What happens with pop-ups and sounds during a fight.")
+    local cbLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    cbLabel:SetPoint("TOPLEFT", 44, y - 3)
+    cbLabel:SetText("In combat:")
+    local prevC = cbLabel
+    self.combatRadios = {}
+    local combatTips = {
+        all = "Pop-ups and sounds as usual, also in the middle of a fight.",
+        summary = "No pop-ups or sounds during the fight. When it's over, one pop-up says what came in.",
+        count = "No pop-ups or sounds, and no summary. The notifier, the minimap button and the badges still count "
+            .. "the new messages.",
+    }
+    for _, opt in ipairs({ { "all", "Show everything" }, { "summary", "Summary afterwards" }, { "count", "Only the count" } }) do
+        local r = S.Radio(content, opt[2])
+        r:SetPoint("LEFT", prevC, "RIGHT", prevC == cbLabel and 8 or 12, prevC == cbLabel and 0 or -1)
+        r.value = opt[1]
+        r:SetScript("OnClick", function()
+            TG.db.settings.combatNotify = opt[1]
+            O:Refresh()
+        end)
+        S.Tooltip(r, opt[2], combatTips[opt[1]])
+        prevC = r.label
+        self.combatRadios[#self.combatRadios + 1] = r
+    end
+    y = y - 24
 
-    ---------------------------------------------------------------- Window
-    page("window", "Window", "How the Telegnome window looks.")
+    section("Do not disturb", "dnd")
+    self.dnd = check("Do not disturb", 0,
+        function() return s().dnd end, function(v) TG:SetDND(v, true) end,
+        "Do not disturb",
+        "No pop-up previews and no sounds. Messages still arrive in Telegnome and the counter keeps counting. "
+        .. "Also: /tg dnd, or Ctrl-click the notifier or minimap button.")
+    self.dndReply = check("Auto-reply to whispers while it's on", 30,
+        function() return s().dndReply end, function(v) s().dndReply = v end,
+        "Auto-reply",
+        "Answers whispers and Battle.net whispers with the message below, at most once per person every 30 minutes. "
+        .. "Replies start with [Auto-reply] so two Telegnome users never answer each other forever.")
+    index("Auto-reply message", "The message sent while Do not disturb is on.")
+    local msgBox = S.EditBox(content)
+    msgBox:SetPoint("TOPLEFT", 44, y - 2)
+    msgBox:SetPoint("TOPRIGHT", -12, y - 2)
+    msgBox:SetHeight(26)
+    msgBox:SetMaxLetters(200)
+    if msgBox.SetMaxBytes then msgBox:SetMaxBytes(240) end -- chat messages hold 255 bytes, prefix included
+    msgBox:SetScript("OnTextChanged", function(box, userInput)
+        if userInput then TG.db.settings.dndMessage = box:GetText() end
+    end)
+    msgBox:SetScript("OnEnterPressed", function(box) box:ClearFocus() end)
+    S.Tooltip(msgBox, "Auto-reply message", "Sent as \"[Auto-reply] <your message>\".")
+    self.dndMessage = msgBox
+    y = y - 36
+
+    section("Group chats and channels", "groups")
+    self.notifyGroups = check("Also pop up for group chat messages", 30,
+        function() return s().notifyGroups end, function(v) s().notifyGroups = v end,
+        "Group chats", "Followed channels have their own Pop-up tick in the Followed channels tab.")
+
+    check("Show who joins and leaves group chats", 30,
+        function() return s().groupJoinLeave end, function(v) s().groupJoinLeave = v end,
+        "Joined / left", "A grey line in the group when a member comes online (joins) or goes offline (leaves). "
+        .. "Off by default: the \"N online\" button in each group shows who's around without filling the chat.")
+    index("Alert words for followed channels", "Words that make a message in a followed channel pop up.")
+    local kwLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    kwLabel:SetPoint("TOPLEFT", 44, y - 8)
+    kwLabel:SetText("Alert words:")
+    local kwBox = S.EditBox(content)
+    kwBox:SetPoint("LEFT", kwLabel, "RIGHT", 8, 0)
+    kwBox:SetPoint("RIGHT", content, "RIGHT", -12, 0)
+    kwBox:SetHeight(24)
+    kwBox:SetMaxLetters(200)
+    kwBox:SetScript("OnTextChanged", function(box, userInput)
+        if userInput then TG.db.settings.keywords = box:GetText() end
+    end)
+    kwBox:SetScript("OnEnterPressed", function(box) box:ClearFocus() end)
+    S.Tooltip(kwBox, "Alert words for followed channels",
+        "Words separated by commas, e.g. LFM, tank, your name. A message in a followed channel that contains one "
+        .. "pops up (and plays the sound) even if that channel's Pop-up box isn't ticked.")
+    self.keywords = kwBox
+    y = y - 32
+
+    section("Mail")
+    check("Tell me when new mail arrives", 0,
+        function() return s().mailNotify ~= false end, function(v) s().mailNotify = v end,
+        "New mail", "A pop-up (and your sound, if sounds are on) when mail arrives, and when you log in with "
+        .. "unread mail. The game only says who sent the latest three; open a mailbox to read them. Follows "
+        .. "Do not disturb and the In combat choice under Notifications.")
+    gap(8)
+    local mailHint = content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    mailHint:SetPoint("TOPLEFT", 18, y)
+    mailHint:SetText("{from} is filled in with who sent it, e.g. \"Thrall and Stormwind Auction House (2)\".")
+    mailHint:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
+    y = y - 18
+    local mailBox = replyBox("Text", function() return s().mailText or TG.Mail.DEFAULT_TEXT end,
+        function(v) s().mailText = v end, "What the new mail pop-up says.")
+    S.Tooltip(mailBox, "Notification text", "What the pop-up says. Leave it empty for the standard text: "
+        .. TG.Mail.DEFAULT_TEXT)
+    gap(4)
+    local mailTest = S.Link(content, "Show an example")
+    mailTest:SetPoint("TOPLEFT", 18, y)
+    mailTest:SetScript("OnClick", function()
+        TG.Mail:Notify({ { name = "Stormwind Auction House", n = 2 }, { name = "Thrall", n = 1 } }, true)
+    end)
+    y = y - 24
+
+    ---------------------------------------------------------------- Look
+    page("window", "Look", "How the window, the on-screen counter and the minimap button look.")
+    section("Window")
+    index("Theme (colours)", "The colour theme of the window.")
     local thLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     thLabel:SetPoint("TOPLEFT", 18, y - 4)
     thLabel:SetText("Theme")
@@ -327,7 +403,7 @@ function O:Create()
     thName:SetPoint("LEFT", prevSw, "RIGHT", 10, 0)
     self.themeName = thName
     y = y - 32
-
+    index("Message text size: small, normal, large", "How big the text in conversations is.")
     local tsLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     tsLabel:SetPoint("TOPLEFT", 18, y - 2)
     tsLabel:SetText("Message text")
@@ -346,7 +422,7 @@ function O:Create()
         self.sizeRadios[#self.sizeRadios + 1] = r
     end
     y = y - 28
-
+    index("Sort list by", "How conversations are sorted in the lists.")
     local soLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     soLabel:SetPoint("TOPLEFT", 18, y - 2)
     soLabel:SetText("Sort list by")
@@ -368,6 +444,7 @@ function O:Create()
         "Compact chat", "Shows every message as one line - time, name, text - like the game's own chat. "
         .. "More messages fit on screen. Off: messages are grouped in bubbles, yours on the right.")
     gap(4)
+    index("Opacity (see-through window)", "Make the window see-through. Also: /tg opacity 30-100")
 
     local opLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     opLabel:SetPoint("TOPLEFT", 18, y - 2)
@@ -398,8 +475,45 @@ function O:Create()
         .. "(While you drag the slider it stays see-through, so you can see what you're choosing.)")
     gap(6)
 
-    ---------------------------------------------------------------- Chat
-    page("chat", "Chat", "What shows up in Telegnome and what stays in the game's own chat.")
+    section("On-screen counter", "counter")
+    self.counter = check("Show the missed-messages counter on screen", 0,
+        function() return s().counter end, function(v) s().counter = v end,
+        "Counter", "A small cog with the number of unread messages. Click it to open Telegnome.")
+    self.hideEmpty = check("Only when there are unread messages", 30,
+        function() return s().counterHideEmpty end, function(v) s().counterHideEmpty = v end)
+    index("Counter grows to the left or right", "Which way the notifier grows.")
+    local grow = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    grow:SetPoint("TOPLEFT", 44, y - 3)
+    grow:SetText("Grows to the:")
+    local prevG = grow
+    self.growRadios = {}
+    for _, opt in ipairs({ { "right", "Right" }, { "left", "Left" } }) do
+        local r = S.Radio(content, opt[2])
+        r:SetPoint("LEFT", prevG, "RIGHT", prevG == grow and 8 or 12, prevG == grow and 0 or -1)
+        r.value = opt[1]
+        r:SetScript("OnClick", function()
+            TG.db.settings.toastGrow = opt[1]
+            TG.Toast:ApplyAnchor()
+            O:Refresh()
+        end)
+        prevG = r.label
+        self.growRadios[#self.growRadios + 1] = r
+    end
+    S.Tooltip(self.growRadios[2], "Grow to the left", "Handy if the counter sits near the right edge of the screen.")
+    y = y - 24
+    index("Reset the counter's position", "Moves the notifier back to the top of the screen.")
+    local reset = S.Button(content, "Reset position", 120, 22)
+    reset:SetPoint("TOPLEFT", 16, y - 2)
+    reset:SetScript("OnClick", function() TG.Toast:ResetPosition() end)
+    S.Tooltip(reset, "Reset position", "Moves the notifier back to the top of the screen. Shift-drag it to move it yourself.")
+    y = y - 32
+    section("Minimap")
+    check("Show minimap button", 0,
+        function() return not TG.db.minimap.hide end, function(v) TG.db.minimap.hide = not v end)
+
+    ---------------------------------------------------------------- Chats
+    page("chat", "Chats", "What shows up in Telegnome, and how the lists and typing work.")
+    section("Keep out of the main chat", "out")
     self.only = check("Only in Telegnome (keep it all out of the main chat)", 0,
         TG.IsTelegnomeOnly and function() return TG:IsTelegnomeOnly() end, function(v) TG:SetTelegnomeOnly(v) end,
         "Only in Telegnome", "Whispers, Battle.net whispers, followed channels and group chats only show up in "
@@ -418,6 +532,8 @@ function O:Create()
     if self.groupsHidden.SetMotionScriptsWhileDisabled then
         self.groupsHidden:SetMotionScriptsWhileDisabled(true) -- so the explanation shows even though it's greyed out
     end
+
+    section("Typing")
     check("Enter types in Telegnome while its window is open", 0,
         function() return s().enterToTelegnome end, function(v) s().enterToTelegnome = v end,
         "Enter key", "With a conversation open, pressing Enter puts the cursor in Telegnome's message box "
@@ -427,30 +543,8 @@ function O:Create()
         "Keep typing", "On: the cursor stays in the message box after you send, so you can write the next "
         .. "message straight away. Off: the box lets go after each message, like the game's chat, and you "
         .. "click it (or press Enter) to write again.")
-    local inLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    inLabel:SetPoint("TOPLEFT", 18, y - 2)
-    inLabel:SetText("In dungeons and raids")
-    self.instRadios = {}
-    local prevI = inLabel
-    for _, opt in ipairs({ { "ask", "Ask" }, { "always", "Always follow" }, { "never", "Never" } }) do
-        local r = S.Radio(content, opt[2])
-        r:SetPoint("LEFT", prevI, "RIGHT", prevI == inLabel and 14 or 12, prevI == inLabel and 0 or -1)
-        r.value = opt[1]
-        r:SetScript("OnClick", function()
-            TG.db.settings.instanceChat = opt[1]
-            O:Refresh()
-        end)
-        S.Tooltip(r, "Dungeons and raids", "Follow Party chat in a dungeon, or Raid chat in a raid (and Instance "
-            .. "chat), until you leave. It's pinned at the top of the All tab while you're inside. Ask: a pop-up "
-            .. "you click when you enter.")
-        prevI = r.label
-        self.instRadios[#self.instRadios + 1] = r
-    end
-    y = y - 28
-    check("Pop-up notifications for the dungeon or raid chat", 30,
-        function() return s().instancePopups ~= false end, function(v) s().instancePopups = v end,
-        "Dungeon and raid chat", "For Party or Raid chat that Telegnome follows just while you're inside. "
-        .. "Off: it still counts unread messages. A chat you already follow keeps its own settings.")
+
+    section("Lists")
     check("Count people I grouped with in the last week as friends", 0,
         function() return s().groupedFriends ~= false end, function(v) s().groupedFriends = v; TG:QueueRefresh() end,
         "Grouped with", "Players you were in a group with in the last seven days are listed under Friends, and their "
@@ -487,14 +581,42 @@ function O:Create()
     daysLabel:SetText("days without new messages")
     self.archiveDays = days
     gap(4)
+
+    section("Dungeons and raids")
+    index("In dungeons and raids: ask, always follow, never", "Follow Party or Raid chat while you're inside.")
+    local inLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    inLabel:SetPoint("TOPLEFT", 18, y - 2)
+    inLabel:SetText("Follow Party or Raid chat")
+    self.instRadios = {}
+    local prevI = inLabel
+    for _, opt in ipairs({ { "ask", "Ask" }, { "always", "Always follow" }, { "never", "Never" } }) do
+        local r = S.Radio(content, opt[2])
+        r:SetPoint("LEFT", prevI, "RIGHT", prevI == inLabel and 14 or 12, prevI == inLabel and 0 or -1)
+        r.value = opt[1]
+        r:SetScript("OnClick", function()
+            TG.db.settings.instanceChat = opt[1]
+            O:Refresh()
+        end)
+        S.Tooltip(r, "Dungeons and raids", "Follow Party chat in a dungeon, or Raid chat in a raid (and Instance "
+            .. "chat), until you leave. It's pinned at the top of the All tab while you're inside. Ask: a pop-up "
+            .. "you click when you enter.")
+        prevI = r.label
+        self.instRadios[#self.instRadios + 1] = r
+    end
+    y = y - 28
+    check("Pop-up notifications for the dungeon or raid chat", 30,
+        function() return s().instancePopups ~= false end, function(v) s().instancePopups = v end,
+        "Dungeon and raid chat", "For Party or Raid chat that Telegnome follows just while you're inside. "
+        .. "Off: it still counts unread messages. A chat you already follow keeps its own settings.")
+
+    section("Group chats and channels")
     check("Pick up group codes from chat", 0,
         function() return s().detectInvites end, function(v) s().detectInvites = v end,
         "Group codes",
         "When someone sends \"Telegnome code: ...\" in a whisper, party, guild or other chat, "
-        .. "it's filled in the next time you click + New group.")
-    check("Show minimap button", 0,
-        function() return not TG.db.minimap.hide end, function(v) TG.db.minimap.hide = not v end)
-    gap(8)
+        .. "a pop-up offers to join, and it's filled in the next time you click + New group.")
+    gap(6)
+    index("Your chat channels (leave channels)", "Every chat channel your character is in, with a Leave button.")
     local slots = S.Button(content, "Your chat channels...", 160, 22)
     slots:SetPoint("TOPLEFT", 16, y)
     slots:SetScript("OnClick", function() TG.ChannelList:Open() end)
@@ -503,9 +625,9 @@ function O:Create()
         .. "The game allows 10.")
     y = y - 30
 
-    ---------------------------------------------------------------- Requests
-    gap(4)
-    page("requests", "Requests", "For when you list a group and strangers start whispering.")
+    ---------------------------------------------------------------- Requests & Business
+    page("requests", "Requests & Business", "Collecting whispers from people you don't know: group finder or your ad.")
+    section("Requests")
     check("Collect strangers' whispers under Requests while I'm listed", 0,
         function() return s().requestsTab end, function(v) s().requestsTab = v end,
         "Requests", "While you or your group are listed in the group finder, whispers from people who aren't "
@@ -525,26 +647,6 @@ function O:Create()
     blanks:SetText("{name}, {class} and {level} are filled in for the person you answer.")
     blanks:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
     y = y - 18
-    self.replyBoxes = {}
-    local function replyBox(label, get, set)
-        local l = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        l:SetPoint("TOPLEFT", 18, y - 7)
-        l:SetWidth(62)
-        l:SetJustifyH("LEFT")
-        l:SetText(label)
-        local box = S.EditBox(content)
-        box:SetPoint("TOPLEFT", 84, y)
-        box:SetPoint("RIGHT", content, "RIGHT", -12, 0)
-        box:SetHeight(24)
-        box:SetMaxLetters(120)
-        if box.SetMaxBytes then box:SetMaxBytes(240) end
-        box.get = get
-        box:SetScript("OnTextChanged", function(b, userInput) if userInput then set(b:GetText()) end end)
-        box:SetScript("OnEnterPressed", function(b) b:ClearFocus() end)
-        self.replyBoxes[#self.replyBoxes + 1] = box
-        y = y - 28
-        return box
-    end
     for i = 1, 3 do
         replyBox("Reply " .. i, function() return (s().quickReplies or {})[i] or "" end,
             function(v) s().quickReplies = s().quickReplies or {}; s().quickReplies[i] = v end)
@@ -553,9 +655,7 @@ function O:Create()
     S.Tooltip(dBox, "Decline message", "\"Decline\" in the Reply menu sends this and dismisses the request, "
         .. "and Decline all sends it to everyone still waiting. Leave it empty to dismiss without a message.")
 
-    ---------------------------------------------------------------- Open for business
-    gap(4)
-    page("business", "Open for business", "Replies for the Business tab, where you post your ad and collect whispers.")
+    section("Business", "business")
     check("Show the Business tab", 0,
         function() return s().businessTab ~= false end, function(v) s().businessTab = v; UI:UpdateTabs() end,
         "Business tab", "Open for business: write an ad, post it, and collect the whispers in their own tab. "
@@ -579,40 +679,15 @@ function O:Create()
     bizNote:SetPoint("TOPLEFT", 18, y)
     bizNote:SetPoint("RIGHT", content, "RIGHT", -12, 0)
     bizNote:SetJustifyH("LEFT")
-    bizNote:SetText("Your ad, Start / Stop and how long it stays open are in the Business tab. Listing in the group "
-        .. "finder pauses it; it opens again when you stop listing. Also: /tg business [minutes|off]")
+    bizNote:SetText("Your ad, Start / Stop and how long it stays open are in the Business tab. Only one of Requests "
+        .. "and Business collects at a time, and the one started last wins: listing in the group finder or Collect "
+        .. "now pauses Business, and starting Business pauses Collect now. Also: /tg business [minutes|off]")
     bizNote:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
-    y = y - 30
-
-    ---------------------------------------------------------------- Mail
-    gap(4)
-    page("mail", "Mail", "A pop-up when new mail arrives in your mailbox.")
-    check("Tell me when new mail arrives", 0,
-        function() return s().mailNotify ~= false end, function(v) s().mailNotify = v end,
-        "New mail", "A pop-up (and your sound, if sounds are on) when mail arrives, and when you log in with "
-        .. "unread mail. The game only says who sent the latest three; open a mailbox to read them. Follows "
-        .. "Do not disturb and the In combat choice under Notifications.")
-    gap(8)
-    local mailHint = content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    mailHint:SetPoint("TOPLEFT", 18, y)
-    mailHint:SetText("{from} is filled in with who sent it, e.g. \"Thrall and Stormwind Auction House (2)\".")
-    mailHint:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
-    y = y - 18
-    local mailBox = replyBox("Text", function() return s().mailText or TG.Mail.DEFAULT_TEXT end,
-        function(v) s().mailText = v end)
-    S.Tooltip(mailBox, "Notification text", "What the pop-up says. Leave it empty for the standard text: "
-        .. TG.Mail.DEFAULT_TEXT)
-    gap(4)
-    local mailTest = S.Link(content, "Show an example")
-    mailTest:SetPoint("TOPLEFT", 18, y)
-    mailTest:SetScript("OnClick", function()
-        TG.Mail:Notify({ { name = "Stormwind Auction House", n = 2 }, { name = "Thrall", n = 1 } }, true)
-    end)
-    y = y - 24
+    y = y - 44
 
     ---------------------------------------------------------------- Your data
-    gap(4)
     page("data", "Your data", "What is saved, and where.")
+    index("Where Telegnome saves your data", "One file on this computer. Nothing is uploaded.")
     local info = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     info:SetPoint("TOPLEFT", 18, y)
     info:SetPoint("RIGHT", content, "RIGHT", -14, 0)
@@ -630,6 +705,7 @@ function O:Create()
     counts:SetTextColor(0.85, 0.7, 0.4)
     self.dataCounts = counts
     y = y - 20
+    index("Delete all messages", "Empties every conversation after asking.")
     local wipe = S.Button(content, "Delete all messages...", 170, 22)
     wipe:SetPoint("TOPLEFT", 16, y)
     wipe:SetScript("OnClick", function() TG:ConfirmClearAllHistory() end)
@@ -637,7 +713,38 @@ function O:Create()
         .. "contacts and settings stay. To remove one conversation's messages, use Clear history in it.")
     y = y - 30
 
+    ---------------------------------------------------------------- Help
+    page("help", "Help", "What each tab is for. The ? next to the cog shows the same for the tab you're on.")
+    for _, tab in ipairs({ "all", "dm", "channels", "groups", "requests", "business" }) do
+        local h = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        h:SetPoint("TOPLEFT", 18, y)
+        h:SetText(TG.Help.Title(tab))
+        y = y - 18
+        local body = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        body:SetPoint("TOPLEFT", 18, y)
+        body:SetWidth(400)
+        body:SetJustifyH("LEFT")
+        body:SetSpacing(2)
+        body:SetText(TG.Help.Body(tab))
+        y = y - S.Num(body:GetStringHeight(), 110) - 16
+    end
+
     content:SetHeight(-y + 8)
+
+
+    -- Search results: a page of its own, filled by O:Search
+    local res = CreateFrame("Frame", nil, clip)
+    res:SetSize(440, 400)
+    res:Hide()
+    self.resultsFrame = res
+    local rtitle = res:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    rtitle:SetPoint("TOPLEFT", 14, -10)
+    self.resultsTitle = rtitle
+    local none = res:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+    none:SetPoint("TOPLEFT", 14, -40)
+    none:SetText("Nothing found. Try another word, like sound, reply or archive.")
+    self.resultsNone = none
+    self.resultRows = {}
 
     local done = S.Button(f, "Done", 80, 24)
     done:SetPoint("BOTTOMRIGHT", -30, 10) -- clear of the window's resize corner
@@ -653,7 +760,7 @@ function O:Create()
             n = n + 1
             local b = CreateFrame("Button", nil, side)
             b:SetHeight(30)
-            b:SetPoint("TOPLEFT", 6, -44 - (n - 1) * 32)
+            b:SetPoint("TOPLEFT", 6, -76 - (n - 1) * 32)
             b:SetPoint("RIGHT", -6, 0)
             local sel = S.Rounded(b, 5)
             for _, t in ipairs(sel.parts) do S.Paint(t, "hivertex", 0.13) end
@@ -682,19 +789,128 @@ function O:Create()
 end
 
 -- One page at a time on the right.
-function O:ShowPage(id)
+-- at: a y position on the page (a section or a setting) to scroll to, instead of the top.
+function O:ShowPage(id, at)
     local shown
     for _, pg in ipairs(self.pages) do
         if pg.id == id then shown = pg end
     end
     shown = shown or self.pages[1]
     if not shown then return end
+    if self.search and self.search:GetText() ~= "" and not self.jumping then
+        self.jumping = true
+        self.search:SetText("") -- a category click leaves the search
+        self.jumping = false
+    end
+    if self.resultsFrame then self.resultsFrame:Hide() end
     self.page = shown.id
     for _, pg in ipairs(self.pages) do pg.frame:SetShown(pg == shown) end
     self.clip:SetScrollChild(shown.frame)
     shown.frame:SetWidth(S.Num(self.clip:GetWidth(), 440))
+    local top = at and math.max(0, -at - 12) or 0
     self.clip:SetVerticalScroll(0)
+    if top > 0 then
+        C_Timer.After(0, function() -- once the scroll range knows the page's height
+            local range = S.Num(self.clip:GetVerticalScrollRange(), 0)
+            self.clip:SetVerticalScroll(math.min(top, range))
+        end)
+    end
     for _, b in ipairs(self.catButtons) do b:SetSelected(b.id == shown.id) end
+end
+
+-- A short glow behind the setting you jumped to from the search.
+function O:Flash(id, at)
+    local pg
+    for _, p in ipairs(self.pages) do if p.id == id then pg = p end end
+    if not pg then return end
+    if not pg.flash then
+        local t = pg.frame:CreateTexture(nil, "BACKGROUND")
+        t:SetHeight(26)
+        S.Paint(t, "hivertex", 0.22)
+        pg.flash = t
+    end
+    pg.flash:ClearAllPoints()
+    pg.flash:SetPoint("TOPLEFT", pg.frame, "TOPLEFT", 6, at + 2)
+    pg.flash:SetPoint("RIGHT", pg.frame, "RIGHT", -6, 0)
+    pg.flash:Show()
+    local mark = {}
+    self.flashMark = mark
+    C_Timer.After(1.8, function() if O.flashMark == mark then pg.flash:Hide() end end)
+end
+
+-- The settings whose name, explanation, section or page has every word typed.
+function O:Find(text)
+    local words = {}
+    for w in (text or ""):lower():gmatch("%S+") do words[#words + 1] = w end
+    if #words == 0 then return {} end
+    local found = {}
+    for _, e in ipairs(self.index or {}) do
+        local hay = (e.text .. " " .. (e.tip or "") .. " " .. (e.section or "") .. " " .. (e.pageLabel or "")):lower()
+        local all = true
+        for _, w in ipairs(words) do
+            if not hay:find(w, 1, true) then all = false break end
+        end
+        if all then found[#found + 1] = e end
+    end
+    return found
+end
+
+function O:Search(text)
+    if not self.resultsFrame then return end
+    if not text or not text:match("%S") then
+        self:ShowPage(self.page or CATEGORIES[1])
+        return
+    end
+    local found = self:Find(text)
+    for _, pg in ipairs(self.pages) do pg.frame:Hide() end
+    for _, b in ipairs(self.catButtons) do b:SetSelected(false) end
+    local res = self.resultsFrame
+    res:Show()
+    self.clip:SetScrollChild(res)
+    res:SetWidth(S.Num(self.clip:GetWidth(), 440))
+    self.clip:SetVerticalScroll(0)
+    self.resultsTitle:SetText(("%d setting%s found"):format(#found, #found == 1 and "" or "s"))
+    self.resultsNone:SetShown(#found == 0)
+    for i, e in ipairs(found) do
+        local row = self.resultRows[i]
+        if not row then
+            row = CreateFrame("Button", nil, res)
+            row:SetHeight(36)
+            local hl = row:CreateTexture(nil, "HIGHLIGHT")
+            hl:SetAllPoints()
+            hl:SetColorTexture(1, 1, 1, 0.06)
+            row.name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            row.name:SetPoint("TOPLEFT", 8, -3)
+            row.name:SetPoint("RIGHT", -8, 0)
+            row.name:SetJustifyH("LEFT")
+            row.name:SetWordWrap(false)
+            row.path = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+            row.path:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -2)
+            row.path:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
+            row:SetScript("OnClick", function(r) O:Jump(r.entry) end)
+            self.resultRows[i] = row
+        end
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", res, "TOPLEFT", 6, -38 - (i - 1) * 38)
+        row:SetPoint("RIGHT", res, "RIGHT", -6, 0)
+        row.entry = e
+        row.name:SetText(e.text)
+        row.path:SetText(e.pageLabel .. (e.section and (" > " .. e.section) or ""))
+        row:Show()
+    end
+    for i = #found + 1, #self.resultRows do self.resultRows[i]:Hide() end
+    res:SetHeight(48 + #found * 38)
+end
+
+-- From a search result to the setting: its page, scrolled to it, with a short glow.
+function O:Jump(e)
+    if not e then return end
+    self.jumping = true
+    self.search:SetText("")
+    self.search:ClearFocus()
+    self.jumping = false
+    self:ShowPage(e.page, e.y)
+    self:Flash(e.page, e.y)
 end
 
 function O:Refresh()
@@ -762,9 +978,14 @@ function O:IsShown()
     return self.frame and self.frame:IsShown() or false
 end
 
-function O:Open(page)
+-- page / section: where to open. Without them it opens where the tab you're on is set up (TAB_PAGE).
+function O:Open(page, section)
     UI:Show()
     self:Create()
+    if not page then
+        local t = TAB_PAGE[UI.tab or "all"] or {}
+        page, section = t[1], t[2]
+    end
     if TG.Help then TG.Help:Close() end
     -- closing Settings goes back to the Requests or Business overview if that was open
     if not self:IsShown() then
@@ -777,7 +998,13 @@ function O:Open(page)
     TG.Requests:ClosePanel()
     self:Refresh()
     self.frame:Show()
-    self:ShowPage(page or CATEGORIES[1]) -- always start on the first page, unless asked for another
+    if self.search and self.search:GetText() ~= "" then
+        self.jumping = true
+        self.search:SetText("")
+        self.jumping = false
+    end
+    local at = section and self.sections[page or ""] and self.sections[page][section]
+    self:ShowPage(page or CATEGORIES[1], at)
 end
 
 function O:Close()

@@ -32,7 +32,7 @@ S.PANEL = { 0.11, 0.08, 0.05 }     -- panel background    (follows the theme)
 local WHITE = "Interface\\Buttons\\WHITE8x8"
 
 ---------------------------------------------------------------------------
--- Colour themes (Settings > Window, or /tg theme <name>)
+-- Colour themes (Settings > Look, or /tg theme <name>)
 ---------------------------------------------------------------------------
 
 -- edge: borders, cog: cogs, panel: backgrounds, hi: selection.

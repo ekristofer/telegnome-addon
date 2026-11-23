@@ -21,7 +21,7 @@ H.TEXT = {
         .. "- + New message starts a conversation with anyone.\n"
         .. "- Right-click a person for a note, notifications, invite and archive.\n"
         .. "- Conversations with nothing new for a week move to Archive. Change the number of days in "
-        .. "Settings > Chat." },
+        .. "Settings > Chats." },
     channels = { "Channels", "Guild, Party, Trade or any other chat channel, followed into Telegnome so it "
         .. "doesn't flood the main chat.\n\n"
         .. "- + Follow channel picks which ones. Add a filtered copy to see only messages with certain words, "
@@ -40,14 +40,14 @@ H.TEXT = {
         .. "(also /tg recruit).\n"
         .. "- Each card shows the class and level. Invite, Reply with a quick reply, or Decline.\n"
         .. "- Filter by class with the icons at the top. Decline all answers everyone still waiting.\n"
-        .. "- Quick replies and decline messages are in Settings > Requests." },
+        .. "- Quick replies and decline messages are in Settings > Requests & Business." },
     business = { "Business", "For crafters, sellers and recruiters: post an ad and collect the whispers you "
         .. "get back.\n\n"
         .. "- Write your ad (shift-click a profession or an item to add its link), choose where it goes and for "
         .. "how long, then press Start and Post.\n"
         .. "- The game needs a click for every post, so Post never repeats on its own.\n"
         .. "- Whispers from people you don't know land here as cards, with their own quick replies "
-        .. "(Settings > Open for business).\n"
+        .. "(Settings > Requests & Business).\n"
         .. "- Saved ads keeps ads you use again. Listing in the group finder pauses it." },
 }
 
@@ -102,7 +102,7 @@ function H:Create()
     more:SetPoint("BOTTOMLEFT", 18, 16)
     more:SetPoint("RIGHT", ok, "LEFT", -12, 0)
     more:SetJustifyH("LEFT")
-    more:SetText("Hover buttons and ticks for more. All settings are behind the cog.")
+    more:SetText("Every tab's help is in Settings > Help. Hover buttons and ticks for more.")
     more:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
 end
 

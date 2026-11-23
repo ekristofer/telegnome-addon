@@ -32,7 +32,7 @@ local DEFAULTS = {
         opacity = 100,        -- main window opacity in percent (30-100)
         opacityHover = true,  -- a see-through window turns solid under the mouse or while typing
         keywords = "",        -- alert words for followed channels, comma-separated
-        groupJoinLeave = true, -- "X joined / left" lines in group chats
+        groupJoinLeave = false, -- "X joined / left" lines in group chats (the online list in the group shows it instead)
         enterToTelegnome = true, -- Enter puts the cursor in Telegnome while its window is open
         keepTyping = true,    -- after sending, the cursor stays in the message box
         groupedFriends = true, -- people you grouped with in the last week count as friends
@@ -49,7 +49,7 @@ local DEFAULTS = {
         instancePopups = true, -- pop-ups for Party / Raid chat followed just for a dungeon or raid
         archiveOn = true,     -- direct messages with nothing new for archiveDays days go to Archive
         archiveDays = 7,
-        -- one-click answers for requests (Settings > Requests)
+        -- one-click answers for requests (Settings > Requests & Business)
         quickReplies = { "Inviting you now, {name}!", "What level and role are you?", "One moment, checking the group." },
         declineReply = "Sorry, the group is full.",
         requestsTab = true,   -- collect strangers' whispers under Requests while listed in the group finder
@@ -165,6 +165,11 @@ local function migrate(db)
     end
     -- 0.9: the All tab is where new installs start; people who used Telegnome before keep Direct messages.
     if db.lastTab == nil then db.lastTab = (db.seq or 0) > 0 and "dm" or "all" end
+    -- 0.9.2: the online list in each group replaces the "joined / left" lines (they can be turned back on)
+    if not db.joinLeave092 then
+        db.settings.groupJoinLeave = false
+        db.joinLeave092 = true
+    end
     -- 0.9.2: ads 2 and 3 (from the first betas) become saved ads
     if not db.savedAds092 then
         db.settings.savedAds = db.settings.savedAds or {}
@@ -491,7 +496,7 @@ function TG:SectionOf(th)
 end
 
 -- Archive: conversations you archived, and direct messages with nothing new for a while
--- (Settings > Chat). A new message, sent or received, brings a conversation back.
+-- (Settings > Chats). A new message, sent or received, brings a conversation back.
 function TG:LastActivity(th)
     local m = th.msgs and th.msgs[#th.msgs]
     return math.max(m and m.t or 0, th.active or 0, th.unarchivedAt or 0)
@@ -1168,9 +1173,7 @@ SlashCmdList.TELEGNOME = function(input)
         elseif tonumber(arg) then TG.Business:Start(tonumber(arg))
         else TG.Business:Toggle() end
     elseif cmd == "recruit" or cmd == "requests" then
-        s.recruiting = not s.recruiting
-        TG:Print("Collecting whispers under Requests at any time, listed or not: " .. onOff(s.recruiting))
-        TG:RefreshUnread()
+        TG.Requests:SetRecruiting(not s.recruiting)
         if s.recruiting then TG.Requests:OpenPanel(nil, "requests") end
     elseif cmd == "dnd" then
         TG:SetDND(not s.dnd)

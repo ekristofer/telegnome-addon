@@ -26,7 +26,7 @@ local function hex(c)
     return ("%02x%02x%02x"):format(math.floor(c[1] * 255), math.floor(c[2] * 255), math.floor(c[3] * 255))
 end
 
--- compact (Settings > Window): every message is one line, "12:30 Name: text", without bubbles or grouping.
+-- compact (Settings > Look): every message is one line, "12:30 Name: text", without bubbles or grouping.
 function View:GapBefore(item)
     if self.compact then return GAP_COMPACT end
     return item.cont and GAP_CONT or GAP

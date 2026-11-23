@@ -487,12 +487,13 @@ function UI:Create()
     self.renameBtn = renameBtn
 
     -- Groups: who's in the channel right now
-    local whoBtn = S.Button(conv, "Online", 64, 24)
+    local whoBtn = S.Button(conv, "Online", 84, 24)
     whoBtn:SetPoint("RIGHT", renameBtn, "LEFT", -6, 0)
-    whoBtn:SetScript("OnClick", function()
-        if UI.selected then TG.Groups:RequestMembers(UI.selected) end
+    whoBtn:SetScript("OnClick", function(s)
+        if UI.selected then TG.Groups:OpenMembersMenu(UI.selected, s) end
     end)
-    S.Tooltip(whoBtn, "Who's online", "Lists the members who are in this group chat right now.")
+    S.Tooltip(whoBtn, "Who's online", "Members online now have a green dot, members seen before who aren't online a "
+        .. "grey one. Click a name to whisper them.")
     whoBtn:Hide()
     self.whoBtn = whoBtn
 
@@ -1150,7 +1151,7 @@ function UI.TabOf(th)
     return "dm"
 end
 
--- How the list is sorted inside each section (Settings > Window, right-click a section header, /tg sort).
+-- How the list is sorted inside each section (Settings > Look, right-click a section header, /tg sort).
 UI.SORTS = { recent = "Most recent", name = "Name", unread = "Unread first" }
 UI.SORT_ORDER = { "recent", "name", "unread" }
 
@@ -1489,6 +1490,7 @@ function UI:UpdateHeaderButtons(th)
     self.moreBtn:SetShown(th ~= nil)
     self.renameBtn:SetShown(isGroup)
     self.whoBtn:SetShown(isGroup)
+    if isGroup and self.selected then self.whoBtn:SetText(TG.Groups:OnlineLabel(self.selected)) end
     self.favBtn:SetShown(th ~= nil)
     self.inviteBtn:SetShown(isReq)
     if th then
@@ -1501,7 +1503,7 @@ function UI:UpdateHeaderButtons(th)
         end
     end
     -- the name gets whatever the buttons leave
-    self.headerBtn:SetPoint("TOPRIGHT", -(isGroup and 226 or isReq and 148 or th and 78 or 48), -6)
+    self.headerBtn:SetPoint("TOPRIGHT", -(isGroup and 246 or isReq and 148 or th and 78 or 48), -6)
 end
 
 -- Closes whatever panel is open over the conversation.
@@ -1826,14 +1828,14 @@ end
 -- Public
 ---------------------------------------------------------------------------
 
--- Bubbles or compact lines (Settings > Window).
+-- Bubbles or compact lines (Settings > Look).
 function UI:ApplyChatStyle()
     if not self.msgs then return end
     self.msgs.compact = TG.db.settings.compactChat and true or false
     if self.selected and TG.db.threads[self.selected] then self:Select(self.selected) end
 end
 
--- Message text size (Settings > Window): the chat font, two points smaller or larger.
+-- Message text size (Settings > Look): the chat font, two points smaller or larger.
 local TEXT_SIZES = { small = -2, normal = 0, large = 2 }
 
 function UI:ApplyTextSize()
@@ -1844,7 +1846,7 @@ function UI:ApplyTextSize()
     self.msgs:SetBodyFont(path, math.max(8, math.floor(size + 0.5) + delta), flags or "")
 end
 
--- Main window opacity (Settings > Window). The notifier and minimap button aren't affected.
+-- Main window opacity (Settings > Look). The notifier and minimap button aren't affected.
 UI.MIN_OPACITY = 30
 
 function UI:SetOpacity(percent)

@@ -70,6 +70,14 @@ function T:Create()
     local count = pill:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     count:SetPoint("LEFT", pcog, "RIGHT", 7, 0)
     pill.count = count
+    -- Collecting group requests (listed in the group finder, or Collect now): the group finder's eye
+    local eye = pill:CreateTexture(nil, "OVERLAY")
+    eye:SetSize(18, 18)
+    eye:SetPoint("LEFT", pill, "LEFT", PILL_W - 6, 0)
+    eye:SetTexture("Interface\\LFGFrame\\LFG-Eye")
+    eye:SetTexCoord(0, 0.125, 0, 0.25) -- the first frame of its animation
+    eye:Hide()
+    pill.eye = eye
     -- Open for business: a gold coin, and the minutes left
     local coin = pill:CreateTexture(nil, "OVERLAY")
     coin:SetSize(14, 14)
@@ -165,8 +173,12 @@ function T:ShowTooltip()
     local s = TG.db.settings
     if s.business then
         local left = TG.Business:MinutesLeft()
-        GameTooltip:AddLine(s.businessPaused and "Open for business: paused while you're listed"
+        GameTooltip:AddLine(s.businessPaused and "Open for business: paused while Requests collects"
             or ("Open for business: " .. (left and (left .. " min left") or "until you stop it")), 1, 0.82, 0)
+    end
+    if TG.Requests and TG.Requests:Collecting() then
+        GameTooltip:AddLine(s.recruiting and "Collecting requests (Collect now)"
+            or "Collecting requests: you're listed in the group finder", 0.4, 0.9, 0.4)
     end
     local unread = {}
     for key, th in pairs(TG.db.threads) do
@@ -259,6 +271,7 @@ function T:ShouldShowPill()
     local s = TG.db.settings
     if not s.counter then return false end
     if s.business then return true end -- the coin shows you're open for business
+    if TG.Requests and TG.Requests:Collecting() then return true end -- and the eye that requests are collected
     if s.counterHideEmpty and TG:TotalUnread() == 0 then return false end
     return true
 end
@@ -282,6 +295,15 @@ function T:Update()
     -- open for business: the coin, the minutes left (none when it's until you stop it), grey while paused
     local s = TG.db.settings
     local w = PILL_W
+    local collecting = TG.Requests and TG.Requests:Collecting()
+    pill.eye:SetShown(collecting and true or false)
+    pill.coin:ClearAllPoints()
+    if collecting then
+        pill.coin:SetPoint("LEFT", pill.eye, "RIGHT", 4, 0)
+        w = w + 20
+    else
+        pill.coin:SetPoint("LEFT", pill, "LEFT", PILL_W - 6, 0)
+    end
     if s.business then
         local left = TG.Business:MinutesLeft()
         pill.coin:Show()

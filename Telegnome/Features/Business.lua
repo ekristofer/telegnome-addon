@@ -1,8 +1,9 @@
 -- Telegnome: Open for business, in its own Business tab. For crafters, sellers and recruiters: write
 -- an ad (with links) and post it, and while it's open, whispers from people you don't know are
 -- collected in the tab with their own quick replies. It stops after the time you chose, or when you stop it.
---   Listing in the group finder pauses it (Requests collects group whispers then); it comes back by
---   itself when you stop listing.
+--   Only one of Requests and Business collects at a time, and the one started last wins: listing in the
+--   group finder or Collect now pauses Business (it comes back when they stop), and starting Business
+--   pauses Collect now (it comes back when Business closes).
 
 local _, ns = ...
 local TG = ns.TG
@@ -44,7 +45,13 @@ function B:Start(minutes)
     minutes = tonumber(minutes) or tonumber(s.businessMinutes) or 30
     s.business = true
     s.businessUntil = (not forever and minutes > 0) and (time() + minutes * 60) or nil
-    s.businessPaused = TG.Requests:IsHosting() or nil
+    -- started last, so it wins over Collect now (which comes back when Business closes)
+    if s.recruiting then
+        s.recruiting = false
+        s.recruitPausedByBiz = true
+        TG:Print("Collect now (Requests) is paused while you're open for business. It comes back when you close.")
+    end
+    s.businessPaused = TG.Requests:IsHosting() or nil -- a group finder listing still comes first
     if s.businessPaused then
         TG:Print("Open for business is on, but paused while you're listed in the group finder.")
     else
@@ -60,6 +67,11 @@ function B:Stop(reason)
     local s = S()
     if not s.business then return end
     s.business, s.businessUntil, s.businessPaused = false, nil, nil
+    if s.recruitPausedByBiz then -- Collect now was on before Business started
+        s.recruitPausedByBiz = nil
+        s.recruiting = true
+        TG:Print("Collect now is back on: whispers from people you don't know go to Requests again.")
+    end
     changed()
     local waiting = #TG.Requests:OpenKeys("business")
     local body = waiting > 0 and (("%d whisper%s waiting in the Business tab."):format(waiting, waiting == 1 and "" or "s"))
@@ -77,20 +89,29 @@ function B:Toggle(minutes)
 end
 
 -- Called when your group finder listing starts or stops. True when it showed its own pop-up.
-function B:OnHostingChanged(hosting)
+function B:OnHostingChanged()
+    return self:SyncPause()
+end
+
+-- Business is paused while Requests collects: you're listed in the group finder, or Collect now is on.
+-- True when it showed its own pop-up.
+function B:SyncPause()
     local s = S()
     if not s.business then return false end
-    if hosting and not s.businessPaused then
+    local hosting = TG.Requests:IsHosting()
+    local want = hosting or s.recruiting
+    if want and not s.businessPaused then
         s.businessPaused = true
         changed()
+        local why = hosting and "You're listed in the group finder" or "Collect now is on"
         if TG.Toast then
-            TG.Toast:Notice("|cffffd100Open for business paused|r", "You're listed in the group finder, so Requests "
-                .. "collects group whispers now. It comes back when you stop listing.",
+            TG.Toast:Notice("|cffffd100Open for business paused|r", why .. ", so whispers from people you don't "
+                .. "know go to Requests. Business comes back when " .. (hosting and "you stop listing." or "you stop collecting."),
                 function() TG.Requests:OpenPanel(nil, "requests") end)
         end
-        TG:Print("Open for business is paused while you're listed in the group finder.")
+        TG:Print("Open for business is paused while " .. (hosting and "you're listed in the group finder." or "Collect now is on."))
         return true
-    elseif not hosting and s.businessPaused then
+    elseif not want and s.businessPaused then
         s.businessPaused = nil
         if s.businessUntil and time() >= s.businessUntil then
             self:Stop("time")
@@ -236,7 +257,7 @@ function B:OpenDurationMenu(anchor)
     end)
 end
 
--- The Business tab: shown unless you've hidden it (Settings > Open for business), and while it's in use.
+-- The Business tab: shown unless you've hidden it (Settings > Requests & Business), and while it's in use.
 function B:TabVisible()
     if not TG.db then return false end
     local s = S()

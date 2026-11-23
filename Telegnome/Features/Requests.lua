@@ -60,6 +60,20 @@ function R:Collecting()
     return s.recruiting or (s.requestsTab and s.requestsCollect ~= false and self:IsHosting()) or false
 end
 
+-- Collect now / /tg recruit. Started last, so it pauses Open for business until it stops.
+function R:SetRecruiting(on)
+    local s = TG.db.settings
+    on = on and true or false
+    if (s.recruiting and true or false) == on then return end
+    s.recruiting = on
+    s.recruitPausedByBiz = nil
+    TG:Print("Collecting strangers' whispers under Requests at any time, listed or not: " .. (on and "on" or "off"))
+    TG.Business:SyncPause()
+    TG:RefreshUnread()
+    if UI.frame then UI:UpdateTabs() end
+    self:Refresh()
+end
+
 -- The Requests tab: always, unless hidden in Settings - then while listed, collecting, or with requests on it.
 function R:TabVisible()
     if not TG.db then return false end
@@ -627,14 +641,7 @@ function R:Create()
     -- when not listed: collect anyway (the same as /tg recruit)
     local collect = S.Button(f, "Collect now", 120, 22, true)
     collect:SetPoint("TOPRIGHT", -14, -8)
-    collect:SetScript("OnClick", function()
-        local s = TG.db.settings
-        s.recruiting = not s.recruiting
-        TG:Print("Collecting strangers' whispers under Requests: " .. (s.recruiting and "on" or "off"))
-        TG:RefreshUnread()
-        UI:UpdateTabs()
-        R:Refresh()
-    end)
+    collect:SetScript("OnClick", function() R:SetRecruiting(not TG.db.settings.recruiting) end)
     S.Tooltip(collect, "Collect now", "Collects whispers from people who aren't friends, guild members or favorites "
         .. "here even when you're not listed in the group finder (the same as /tg recruit). Press again to stop.")
     self.collectBtn = collect
@@ -658,7 +665,7 @@ function R:Create()
     start:SetPoint("TOPRIGHT", -14, -8)
     start:SetScript("OnClick", function() TG.Business:Toggle() end)
     S.Tooltip(start, "Open for business", "While it's open, whispers from people who aren't friends, guild members or "
-        .. "favorites are collected here, with the quick replies from Settings > Open for business.")
+        .. "favorites are collected here, with the quick replies from Settings > Requests & Business.")
     biz.start = start
     local dur = S.Button(f, "", 140, 22)
     dur:SetPoint("RIGHT", start, "LEFT", -8, 0)
@@ -838,7 +845,7 @@ function R:Create()
     decline:SetScript("OnClick", function() R:ConfirmDeclineAll() end)
     S.Tooltip(decline, "Decline all", "Sends your decline message to everyone still on the list and takes them off it. "
         .. "People you invited or who are in your group stay. In the Business tab it sends the Decline all message "
-        .. "from Settings > Open for business instead.")
+        .. "from Settings > Requests & Business instead.")
     self.declineBtn = decline
 
     local clear = S.Link(f, "Clear all", "GameFontNormal")
@@ -857,6 +864,11 @@ function R:Refresh()
             UI:UpdateTabs()
             self.inRefresh = false
         end
+    end
+    local collecting = self:Collecting()
+    if collecting ~= self.wasCollecting then -- the eye on the notifier
+        self.wasCollecting = collecting
+        if TG.Toast and TG.Toast.Update then TG.Toast:Update() end
     end
     if not self:IsPanelShown() then return end
 
@@ -921,7 +933,9 @@ function R:UpdateStatus()
     if self:View() == "business" then
         local left = TG.Business:MinutesLeft()
         if s.business and s.businessPaused then
-            set({ 1, 0.67, 0.2 }, "Paused while you're listed in the group finder. It opens again when you stop listing.")
+            set({ 1, 0.67, 0.2 }, self:IsHosting()
+                and "Paused while you're listed in the group finder. It opens again when you stop listing."
+                or "Paused while Collect now is on in Requests. It opens again when you stop collecting.")
         elseif s.business then
             set(S.ONLINE, ("Open %s. Whispers from people you don't know land here.")
                 :format(left and ("- " .. left .. " min left") or "until you stop it"))
@@ -931,11 +945,13 @@ function R:UpdateStatus()
         return
     end
     if s.recruiting then
-        set(S.ONLINE, "Collecting (/tg recruit). Whispers from people you don't know land here.")
+        set(S.ONLINE, "Collecting (Collect now). Whispers from people you don't know land here." .. paused)
     elseif hosting and s.requestsCollect ~= false then
         set(S.ONLINE, "You're listed in the group finder. Whispers from people you don't know land here." .. paused)
     elseif hosting then
         set({ 1, 0.67, 0.2 }, "Paused. Tick Collect whispers to collect them here again.")
+    elseif s.recruitPausedByBiz then
+        set({ 1, 0.67, 0.2 }, "Collect now is paused while you're open for business. It comes back when Business closes.")
     else
         set(S.OFFLINE, "Not collecting right now. It starts by itself when you list in the group finder.")
     end
