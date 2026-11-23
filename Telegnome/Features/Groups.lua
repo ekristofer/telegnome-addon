@@ -147,6 +147,32 @@ local function channelID(channel)
     return tonumber(id) or 0
 end
 
+-- The chat window that shows a group when "Show in the WoW chat window" is on.
+local function mainFrame()
+    return DEFAULT_CHAT_FRAME or ChatFrame1
+end
+
+function G:ShowInChatFrame(channel)
+    local add = ChatFrame_AddChannel or (ChatFrameUtil and ChatFrameUtil.AddChannel)
+    local cf = mainFrame()
+    if add and cf then pcall(add, cf, channel) end
+end
+
+-- Puts the group's channel in (or takes it out of) the main chat window, as the group's setting says.
+function G:ApplyChatFrame(th)
+    if not (th and th.channel) then return end
+    if th.showInChat then self:ShowInChatFrame(th.channel) else self:HideFromChatFrames(th.channel) end
+end
+
+function G:SetShowInChat(key, on)
+    local th = TG.db.threads[key]
+    if not (th and th.channel) then return end
+    th.showInChat = on and true or nil
+    self:ApplyChatFrame(th)
+    TG:Print(on and ("\"%s\" now also shows in the WoW chat window."):format(th.name)
+        or ("\"%s\" no longer shows in the WoW chat window."):format(th.name))
+end
+
 function G:HideFromChatFrames(channel)
     local remove = ChatFrame_RemoveChannel or (ChatFrameUtil and ChatFrameUtil.RemoveChannel)
     if not remove then return end
@@ -162,7 +188,7 @@ function G:JoinChannel(th)
     local join = JoinTemporaryChannel or JoinChannelByName
     if not join then return end
     join(th.channel, th.pass)
-    C_Timer.After(1, function() G:HideFromChatFrames(th.channel) end)
+    C_Timer.After(1, function() G:ApplyChatFrame(th) end)
     C_Timer.After(4, function()
         if TG.db.threads[G.KeyFor(th.channel)] and channelID(th.channel) == 0 then
             TG:Print(("Couldn't join the group \"%s\". You might be in too many chat channels (the game allows 10)."):format(th.name))
@@ -249,13 +275,29 @@ function G:OnEvent(event, ...)
     TG:AddMessage(key, { kind = "GROUP" }, outgoing, text, { from = from, cls = TG:ClassFromGUID(guid) })
 end
 
+-- Same message, but labelled with the group's name instead of its hidden channel code:
+-- "[8. Raid team]" rather than "[8. tgx7k2...]".
+function G.ChatArgs(th, ...)
+    local n = select("#", ...)
+    local args = { ... }
+    local num = args[8]
+    if type(num) == "number" or (type(num) == "string" and not TG.isSecret(num) and num ~= "") then
+        args[4] = ("%s. %s"):format(num, th.name or "Group")
+    end
+    return unpack(args, 1, n)
+end
+
 function G:InstallChatFilter(add)
-    local function filter(_, _, ...)
+    local function filter(_, event, ...)
         local msg, sender = ...
         local base = select(9, ...)
         if TG.isSecret(msg) or TG.isSecret(sender) or TG.isSecret((select(12, ...))) then return false end
         if type(base) == "string" and not TG.isSecret(base) and TG.db
             and (TG.db.threads[G.KeyFor(base)] or G.IsTelegnomeChannel(base)) then
+            local th = TG.db.threads[G.KeyFor(base)]
+            if event == "CHAT_MSG_CHANNEL" and th and th.showInChat then
+                return false, G.ChatArgs(th, ...)
+            end
             return true
         end
         return false
@@ -301,8 +343,9 @@ end
 function G:OnMemberList(text)
     local lp = self.listPending
     if not lp or GetTime() - lp.t > 3 or type(text) ~= "string" then return end
-    for token in text:gmatch("[^,%s]+") do
-        local name = token:gsub("^[%*@%+]+", "")
+    -- names are separated by commas; a name itself can have a space in it ("First Last")
+    for token in text:gmatch("[^,]+") do
+        local name = token:gsub("^%s+", ""):gsub("%s+$", ""):gsub("^[%*@%+]+", "")
         name = Ambiguate and Ambiguate(name, "short") or name
         if name ~= "" and not name:find("[%[%]%.:]") and not lp.seen[name] then
             lp.seen[name] = true
@@ -319,7 +362,7 @@ function G:ShowMembers()
     if #lp.names == 0 then
         text = "Couldn't get the list of who is online."
     else
-        table.sort(lp.names)
+        table.sort(lp.names, function(a, b) return a:lower() < b:lower() end)
         text = ("Online now (%d): %s"):format(#lp.names, table.concat(lp.names, ", "))
     end
     if not UI:ShowNote(lp.key, text) then TG:Print(text) end
@@ -728,9 +771,11 @@ function G:OpenMenu(key, anchor)
         root:CreateButton(th.fav and "Unpin" or "Pin to the top", function() TG:SetFavorite(key, not th.fav) end)
         UI.AddPinMoveEntries(root, key)
         root:CreateButton("Who's online", function() G:RequestMembers(key) end)
-        root:CreateButton(th.muted and "Unmute" or "Mute (no pop-ups or sound)", function()
-            TG:SetMuted(key, not th.muted)
-        end)
+        root:CreateCheckbox("Show in the WoW chat window", function() return th.showInChat end,
+            function() G:SetShowInChat(key, not th.showInChat) end)
+        root:CreateCheckbox("Pop-up notifications and sound",
+            function() return not th.muted end,
+            function() TG:SetMuted(key, not th.muted) end)
         root:CreateButton("Rename group", function() G:AskRename(key) end)
         if th.code then
             root:CreateButton("Show invite code", function() G:ShowCode(key) end)

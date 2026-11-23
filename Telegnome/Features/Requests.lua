@@ -299,7 +299,7 @@ end
 function R:Invite(key)
     local th = TG.db.threads[key]
     if not th or th.kind ~= "WHISPER" then return end
-    if not (TG.Demo and TG.Demo.on) then
+    if not (TG.Demo and TG.Demo.on) and not th.fake then
         local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
         if not invite then
             TG:Print("This version of the game doesn't let addons send invites.")

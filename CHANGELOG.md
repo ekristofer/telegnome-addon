@@ -10,6 +10,10 @@
 - Alert words per channel: right-click a followed channel > Alert words for this channel... (the words in Settings still count everywhere).
 - Matching words are picked out in gold in channel messages.
 - **New mail:** a pop-up when mail arrives, and when you log in with unread mail, saying who sent it ("New mail from Thrall and Stormwind Auction House (2)"). Change the text or turn it off in the new Settings > Mail page. The game names the latest three senders only; open a mailbox to read the mail.
+- **Show in the WoW chat window:** right-click a group chat to have its messages appear in the normal chat window too, labelled with the group's name. Telegnome still shows them as usual.
+- Right-click menus: Mute is now a tick box like the other settings. People and group chats have **Pop-up notifications and sound** (on unless you turn it off); followed channels keep their Pop-up notifications tick and get **Mute everything (alert words too)**.
+- `/tg test stranger`: a whisper from a made-up player you don't know, handled like a real one, so you can try Open for business and Requests without waiting for someone to whisper you. Replies and invites to them stay on your computer.
+- Fixed: Who's online in a group chat split names with a space in them (first and last name) into separate names. Whole names are now listed in alphabetical order.
 - `/tg demo`: the window stays solid while the sample conversations are shown, whatever your opacity setting, so screenshots come out clean. Your opacity is back as soon as the demo is off.
 
 ## 0.9.1

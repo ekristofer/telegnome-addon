@@ -746,9 +746,9 @@ function UI.AddMenuEntries(root, key)
     root:CreateButton(TG.Social:GetNote(key) and "Edit note..." or "Add note...", function() TG.Social:EditNote(key) end)
     if th then
         root:CreateButton("Search in this conversation", function() TG.Search:Open(key) end)
-        root:CreateButton(th.muted and "Unmute" or "Mute (no pop-ups or sound)", function()
-            TG:SetMuted(key, not th.muted)
-        end)
+        root:CreateCheckbox("Pop-up notifications and sound",
+            function() return not th.muted end,
+            function() TG:SetMuted(key, not th.muted) end)
         root:CreateButton(th.fav and "Unpin" or "Pin to the top", function()
             TG:SetFavorite(key, not th.fav)
         end)

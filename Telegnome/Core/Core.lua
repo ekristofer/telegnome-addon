@@ -811,6 +811,11 @@ function TG:Send(key, text)
         self:AddMessage(key, { kind = th.kind }, true, text)
         return true
     end
+    if th.fake then -- a pretend stranger from /tg test stranger: nothing is sent
+        self:AddMessage(key, { kind = th.kind }, true, text)
+        self:AddSystemLine(key, "Test person - nothing was actually sent.")
+        return true
+    end
 
     if th.kind == "GROUP" then
         return self.Groups:Send(th, text)
@@ -1051,6 +1056,58 @@ end
 
 local function onOff(v) return v and "|cff55ff55on|r" or "|cffff5555off|r" end
 
+-- /tg test stranger: a whisper from a made-up player you don't know, handled exactly like a real one,
+-- so Requests and Open for business can be tried without anyone whispering you. Replies and invites
+-- to them stay on your computer.
+local TEST_PEOPLE = {
+    { "Brakkus", "WARRIOR" }, { "Lunaria", "PRIEST" }, { "Fizzlebolt", "MAGE" }, { "Thornwick", "DRUID" },
+    { "Grimsy", "ROGUE" }, { "Halvard", "PALADIN" }, { "Zuljaya", "SHAMAN" }, { "Morwenna", "WARLOCK" },
+    { "Tarrok", "HUNTER" }, { "Pipwhistle", "MAGE" }, { "Esmeray", "DRUID" }, { "Durgan", "WARRIOR" },
+}
+local TEST_BUSINESS = {
+    "Hi! Can you make that for me? I have the mats",
+    "How much for it? Can tip",
+    "hey, still selling?",
+    "Do you have the recipe? Would pay 5g",
+    "Interested! Where can I meet you?",
+}
+local TEST_GROUP = {
+    "lvl %d %s, can I join?",
+    "inv pls, %d %s",
+    "Hi, %s here (%d), still need people?",
+    "can i come? %s lvl %d",
+}
+
+function TG:TestStranger()
+    local pick
+    for _ = 1, 20 do
+        local p = TEST_PEOPLE[math.random(#TEST_PEOPLE)]
+        local key = TG.WhisperKey(p[1] .. "-Testrealm")
+        if not self.db.threads[key] then pick = p break end
+    end
+    pick = pick or TEST_PEOPLE[math.random(#TEST_PEOPLE)]
+    local name = pick[1] .. "-Testrealm"
+    local key = TG.WhisperKey(name)
+    local info = { kind = "WHISPER", name = name, class = pick[2] }
+    local text
+    if self.Business and self.Business:IsOn() and not self.Requests:IsHosting() then
+        text = TEST_BUSINESS[math.random(#TEST_BUSINESS)]
+    else
+        local className = (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[pick[2]]) or pick[2]:lower()
+        local level = math.random(20, 60)
+        local f = TEST_GROUP[math.random(#TEST_GROUP)]
+        if f:find("^Hi") or f:find("^can i") then text = f:format(className, level) else text = f:format(level, className) end
+    end
+    local th = self:EnsureThread(key, info)
+    th.fake = true
+    self.Requests:OnWhisper(key, info, text)
+    self:AddMessage(key, info, false, text)
+    self:MaybeAutoReply(key, text)
+    if not self.Requests:IsActive() and not th.req then
+        self:Print("Test whisper added under Direct messages. Start Open for business, list in the group finder or use /tg recruit first to see it as a request.")
+    end
+end
+
 SLASH_TELEGNOME1 = "/telegnome"
 SLASH_TELEGNOME2 = "/tg"
 SlashCmdList.TELEGNOME = function(input)
@@ -1158,6 +1215,8 @@ SlashCmdList.TELEGNOME = function(input)
         TG.Demo:Command(rest and rest:lower() or "")
     elseif cmd == "slaay-mode" or cmd == "slay-mode" or cmd == "slaay" then -- not in the help either
         TG.Slay:Toggle()
+    elseif cmd == "test stranger" or cmd == "test request" or cmd == "test business" then
+        TG:TestStranger()
     elseif cmd == "test" then
         TG:AddMessage("W:testgnome-gnomeregan",
             { kind = "WHISPER", name = "Testgnome-Gnomeregan", class = "MAGE" },
@@ -1186,6 +1245,7 @@ SlashCmdList.TELEGNOME = function(input)
         print("  /tg minimap - minimap button (" .. onOff(not TG.db.minimap.hide) .. ")")
         print("  /tg clear - close the selected conversation")
         print("  /tg test - add a fake incoming whisper")
+        print("  /tg test stranger - a whisper from a made-up stranger, to try Requests and Open for business")
         print("  /tg debug - print raw event info (" .. onOff(s.debug) .. ")")
     end
 end
