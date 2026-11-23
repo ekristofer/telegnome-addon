@@ -639,9 +639,13 @@ function R:Create()
     chan:SetScript("OnClick", function(s) TG.Business:OpenChannelMenu(s, function() R:Refresh() end) end)
     S.Tooltip(chan, "Where it goes", "Trade, Say, Yell, Guild or any channel you're in.")
     biz.chan = chan
+    local saved = S.Button(f, "Saved", 70, 24)
+    saved:SetPoint("RIGHT", chan, "LEFT", -6, 0)
+    S.Tooltip(saved, "Saved ads", "Save this ad for another time, or put a saved one in the box.")
+    biz.saved = saved
     local ad = S.EditBox(f)
     ad:SetPoint("TOPLEFT", 44, -40)
-    ad:SetPoint("RIGHT", chan, "LEFT", -6, 0)
+    ad:SetPoint("RIGHT", saved, "LEFT", -6, 0)
     ad:SetHeight(24)
     ad:SetMaxLetters(255)
     if ad.SetMaxBytes then ad:SetMaxBytes(255) end
@@ -655,6 +659,15 @@ function R:Create()
     S.Tooltip(ad, "Your ad", "Click here and shift-click your profession or an item to add its link.")
     TG.Business.linkBoxes[#TG.Business.linkBoxes + 1] = ad
     biz.ad = ad
+    saved:SetScript("OnClick", function(b)
+        TG.Business:OpenSavedMenu(b, function() return ad:GetText() end, function(text)
+            local s = TG.db.settings
+            s.ads = s.ads or {}
+            s.ads[1] = text
+            ad:SetText(text)
+            ad:ClearFocus()
+        end)
+    end)
     self.biz = biz
 
     local dot = S.Dot(f, 8)

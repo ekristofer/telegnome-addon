@@ -70,6 +70,17 @@ function T:Create()
     local count = pill:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     count:SetPoint("LEFT", pcog, "RIGHT", 7, 0)
     pill.count = count
+    -- Open for business: a gold coin, and the minutes left
+    local coin = pill:CreateTexture(nil, "OVERLAY")
+    coin:SetSize(14, 14)
+    coin:SetPoint("LEFT", pill, "LEFT", PILL_W - 6, 0)
+    coin:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon")
+    coin:Hide()
+    pill.coin = coin
+    local timer = pill:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    timer:SetPoint("LEFT", coin, "RIGHT", 3, 0)
+    timer:Hide()
+    pill.timer = timer
     self.pill = pill
 
     -- Expanded content (fixed size; the frame's clipping reveals it while growing)
@@ -151,6 +162,12 @@ function T:ShowTooltip()
     GameTooltip:SetOwner(f, "ANCHOR_BOTTOM")
     GameTooltip:AddLine("Telegnome")
     if TG.db.settings.dnd then GameTooltip:AddLine("Do not disturb is on", 1, 0.55, 0.3) end
+    local s = TG.db.settings
+    if s.business then
+        local left = TG.Business:MinutesLeft()
+        GameTooltip:AddLine(s.businessPaused and "Open for business: paused while you're listed"
+            or ("Open for business: " .. (left and (left .. " min left") or "until you stop it")), 1, 0.82, 0)
+    end
     local unread = {}
     for key, th in pairs(TG.db.threads) do
         if (th.unread or 0) > 0 and th.kind ~= "CHANNEL" then unread[#unread + 1] = { key = key, th = th } end
@@ -228,7 +245,7 @@ function T:Collapse()
     self.full:Hide()
     self.fullSpin:Stop()
     local keep = self:ShouldShowPill()
-    self:AnimateTo(PILL_W, PILL_H, function()
+    self:AnimateTo(self.pillW or PILL_W, PILL_H, function()
         if keep then T.pill:Show() else T.frame:Hide() end
         T:Update()
     end)
@@ -241,6 +258,7 @@ end
 function T:ShouldShowPill()
     local s = TG.db.settings
     if not s.counter then return false end
+    if s.business then return true end -- the coin shows you're open for business
     if s.counterHideEmpty and TG:TotalUnread() == 0 then return false end
     return true
 end
@@ -261,6 +279,21 @@ function T:Update()
         pill.count:SetTextColor(0.5, 0.5, 0.5)
         pill.cog:SetDesaturated(true)
     end
+    -- open for business: the coin, the minutes left (none when it's until you stop it), grey while paused
+    local s = TG.db.settings
+    local w = PILL_W
+    if s.business then
+        local left = TG.Business:MinutesLeft()
+        pill.coin:Show()
+        pill.coin:SetDesaturated(s.businessPaused and true or false)
+        pill.timer:SetShown(left ~= nil and not s.businessPaused)
+        if left then pill.timer:SetText(left .. "m") end
+        w = w + 16 + ((left and not s.businessPaused) and (S.Num(pill.timer:GetStringWidth(), 20) + 4) or 0)
+    else
+        pill.coin:Hide()
+        pill.timer:Hide()
+    end
+    self.pillW = w
     if TG.db.settings.dnd then -- red cog = do not disturb
         pill.cog:SetVertexColor(0.95, 0.4, 0.3)
     else
@@ -268,7 +301,7 @@ function T:Update()
     end
     if not self.expanded and not self.animating then
         if self:ShouldShowPill() then
-            self.frame:SetSize(PILL_W, PILL_H)
+            self.frame:SetSize(w, PILL_H)
             pill:Show()
             self.frame:Show()
         else

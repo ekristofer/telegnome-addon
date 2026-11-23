@@ -603,6 +603,8 @@ function UI:Create()
     end)
     f:SetScript("OnShow", function() UI:OnShow() end)
     f:SetScript("OnHide", function()
+        -- the Requests or Business overview comes back when you open the window again
+        UI.reopenOverview = TG.Requests:IsPanelShown() or nil
         TG.Picker:Close(); TG.Settings:Close(); TG.Groups:ClosePanel(); TG.Channels:ClosePanel(); TG.ChannelList:Close(); TG.Requests:ClosePanel()
         TG.Search:Close()
     end)
@@ -1560,7 +1562,7 @@ function UI:SetTab(tab)
     end
     self.tab = tab
     self.offset = 0
-    if tab ~= "requests" and tab ~= "business" then TG.db.lastTab = tab end
+    if tab ~= "requests" then TG.db.lastTab = tab end
     self:UpdateNewButton()
     self:UpdateTabs()
     if self.tab ~= tab then return end -- the tab isn't available (no requests); UpdateTabs moved on
@@ -1765,14 +1767,23 @@ function UI:OnShow()
     if not self.tabRestored then
         self.tabRestored = true
         local last = TG.db.lastTab
+        if last == "business" and not TG.Business:TabVisible() then last = nil end
         if last and last ~= "requests" and self.tabs and self.tabs[last] then self.tab = last end
+        if last == "business" then self.reopenOverview = true end
     end
+    -- the conversation you had open, if it's still in this tab; otherwise the top of the tab
     local key = self.selected
-    if not key or not TG.db.threads[key] then key = self:FirstKey() end
+    local th = key and TG.db.threads[key]
+    if not th or not UI.Belongs(th, self.tab) then key = self:FirstKey() end
     self:UpdateNewButton()
     if key then self:Select(key) else self:ShowEmpty() end
     self:RefreshList()
     TG:RefreshUnread()
+    -- back where you were: the Requests or Business overview, if that was open
+    if self.reopenOverview and (self.tab == "requests" or self.tab == "business") then
+        TG.Requests:OpenPanel(true, self.tab)
+    end
+    self.reopenOverview = nil
 end
 
 ---------------------------------------------------------------------------

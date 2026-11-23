@@ -59,6 +59,7 @@ local DEFAULTS = {
         businessForever = false, -- ...or until you stop it
         businessTab = true,   -- show the Business tab
         ads = { "", "", "" },
+        savedAds = {},        -- ads saved for later (the Saved button in the Business tab)
         adChannel = "Trade",
         bizReplies = { "Sure, {name}! Send me the mats and I'll open a trade.", "Meet me at the bank, I'll open a trade.",
             "One moment, I'm finishing another order." },
@@ -161,6 +162,15 @@ local function migrate(db)
     end
     -- 0.9: the All tab is where new installs start; people who used Telegnome before keep Direct messages.
     if db.lastTab == nil then db.lastTab = (db.seq or 0) > 0 and "dm" or "all" end
+    -- 0.9.2: ads 2 and 3 (from the first betas) become saved ads
+    if not db.savedAds092 then
+        db.settings.savedAds = db.settings.savedAds or {}
+        for i = 2, 3 do
+            local a = db.settings.ads and db.settings.ads[i]
+            if type(a) == "string" and a:match("%S") then table.insert(db.settings.savedAds, a) end
+        end
+        db.savedAds092 = true
+    end
     -- 0.9: the Archive sections start folded
     if not db.archive090 then
         db.collapsed = db.collapsed or {}

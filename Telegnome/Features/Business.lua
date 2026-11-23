@@ -24,6 +24,7 @@ end
 
 local function changed()
     TG:RefreshUnread()
+    if TG.Toast and TG.Toast.Update then TG.Toast:Update() end
     TG.Requests:Refresh()
     if TG.UI.frame then TG.UI:UpdateTabs() end
     if TG.Settings and TG.Settings.Refresh then pcall(TG.Settings.Refresh, TG.Settings) end
@@ -155,6 +156,64 @@ function B:Post(i)
     self.lastPost = now
 end
 
+---------------------------------------------------------------------------
+-- Saved ads
+---------------------------------------------------------------------------
+
+B.MAX_SAVED = 15
+
+-- An ad as plain text, for menus: links become their names.
+function B.PlainAd(text, max)
+    local t = (text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1")
+    max = max or 60
+    if #t > max then t = TG.Utf8Left(t, max - 3) .. "..." end
+    return t
+end
+
+function B:SaveAd(text)
+    text = strtrim(text or "")
+    if text == "" then
+        TG:Print("Write the ad first, then save it.")
+        return
+    end
+    local list = S().savedAds or {}
+    S().savedAds = list
+    for i, a in ipairs(list) do
+        if a == text then table.remove(list, i) break end -- saved again: moves to the top
+    end
+    table.insert(list, 1, text)
+    while #list > B.MAX_SAVED do table.remove(list) end
+    TG:Print("Ad saved.")
+end
+
+function B:DeleteSaved(i)
+    local list = S().savedAds or {}
+    if list[i] then table.remove(list, i) end
+end
+
+-- Saved: use one of them, save the current ad, or delete one.
+function B:OpenSavedMenu(anchor, current, use)
+    if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+    local list = S().savedAds or {}
+    MenuUtil.CreateContextMenu(anchor, function(_, root)
+        root:CreateButton("Save this ad", function() B:SaveAd(current()) end)
+        root:CreateDivider()
+        if #list == 0 then
+            root:CreateTitle("|cff888888No saved ads yet|r")
+            return
+        end
+        root:CreateTitle("Use a saved ad")
+        for _, a in ipairs(list) do
+            root:CreateButton(B.PlainAd(a), function() use(a) end)
+        end
+        root:CreateDivider()
+        local del = root:CreateButton("Delete a saved ad")
+        for i, a in ipairs(list) do
+            del:CreateButton(B.PlainAd(a), function() B:DeleteSaved(i) end)
+        end
+    end)
+end
+
 -- How long it stays open. Changing it while open starts the clock again.
 function B:OpenDurationMenu(anchor)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
@@ -241,8 +300,9 @@ local function tick()
     local s = S()
     if s.business and s.businessUntil and time() >= s.businessUntil and not s.businessPaused then
         B:Stop("time")
-    elseif s.business and TG.Requests:IsPanelShown() then
-        TG.Requests:UpdateStatus() -- the minutes left
+    elseif s.business then
+        if TG.Requests:IsPanelShown() then TG.Requests:UpdateStatus() end -- the minutes left
+        if TG.Toast and TG.Toast.Update then TG.Toast:Update() end
     end
 end
 if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(20, tick) end
