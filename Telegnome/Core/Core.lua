@@ -158,6 +158,22 @@ function TG:Debug(...)
     end
 end
 
+-- A character's whole name, as you would whisper it. On WoW Forever names have two parts ("Winterhold Dd")
+-- and UnitName gives them separately (the second part where the realm usually is), so ask for the
+-- full name instead. Elsewhere this is "Name" on your realm and "Name-Realm" on another.
+function TG.UnitFullName(unit)
+    local full = GetUnitName and GetUnitName(unit, true)
+    if type(full) == "string" and full ~= "" and not (TG.isSecret and TG.isSecret(full)) then return full end
+    local name = UnitName and UnitName(unit)
+    if type(name) == "string" and name ~= "" then return name end
+    return nil
+end
+
+-- Your own character's whole name.
+function TG.MyName()
+    return TG.UnitFullName("player")
+end
+
 -- /tg names: every way the game gives the names of the people in your group, to see how
 -- names with two parts ("First Last") come through.
 function TG:PrintGroupNames()

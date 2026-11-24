@@ -120,11 +120,11 @@ function P:Gather(filter)
     local out, seen, seenName = {}, {}, {}
     local exact = false
     local threads = TG.db.threads or {}
-    local myName = UnitName and UnitName("player")
+    local myName = TG.MyName()
     local myRealm = GetNormalizedRealmName and GetNormalizedRealmName()
     local myKey = type(myName) == "string" and TG.FullName(myName) and TG.WhisperKey(TG.FullName(myName)) or nil
     -- never list yourself (your guild roster includes you)
-    if type(myName) == "string" then seenName[myName:lower()] = true end
+    if type(myName) == "string" then seenName[(myName:lower():gsub("[%s%-']", ""))] = true end
 
     local function add(key, info, match, cat, sub, shortMatch, offline)
         if seen[key] or key == myKey then return end
@@ -135,7 +135,7 @@ function P:Gather(filter)
         -- someone from another realm: show the realm too, so you know who it is
         if info.kind == "WHISPER" and type(info.name) == "string" and type(name) == "string" then
             local realm = info.name:match("%-([^%-]+)$")
-            if realm and myRealm and realm:lower() ~= myRealm:lower() and not name:find("-", 1, true) then
+            if realm and myRealm and myRealm ~= "" and realm:lower() ~= myRealm:lower() and not name:find("-", 1, true) then
                 name = name .. "|cff8a7a5c-" .. realm .. "|r"
             end
         end
@@ -186,11 +186,10 @@ function P:Gather(filter)
             or (GetNumSubgroupMembers and GetNumSubgroupMembers() or 0)
         for i = 1, n do
             local unit = (raid and "raid" or "party") .. i
-            local ok, name, realm = pcall(UnitName, unit)
+            local ok, name = pcall(TG.UnitFullName, unit)
             if ok and type(name) == "string" and name ~= myName and name ~= UNKNOWNOBJECT then
-                local _, class = UnitClass(unit)
-                addName((type(realm) == "string" and realm ~= "") and (name .. "-" .. realm:gsub("[%s%-]", "")) or name,
-                    "group", "in your group", class)
+                local class = UnitClass and select(2, UnitClass(unit))
+                addName(name, "group", "in your group", class)
             end
         end
     end
@@ -247,7 +246,7 @@ function P:Gather(filter)
         local saved = ginfo[g.key]
         -- saved before 1.0: only the lowercase key is known, so guess the capitals
         local name = saved and saved.name or g.key:gsub("^W:", ""):gsub("^%l", string.upper)
-            :gsub("%-(%l)", function(c) return "-" .. c:upper() end)
+            :gsub("([%s%-])(%l)", function(sep, c) return sep .. c:upper() end)
         addName(name, "grouped", "grouped " .. UI.ShortTime(g.t), saved and saved.class)
     end
 

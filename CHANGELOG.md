@@ -19,7 +19,8 @@ New chat
 - **+ New chat** opens a page with three choices: Direct message, Group chat or Channel. Direct message shows the player search right on that page; Group chat opens create / join; Channel leads to Follow a channel, Filtered channels or Your chat channels, each its own page.
 - Every New chat page has a **< Back** button, so you can look around without starting over.
 - The player search lists people you might want to whisper and don't have a chat with yet: people you've talked to in the last two days, your group right now, friends, people you grouped with this week and online guild members - each person once, with a label saying where you know them from. Filters at the top show one kind at a time (All · Recent · Group · Friends · Grouped · Guild); Friends lists offline friends last. Typing searches everyone, including people you already have a chat with and older contacts. It finds Battle.net friends by BattleTag or the character they're playing (the game keeps real names unreadable for addons). A scroll bar shows when the list is long.
-- People from other realms show their realm in the player search, and people you grouped with show in their class colour. Your own character no longer shows up under Guild.
+- Fixed: people you grouped with showed only their first name ("Winterhold" instead of "Winterhold Dd"), so whispering them from the list could fail. Their whole name is saved now, and names saved before are fixed. People you grouped with show in their class colour, and your own character no longer shows up under Guild.
+- Fixed: with a two-part character name, group chats could mistake your own messages and "joined" lines for someone else's.
 - The Direct message page has a Close button like the other pages.
 - **Saved ads have names:** saving an ad asks for a short name, and the Saved ads menu shows that name (hover it for the whole ad).
 - The "Business paused" and "back on" pop-ups are shorter, so they fit.

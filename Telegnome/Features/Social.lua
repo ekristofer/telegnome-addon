@@ -41,18 +41,16 @@ function X:NoteGroup()
         local unit = (raid and "raid" or "party") .. i
         local isMe = UnitIsUnit and UnitIsUnit(unit, "player")
         if not isMe then
-            local ok, name, realm = pcall(UnitName, unit)
-            name, realm = ok and clean(name), ok and clean(realm)
+            -- the whole name ("Winterhold Dd" on WoW Forever, "Name-Realm" for another realm elsewhere)
+            local ok, name = pcall(TG.UnitFullName, unit)
+            name = ok and clean(name)
             if name and name ~= UNKNOWNOBJECT then
-                -- whisper names use the realm without spaces or dashes ("Azjol-Nerub" -> "AzjolNerub")
-                realm = realm and realm:gsub("[%s%-]", "") or myRealm()
-                if realm and realm ~= "" then
-                    local key = TG.WhisperKey(name .. "-" .. realm)
-                    if not db.grouped[key] then added = true end
-                    db.grouped[key] = now
-                    local class = UnitClass and select(2, UnitClass(unit))
-                    db.groupedInfo[key] = { name = name .. "-" .. realm, class = clean(class) }
-                end
+                local full = TG.FullName(name)
+                local key = TG.WhisperKey(full)
+                if not db.grouped[key] then added = true end
+                db.grouped[key] = now
+                local class = UnitClass and select(2, UnitClass(unit))
+                db.groupedInfo[key] = { name = full, class = clean(class) }
             end
         end
     end
@@ -62,6 +60,20 @@ end
 function X:Prune()
     local g = TG.db and TG.db.grouped
     if not g then return end
+    -- before 1.0 a WoW Forever name's second part was saved as if it were the realm ("winterhold-dd"):
+    -- on a server without realm names, put the space back
+    if not TG.db.groupedNames100 and GetNormalizedRealmName and not myRealm() then
+        TG.db.groupedNames100 = true
+        local fixed = {}
+        for key, t in pairs(g) do
+            local first, second = key:match("^W:(.-)%-(.+)$")
+            if first then fixed[key] = "W:" .. first .. " " .. second end
+        end
+        for old, new in pairs(fixed) do
+            g[new] = math.max(g[new] or 0, g[old] or 0)
+            g[old] = nil
+        end
+    end
     local now = time()
     for key, t in pairs(g) do
         if type(t) ~= "number" or now - t > WEEK then g[key] = nil end

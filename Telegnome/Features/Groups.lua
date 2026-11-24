@@ -237,7 +237,7 @@ function G:OnEvent(event, ...)
         end
         if TG.db.threads[jkey] and TG.db.settings.groupJoinLeave and type(sender) == "string" and sender ~= "" then
             local who = Ambiguate and Ambiguate(sender, "short") or sender
-            if not (type(guid) == "string" and guid == UnitGUID("player")) and who ~= UnitName("player") then
+            if not (type(guid) == "string" and guid == UnitGUID("player")) and who ~= TG.MyName() then
                 TG:AddSystemLine(jkey, who .. (event == "CHAT_MSG_CHANNEL_JOIN" and " joined." or " left."))
             end
         end
@@ -252,7 +252,7 @@ function G:OnEvent(event, ...)
     if type(guid) == "string" and guid ~= "" then
         outgoing = guid == UnitGUID("player")
     else
-        outgoing = Ambiguate and Ambiguate(sender or "", "short") == UnitName("player") or false
+        outgoing = Ambiguate and Ambiguate(sender or "", "short") == TG.MyName() or false
     end
     local from = Ambiguate and Ambiguate(sender or "?", "short") or sender
     if not outgoing then self:NoteMember(key, sender, true) end -- someone who writes is online
@@ -365,7 +365,7 @@ end
 function G:NoteMember(key, name, online, quiet)
     local th = TG.db.threads[key]
     local full = fullOf(name)
-    if not (th and full) or full == fullOf(UnitName("player")) then return end
+    if not (th and full) or full == fullOf(TG.MyName()) then return end
     th.members = th.members or {}
     th.members[full] = time()
     local set = self.online[key] or {}
@@ -625,7 +625,7 @@ function G:OnScanEvent(event, ...)
     local short = Ambiguate and type(sender) == "string" and Ambiguate(sender, "short") or sender
     if type(guid) == "string" and guid ~= "" then
         if guid == UnitGUID("player") then return end
-    elseif event ~= "CHAT_MSG_BN_WHISPER" and short == UnitName("player") then
+    elseif event ~= "CHAT_MSG_BN_WHISPER" and short == TG.MyName() then
         return
     end
 
