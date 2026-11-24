@@ -120,21 +120,32 @@ function P:Gather(filter)
     local out, seen, seenName = {}, {}, {}
     local exact = false
     local threads = TG.db.threads or {}
+    local myName = UnitName and UnitName("player")
+    local myRealm = GetNormalizedRealmName and GetNormalizedRealmName()
+    local myKey = type(myName) == "string" and TG.FullName(myName) and TG.WhisperKey(TG.FullName(myName)) or nil
+    -- never list yourself (your guild roster includes you)
+    if type(myName) == "string" then seenName[myName:lower()] = true end
 
     local function add(key, info, match, cat, sub, shortMatch, offline)
-        if seen[key] then return end
+        if seen[key] or key == myKey then return end
         local th = threads[key]
         local hasChat = th and not th.req
         if hasChat and not searching then return end
         local name, color, online = TG:DisplayFor(key, info)
+        -- someone from another realm: show the realm too, so you know who it is
+        if info.kind == "WHISPER" and type(info.name) == "string" and type(name) == "string" then
+            local realm = info.name:match("%-([^%-]+)$")
+            if realm and myRealm and realm:lower() ~= myRealm:lower() and not name:find("-", 1, true) then
+                name = name .. "|cff8a7a5c-" .. realm .. "|r"
+            end
+        end
         local readable = type(name) == "string" and not name:find("|K", 1, true)
+        local plainName = readable and name:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):lower() or nil
         if searching then
-            local shown = readable and name:lower() or ""
-            if not match:find(filter, 1, true) and not shown:find(filter, 1, true) then return end
+            if not match:find(filter, 1, true) and not (plainName or ""):find(filter, 1, true) then return end
         end
         -- the same character twice (a contact and a guild member with the realm written differently): once
-        local nameKey = (readable and info.kind ~= "BN") and name:lower():gsub("|c%x%x%x%x%x%x%x%x", "")
-            :gsub("|r", ""):gsub("%-.*$", "") or nil
+        local nameKey = (plainName and info.kind ~= "BN") and plainName:gsub("[%s%-']", "") or nil
         if nameKey and seenName[nameKey] then return end
         seen[key] = true
         if nameKey then seenName[nameKey] = true end
@@ -149,7 +160,6 @@ function P:Gather(filter)
         info.class = info.class or class
         add(key, info, info.name:lower(), cat, sub, fullName:lower():match("^[^%-]+"))
     end
-    local myName = UnitName and UnitName("player")
     local now = time()
 
     -- 1. People you've talked to in the last two days (when searching: anyone you've ever talked to)
@@ -232,9 +242,13 @@ function P:Gather(filter)
         if type(t) == "number" and now - t < 7 * 86400 then grouped[#grouped + 1] = { key = key, t = t } end
     end
     table.sort(grouped, function(a, b) return a.t > b.t end)
+    local ginfo = TG.db.groupedInfo or {}
     for _, g in ipairs(grouped) do
-        local name = g.key:gsub("^W:", ""):gsub("^%l", string.upper):gsub("%-(%l)", function(c) return "-" .. c:upper() end)
-        addName(name, "grouped", "grouped " .. UI.ShortTime(g.t))
+        local saved = ginfo[g.key]
+        -- saved before 1.0: only the lowercase key is known, so guess the capitals
+        local name = saved and saved.name or g.key:gsub("^W:", ""):gsub("^%l", string.upper)
+            :gsub("%-(%l)", function(c) return "-" .. c:upper() end)
+        addName(name, "grouped", "grouped " .. UI.ShortTime(g.t), saved and saved.class)
     end
 
     -- 5. Guild members online
@@ -242,7 +256,7 @@ function P:Gather(filter)
         local total = GetNumGuildMembers() or 0
         for i = 1, math.min(total, 1000) do
             local name, _, _, _, _, _, _, _, online, _, class = GetGuildRosterInfo(i)
-            if online and type(name) == "string" and Ambiguate and Ambiguate(name, "short") ~= myName then
+            if online and type(name) == "string" then
                 addName(name, "guild", "guild", class)
             end
         end

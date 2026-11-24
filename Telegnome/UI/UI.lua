@@ -322,6 +322,7 @@ function UI:Create()
         GameTooltip:SetText("Chats")
         GameTooltip:AddLine("Every conversation in one list: pinned, friends, group chats, channels and others.",
             1, 1, 1, true)
+        GameTooltip:AddLine("Right-click: Mark all as read.", 0.7, 0.7, 0.7, true)
         GameTooltip:Show()
     end)
     self.tabs.all:HookScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1064,25 +1065,50 @@ function UI:GetRow(i)
     closeAll:HookScript("OnLeave", hover)
     plus:HookScript("OnLeave", hover)
 
-    -- drag a pinned conversation onto another pinned one to reorder Pinned
+    -- Dragging on the Chats tab:
+    --   a conversation onto Pinned (its header or a pinned one) pins it there; pinned ones reorder Pinned
+    --   a section header onto another section moves the whole section
     row:RegisterForDrag("LeftButton")
     row:SetScript("OnDragStart", function(s)
-        local th = s.key and TG.db.threads[s.key]
-        if not (th and th.fav) then return end
-        UI.dragKey = s.key
+        if s.header and UI.tab == "all" and UI.MOVABLE[s.header] and not UI.focusSection then
+            UI.dragSection = s.header
+        elseif s.key and TG.db.threads[s.key] and UI.tab == "all" then
+            UI.dragKey = s.key
+        else
+            return
+        end
         s:SetAlpha(0.5)
+        GameTooltip:SetOwner(s, "ANCHOR_CURSOR")
+        GameTooltip:SetText(UI.dragSection and "Drop on another section to move it there"
+            or (TG.db.threads[s.key].fav and "Drop on another pinned chat to reorder" or "Drop on Pinned to pin it"))
+        GameTooltip:Show()
     end)
     row:SetScript("OnDragStop", function(s)
         s:SetAlpha(1)
-        local key = UI.dragKey
-        UI.dragKey = nil
-        if not key then return end
+        GameTooltip:Hide()
+        local key, section = UI.dragKey, UI.dragSection
+        UI.dragKey, UI.dragSection = nil, nil
+        if not (key or section) then return end
+        local target
         for _, r in ipairs(UI.rows) do
-            if r ~= s and r:IsShown() and r.key and r:IsMouseOver() then
-                local th = TG.db.threads[r.key]
-                if th and th.fav then UI:MovePinned(key, r.key) end
-                return
-            end
+            if r ~= s and r:IsShown() and (r.key or r.header) and r:IsMouseOver() then target = r break end
+        end
+        if not target then return end
+        local targetSection = target.header or (UI.sectionOfKey and UI.sectionOfKey[target.key])
+        if section then
+            if targetSection then UI:MoveSection(section, targetSection) end
+            return
+        end
+        local th = TG.db.threads[key]
+        if not th then return end
+        if th.fav then
+            local tt = target.key and TG.db.threads[target.key]
+            if tt and tt.fav then UI:MovePinned(key, target.key) end
+        elseif targetSection == "all_pinned" then
+            TG:SetFavorite(key, true)
+            local tt = target.key and TG.db.threads[target.key]
+            if tt and tt.fav then UI:MovePinned(key, target.key) end
+            UI:RefreshList()
         end
     end)
     row:SetScript("OnClick", function(s, button)
@@ -1290,6 +1316,14 @@ function UI:OpenHeaderMenu(row)
                 end)
             end
         end
+        if UI.tab == "all" and UI.MOVABLE[id] and not UI.focusSection then
+            root:CreateDivider()
+            root:CreateButton("Move section up", function() UI:MoveSection(id, -1) end)
+            root:CreateButton("Move section down", function() UI:MoveSection(id, 1) end)
+            if UI:SectionOrderChanged() then
+                root:CreateButton("Reset section order", function() UI:ResetSectionOrder() end)
+            end
+        end
         root:CreateDivider()
         root:CreateTitle("Sort conversations")
         for _, how in ipairs(UI.SORT_ORDER) do
@@ -1339,6 +1373,72 @@ local ALL_SECTIONS = {
     { id = "all_more", label = "More channels", folded = true }, -- channels set not to show under Channels
     { id = "all_archive", label = "Archive" },
 }
+UI.ALL_SECTIONS = ALL_SECTIONS
+
+-- The sections you can put in your own order (drag a header, or right-click > Move up / Move down).
+-- Pinned stays at the top and Archive at the bottom.
+UI.MOVABLE = { all_friends = true, all_groups = true, all_channels = true, all_others = true, all_more = true }
+
+-- The sections in the order you chose.
+function UI:OrderedSections()
+    local byId, saved, out, used = {}, TG.db.settings.sectionOrder, {}, {}
+    for _, sec in ipairs(ALL_SECTIONS) do byId[sec.id] = sec end
+    out[1] = byId.all_pinned
+    if type(saved) == "table" then
+        for _, id in ipairs(saved) do
+            if UI.MOVABLE[id] and byId[id] and not used[id] then
+                out[#out + 1] = byId[id]
+                used[id] = true
+            end
+        end
+    end
+    for _, sec in ipairs(ALL_SECTIONS) do
+        if UI.MOVABLE[sec.id] and not used[sec.id] then out[#out + 1] = sec end
+    end
+    out[#out + 1] = byId.all_archive
+    return out
+end
+
+-- Moves a section: by a step (-1 up, 1 down), or to where another section is (dragging).
+function UI:MoveSection(id, target)
+    if not UI.MOVABLE[id] then return end
+    local order = {}
+    for _, sec in ipairs(self:OrderedSections()) do
+        if UI.MOVABLE[sec.id] then order[#order + 1] = sec.id end
+    end
+    local from, to
+    for i, v in ipairs(order) do if v == id then from = i end end
+    if type(target) == "number" then
+        to = math.max(1, math.min(#order, from + target))
+    else
+        if target == "all_pinned" then to = 1 elseif target == "all_archive" then to = #order end
+        for i, v in ipairs(order) do if v == target then to = i end end
+    end
+    if not (from and to) or from == to then return end
+    table.remove(order, from)
+    table.insert(order, to, id)
+    TG.db.settings.sectionOrder = order
+    self:RefreshList()
+end
+
+function UI:ResetSectionOrder()
+    TG.db.settings.sectionOrder = nil
+    self:RefreshList()
+end
+
+-- True when the sections are in your own order.
+function UI:SectionOrderChanged()
+    local saved = TG.db.settings.sectionOrder
+    if type(saved) ~= "table" then return false end
+    local i = 0
+    for _, sec in ipairs(ALL_SECTIONS) do
+        if UI.MOVABLE[sec.id] then
+            i = i + 1
+            if saved[i] ~= sec.id then return true end
+        end
+    end
+    return false
+end
 
 -- The "+" on a section header, and what it starts.
 UI.PLUS_FOR = { all_friends = "dm", all_others = "dm", all_groups = "groups", all_channels = "channels",
@@ -1477,8 +1577,10 @@ function UI:BuildAllEntries(keys)
     local focus = self.focusSection
     if focus and not buckets[focus] then focus, self.focusSection = nil, nil end
     if focus then entries[#entries + 1] = { hint = "Showing one section.  Show all", more = "__all" } end
-    for _, sec in ipairs(ALL_SECTIONS) do
+    self.sectionOfKey = {}
+    for _, sec in ipairs(self:OrderedSections()) do
         local b = buckets[sec.id]
+        for _, k in ipairs(b) do self.sectionOfKey[k] = sec.id end
         if (not focus or focus == sec.id) and (#b > 0 or (sec.id == "all_pinned" and not focus)) then
             local unread = 0
             for _, k in ipairs(b) do
@@ -1979,6 +2081,11 @@ function UI:OnShow()
         TG.Requests:OpenPanel(true)
     end
     self.reopenOverview = nil
+    -- first time the window opens after updating to 1.0: what changed
+    if TG.db.whatsNewPending and TG.Help and TG.Help.ShowWhatsNew then
+        TG.db.whatsNewPending = nil
+        TG.Help:ShowWhatsNew()
+    end
 end
 
 ---------------------------------------------------------------------------

@@ -158,8 +158,32 @@ function TG:Debug(...)
     end
 end
 
+-- /tg names: every way the game gives the names of the people in your group, to see how
+-- names with two parts ("First Last") come through.
+function TG:PrintGroupNames()
+    if not (IsInGroup and IsInGroup()) then self:Print("Join a group first, then type /tg names again.") return end
+    local raid = IsInRaid and IsInRaid()
+    local n = raid and (GetNumGroupMembers and GetNumGroupMembers() or 0)
+        or (GetNumSubgroupMembers and GetNumSubgroupMembers() or 0)
+    local function q(v) return v == nil and "nil" or ("\"" .. tostring(v) .. "\"") end
+    for i = 1, n do
+        local unit = (raid and "raid" or "party") .. i
+        local a, b = UnitName(unit)
+        local full = GetUnitName and GetUnitName(unit, true)
+        local roster = raid and GetRaidRosterInfo and GetRaidRosterInfo(i)
+        print(("%s: UnitName %s, %s | GetUnitName %s%s"):format(unit, q(a), q(b), q(full),
+            raid and (" | roster " .. q(roster)) or ""))
+    end
+    self:Print("Your realm: " .. q(GetNormalizedRealmName and GetNormalizedRealmName()))
+end
+
 -- v0.1 keyed character threads case-sensitively; v0.2 uses lowercase keys.
 local function migrate(db)
+    -- 1.0: people coming from an earlier version get a "what's new" card the next time the window opens
+    if not db.whatsNew100 then
+        if db.soundReset060 ~= nil then db.whatsNewPending = "1.0" end
+        db.whatsNew100 = true
+    end
     -- 0.6.0: the sound now plays for every message, so start everyone with it off once.
     if not db.soundReset060 then
         db.settings.sound = false
@@ -1182,6 +1206,10 @@ SlashCmdList.TELEGNOME = function(input)
     elseif cmd == "lfm" or cmd == "recruit" or cmd == "requests" then
         TG.Requests:SetRecruiting(not s.recruiting)
         if s.recruiting then TG.Requests:OpenPanel(nil, "requests") end
+    elseif cmd == "whatsnew" then
+        TG.Help:ShowWhatsNew()
+    elseif cmd == "names" then -- not in the help: what the game says the people in your group are called
+        TG:PrintGroupNames()
     elseif cmd == "dnd" then
         TG:SetDND(not s.dnd)
     elseif cmd == "new" then

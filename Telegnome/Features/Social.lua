@@ -32,6 +32,7 @@ function X:NoteGroup()
     if not (TG.db and IsInGroup and IsInGroup()) then return end
     local db = TG.db
     db.grouped = db.grouped or {}
+    db.groupedInfo = db.groupedInfo or {} -- the name as written and the class, for the New chat list
     local raid = IsInRaid and IsInRaid()
     local n = raid and (GetNumGroupMembers and GetNumGroupMembers() or 0)
         or (GetNumSubgroupMembers and GetNumSubgroupMembers() or 0)
@@ -49,6 +50,8 @@ function X:NoteGroup()
                     local key = TG.WhisperKey(name .. "-" .. realm)
                     if not db.grouped[key] then added = true end
                     db.grouped[key] = now
+                    local class = UnitClass and select(2, UnitClass(unit))
+                    db.groupedInfo[key] = { name = name .. "-" .. realm, class = clean(class) }
                 end
             end
         end
@@ -62,6 +65,12 @@ function X:Prune()
     local now = time()
     for key, t in pairs(g) do
         if type(t) ~= "number" or now - t > WEEK then g[key] = nil end
+    end
+    local info = TG.db.groupedInfo
+    if info then
+        for key in pairs(info) do
+            if not g[key] then info[key] = nil end
+        end
     end
 end
 

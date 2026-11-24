@@ -9,12 +9,17 @@ Two tabs: Chats and Lobby
 - Each section shows up to 8 conversations, then **Show N more** (Settings > Chats; 0 shows everything). Unread and open conversations always show.
 - Others go to Archive sooner than friends: after 1 day by default (Settings > Chats). Friends still after 7.
 - Right-click a section header > **Show only this section** hides the others until you click **Show all**.
+- **Your own section order:** drag a section header onto another one (or right-click > Move section up / down) to put, say, Channels above Friends. Pinned stays on top and Archive at the bottom; right-click > Reset section order puts it back.
+- **Drag to pin:** drag any conversation onto Pinned to pin it.
+- Right-click the Chats tab to mark everything as read (the tab's tooltip now says so).
+- Updating from an earlier version shows a short "Welcome to Telegnome 1.0" card the first time the window opens (`/tg whatsnew` shows it again).
 - Channels set not to show under Channels (right-click > Show under Channels) go to a folded **More channels** section.
 
 New chat
 - **+ New chat** opens a page with three choices: Direct message, Group chat or Channel. Direct message shows the player search right on that page; Group chat opens create / join; Channel leads to Follow a channel, Filtered channels or Your chat channels, each its own page.
 - Every New chat page has a **< Back** button, so you can look around without starting over.
 - The player search lists people you might want to whisper and don't have a chat with yet: people you've talked to in the last two days, your group right now, friends, people you grouped with this week and online guild members - each person once, with a label saying where you know them from. Filters at the top show one kind at a time (All · Recent · Group · Friends · Grouped · Guild); Friends lists offline friends last. Typing searches everyone, including people you already have a chat with and older contacts. It finds Battle.net friends by BattleTag or the character they're playing (the game keeps real names unreadable for addons). A scroll bar shows when the list is long.
+- People from other realms show their realm in the player search, and people you grouped with show in their class colour. Your own character no longer shows up under Guild.
 - The Direct message page has a Close button like the other pages.
 - **Saved ads have names:** saving an ad asks for a short name, and the Saved ads menu shows that name (hover it for the whole ad).
 - The "Business paused" and "back on" pop-ups are shorter, so they fit.
