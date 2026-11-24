@@ -394,8 +394,8 @@ function UI:Create()
     newBtn:SetScript("OnClick", function()
         if UI.tab == "queue" then
             TG.Requests:TogglePanel()
-        elseif TG.Picker.frame and TG.Picker.frame:IsShown() then
-            TG.Picker:Close()
+        elseif TG.NewChat:IsShown() then
+            TG.NewChat:Close()
         elseif TG.Groups:IsPanelShown() then
             TG.Groups:ClosePanel()
         elseif TG.Channels:IsPanelShown() then
@@ -683,7 +683,7 @@ function UI:UpdateCovered()
     local whole = settings or TG.Requests:IsPanelShown() or false          -- these cover the list too
     local otherPanel = TG.Groups:IsPanelShown() or TG.Channels:IsPanelShown() or TG.ChannelList:IsShown()
         or (TG.NewChat and TG.NewChat:IsShown()) or false
-    local picker = TG.Picker.frame and TG.Picker.frame:IsShown() or false  -- this one covers just the list
+    local picker = false -- (1.0: the player search sits on the New chat page, not over the list)
     -- Search gives way when another panel opens on top of it
     if TG.Search:IsShown() and (whole or otherPanel or picker) then TG.Search:Close() end
     local convCovered = whole or otherPanel or TG.Search:IsShown() or false

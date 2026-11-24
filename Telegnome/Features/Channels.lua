@@ -520,7 +520,9 @@ function C:CreatePanel()
     f:Hide()
     self.panel = f
 
-    -- two pages: Followed channels and Filtered channels
+    -- two pages, reached from New chat > Channel: Follow a channel and Filtered channels.
+    -- Each shows its own title next to Back (they used to be tabs on one page).
+    self.backBtn = TG.NewChat.BackButton(f, "follow")
     self.subTabs = {}
     local function subTab(text, id)
         local b = CreateFrame("Button", nil, f)
@@ -537,16 +539,16 @@ function C:CreatePanel()
         S.Paint(under, "hi", 1)
         b.under = under
         b.id = id
-        b:SetScript("OnClick", function() C:ShowSub(id) end)
+        b:EnableMouse(false)
         self.subTabs[#self.subTabs + 1] = b
         return b
     end
-    local t1 = subTab("Followed channels", "follow")
-    t1:SetPoint("TOPLEFT", 14, -8)
+    local t1 = subTab("Follow a channel", "follow")
+    t1:SetPoint("LEFT", self.backBtn, "RIGHT", 12, 0)
     local t2 = subTab("Filtered channels", "filter")
-    t2:SetPoint("LEFT", t1, "RIGHT", 22, 0)
+    t2:SetPoint("LEFT", self.backBtn, "RIGHT", 12, 0)
     local cog = S.Cog(f, 18)
-    cog:SetPoint("LEFT", t2, "RIGHT", 8, 0)
+    self.subCog = cog
     local line = S.Line(f)
     line:SetPoint("TOPLEFT", 8, -36)
     line:SetPoint("TOPRIGHT", -8, -36)
@@ -711,8 +713,13 @@ function C:ShowSub(id)
     self.pageB:SetShown(id == "filter")
     for _, b in ipairs(self.subTabs) do
         local on = b.id == id
-        b.under:SetShown(on)
-        if on then b.fs:SetTextColor(1, 0.82, 0) else b.fs:SetTextColor(0.6, 0.55, 0.45) end
+        b:SetShown(on)
+        b.under:Hide()
+        b.fs:SetTextColor(1, 0.82, 0)
+        if on then
+            self.subCog:ClearAllPoints()
+            self.subCog:SetPoint("LEFT", b.fs, "RIGHT", 8, 0)
+        end
     end
     self:RefreshPanel()
 end

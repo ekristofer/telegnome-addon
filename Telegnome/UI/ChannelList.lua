@@ -173,8 +173,9 @@ function L:Create()
     f:Hide()
     self.frame = f
 
+    local back = TG.NewChat.BackButton(f, "mine")
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 14, -10)
+    title:SetPoint("LEFT", back, "RIGHT", 12, 0)
     title:SetText("Your chat channels")
     local cog = S.Cog(f, 18)
     cog:SetPoint("LEFT", title, "RIGHT", 6, 0)

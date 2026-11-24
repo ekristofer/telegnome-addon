@@ -897,9 +897,10 @@ function G:CreatePanel()
     f:Hide()
     self.panel = f
 
+    local back = TG.NewChat.BackButton(f, "group")
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 14, -10)
-    title:SetText("Group chats")
+    title:SetPoint("LEFT", back, "RIGHT", 12, 0)
+    title:SetText("Group chat")
     local cog = S.Cog(f, 18)
     cog:SetPoint("LEFT", title, "RIGHT", 6, 0)
     local line = S.Line(f)

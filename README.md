@@ -88,7 +88,7 @@ Telegnome has two tabs: **Chats** and **Lobby**. Chats holds every conversation 
 
 Each section shows up to 8 conversations, then **Show N more** (Settings > Chats; 0 shows everything). Unread and open conversations always show. Click a header to fold it. Right-click a header to mark it as read, sort it, or **Show only this section** - every other section hides until you click **Show all**.
 
-**+ New chat** opens a page with three choices: **Direct message** (search for any player or friend), **Group chat** (create one, or join with a code) and **Channel** (follow a channel, a filtered channel, or your chat channels). Hovering a section header shows a small **+** that goes straight there.
+**+ New chat** opens a page with three choices: **Direct message** (search for any player or friend right there, or type a character name and press Enter), **Group chat** (create one, or join with a code) and **Channel** (Follow a channel, Filtered channels or Your chat channels, each its own page). Every page has a **< Back** button. Hovering a section header shows a small **+** that goes straight there.
 
 Right-click someone in the Direct message search and choose **Forget contact** to take them off that list. Telegnome opens on the tab and conversation you used last.
 

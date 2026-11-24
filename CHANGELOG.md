@@ -11,7 +11,9 @@ Two tabs: Chats and Lobby
 - Channels set not to show under Channels (right-click > Show under Channels) go to a folded **More channels** section.
 
 New chat
-- **+ New chat** opens a page with three choices: Direct message, Group chat or Channel. Each opens just what that kind needs (the player search, create / join a group, or follow / filtered channel / your chat channels).
+- **+ New chat** opens a page with three choices: Direct message, Group chat or Channel. Direct message shows the player search right on that page; Group chat opens create / join; Channel leads to Follow a channel, Filtered channels or Your chat channels, each its own page.
+- Every New chat page has a **< Back** button, so you can look around without starting over.
+- The player search lists all your friends from the start (it showed only one until you typed), and finds Battle.net friends by BattleTag or the character they're playing as well as by name.
 - Hover a section header for a small **+** that goes straight there: new message on Friends and Others, new group on Group chats, channel options on Channels.
 
 ## 0.9.2

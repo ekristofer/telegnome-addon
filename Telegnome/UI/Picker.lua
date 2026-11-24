@@ -1,4 +1,4 @@
--- Telegnome: "New message" picker. Lists remembered contacts, Battle.net friends
+-- Telegnome: the player search on New chat > Direct message. Lists remembered contacts, Battle.net friends
 -- and character friends, with a search box. Typing an unknown name starts a whisper to it.
 
 local _, ns = ...
@@ -14,11 +14,10 @@ function P:Create()
     if self.frame then return end
     UI:Create()
 
+    -- placed inside New chat > Direct message by ShowIn
     local f = CreateFrame("Frame", nil, UI.frame)
-    f:SetPoint("TOPLEFT", UI.list, "TOPLEFT", 0, 0)
-    f:SetPoint("BOTTOMRIGHT", UI.list, "BOTTOMRIGHT", 0, 0)
-    f:SetFrameLevel(UI.list:GetFrameLevel() + 20)
     f:EnableMouse(true)
+    f:SetScript("OnSizeChanged", function() P:Refresh() end)
     f:EnableMouseWheel(true)
     f:SetScript("OnMouseWheel", function(_, delta)
         P.offset = math.max(0, P.offset - delta)
@@ -40,14 +39,14 @@ function P:Create()
         P:Refresh()
     end)
     search:SetScript("OnEnterPressed", function() P:ChooseFirst() end)
-    search:SetScript("OnEscapePressed", function() P:Close() end)
+    search:SetScript("OnEscapePressed", function() TG.NewChat:Close() end)
     search:SetScript("OnEditFocusGained", function() P.placeholder:Hide() end)
     search:SetScript("OnEditFocusLost", function(s) P.placeholder:SetShown(s:GetText() == "") end)
     self.search = search
 
     local placeholder = search:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     placeholder:SetPoint("LEFT", 24, 0)
-    placeholder:SetText("Name or BattleTag")
+    placeholder:SetText("Character name, BattleTag or friend")
     self.placeholder = placeholder
 
     local none = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -68,10 +67,14 @@ function P:Gather(filter)
 
     local function add(key, info, match, sub, shortMatch)
         if seen[key] then return end
-        if filter ~= "" and not match:find(filter, 1, true) then return end
+        local name, color, online = TG:DisplayFor(key, info)
+        if filter ~= "" then
+            -- the name you see too, when the game lets addons read it (Battle.net real names it doesn't)
+            local shown = (type(name) == "string" and not name:find("|K", 1, true)) and name:lower() or ""
+            if not match:find(filter, 1, true) and not shown:find(filter, 1, true) then return end
+        end
         seen[key] = true
         if match == filter or shortMatch == filter then exact = true end
-        local name, color, online = TG:DisplayFor(key, info)
         out[#out + 1] = { key = key, info = info, name = name, color = color, online = online, sub = sub }
     end
 
@@ -101,7 +104,10 @@ function P:Gather(filter)
             for _, a in ipairs(list) do
                 local key, info = TG:BNInfoFromAccount(a)
                 TG.bnIDs[key] = a.bnetAccountID
-                add(key, info, a.battleTag:lower(), "Battle.net", a.battleTag:lower():match("^[^#]+"))
+                -- BattleTag, and the character they're playing if they're in WoW
+                local g = a.gameAccountInfo
+                local char = g and type(g.characterName) == "string" and g.characterName or ""
+                add(key, info, (a.battleTag .. " " .. char):lower(), "Battle.net", a.battleTag:lower():match("^[^#]+"))
             end
         end
     end
@@ -167,7 +173,10 @@ function P:Refresh()
     local results = self:Gather(filter)
     self.results = results
 
-    local h = (self.frame:GetHeight() or 0) - SEARCH_H
+    -- right after the page opens the game may not have sized the frame yet: assume a full page then
+    local fh = S.Num(self.frame:GetHeight(), 0)
+    if fh < SEARCH_H + UI.ROW_H then fh = 360 end
+    local h = fh - SEARCH_H
     local visible = math.max(1, math.floor(h / UI.ROW_H))
     self.offset = math.min(self.offset, math.max(0, #results - visible))
     self.none:SetShown(#results == 0 and filter == "")
@@ -193,7 +202,7 @@ function P:Refresh()
 end
 
 function P:Choose(entry)
-    self:Close()
+    TG.NewChat:Close(true)
     TG:OpenConversation(entry.key, entry.info)
 end
 
@@ -208,31 +217,33 @@ end
 -- Public
 ---------------------------------------------------------------------------
 
+-- New chat > Direct message.
 function P:Open()
-    if UI.tab ~= "all" then UI:SetTab("all") end
-    if TG.NewChat then TG.NewChat:Close() end
+    TG.NewChat:Open("dm")
+end
+
+-- Called by the New chat page: the search fills `area`.
+function P:ShowIn(area)
     self:Create()
-    TG.Settings:Close()
-    TG.Groups:ClosePanel()
-    TG.Channels:ClosePanel()
-    TG.ChannelList:Close()
-    TG.Requests:ClosePanel()
+    self.frame:SetParent(area)
+    self.frame:ClearAllPoints()
+    self.frame:SetAllPoints(area)
+    self.frame:SetFrameLevel(area:GetFrameLevel() + 2)
     self.offset = 0
     self.frame:Show()
     self.search:SetText("")
     self.placeholder:Hide()
     self.search:SetFocus()
-    UI.newBtn:SetText("Cancel")
     self:Refresh()
+    C_Timer.After(0, function() P:Refresh() end) -- once the frame has its size
 end
 
 function P:Close()
     if not self.frame then return end
     self.frame:Hide()
     self.search:ClearFocus()
-    UI:UpdateNewButton()
 end
 
 function P:Toggle()
-    if self.frame and self.frame:IsShown() then self:Close() else self:Open() end
+    if self.frame and self.frame:IsShown() then TG.NewChat:Close() else self:Open() end
 end
