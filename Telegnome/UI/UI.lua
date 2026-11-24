@@ -316,6 +316,23 @@ function UI:Create()
         self.tabs[def[1]] = tab
         self.tabOrder[i] = tab
     end
+    -- A very short line on what each tab is for (Queue has its own, below)
+    local TAB_TIPS = {
+        all = "Everything in one list: pinned, direct messages, group chats and channels.",
+        dm = "Whispers and Battle.net messages, one conversation per person.",
+        channels = "Guild, Party, Trade and other channels you follow.",
+        groups = "Private group chats with your friends.",
+    }
+    for id, tip in pairs(TAB_TIPS) do
+        local t = self.tabs[id]
+        t:HookScript("OnEnter", function(b)
+            GameTooltip:SetOwner(b, "ANCHOR_BOTTOM")
+            GameTooltip:SetText(b.baseText or id)
+            GameTooltip:AddLine(tip, 1, 1, 1, true)
+            GameTooltip:Show()
+        end)
+        t:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    end
     -- Queue: what it's for, and what is collecting right now (the tab is greyed out when nothing is)
     self.tabs.queue:HookScript("OnEnter", function(t)
         GameTooltip:SetOwner(t, "ANCHOR_BOTTOM")
