@@ -55,7 +55,7 @@ function B:Start(minutes)
     if s.businessPaused then
         TG:Print("Open for business is on, but paused while you're listed in the group finder.")
     else
-        TG:Print(("Open for business%s. Whispers from people you don't know go to Queue > Business.")
+        TG:Print(("Open for business%s. Whispers from people you don't know go to Lobby > Business.")
             :format(s.businessUntil and (" for " .. minutes .. " minutes") or ""))
     end
     changed()
@@ -74,7 +74,7 @@ function B:Stop(reason)
     end
     changed()
     local waiting = #TG.Requests:OpenKeys("business")
-    local body = waiting > 0 and (("%d whisper%s waiting in Queue > Business."):format(waiting, waiting == 1 and "" or "s"))
+    local body = waiting > 0 and (("%d whisper%s waiting in Lobby > Business."):format(waiting, waiting == 1 and "" or "s"))
         or "No whispers waiting."
     if reason == "time" then
         if TG.Toast then
@@ -119,7 +119,7 @@ function B:SyncPause()
             changed()
             if TG.Toast then
                 TG.Toast:Notice("|cffffd100Open for business is back on|r",
-                    "Whispers from people you don't know go to Queue > Business again.",
+                    "Whispers from people you don't know go to Lobby > Business again.",
                     function() TG.Requests:OpenPanel(nil, "business") end)
             end
             TG:Print("Open for business is back on.")
@@ -154,7 +154,7 @@ end
 function B:Post(i)
     local text = (S().ads or {})[i]
     if type(text) ~= "string" or not text:match("%S") then
-        TG:Print("Your ad is empty. Write it in Queue > Business first.")
+        TG:Print("Your ad is empty. Write it in Lobby > Business first.")
         return
     end
     local now = GetTime()
@@ -257,11 +257,11 @@ function B:OpenDurationMenu(anchor)
     end)
 end
 
--- The Business tab: shown unless you've hidden it (Settings > Queue), and while it's in use.
+-- The Business tab: shown unless you've hidden it (Settings > Lobby), and while it's in use.
 function B:TabVisible()
     if not TG.db then return false end
     local s = S()
-    if s.business then return true end -- (the Queue tab itself has its own Show tick)
+    if s.business then return true end -- (the Lobby tab itself has its own Show tick)
     for _, th in pairs(TG.db.threads) do
         if th.req and th.biz then return true end
     end

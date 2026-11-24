@@ -1018,7 +1018,8 @@ end
 
 function G:OpenPanel()
     UI:Show()
-    if UI.tab ~= "all" then UI:SetTab("groups") end
+    if UI.tab ~= "all" then UI:SetTab("all") end
+    if TG.NewChat then TG.NewChat:Close() end
     self:CreatePanel()
     TG.Settings:Close()
     TG.Picker:Close()

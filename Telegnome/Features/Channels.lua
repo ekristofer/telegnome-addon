@@ -448,7 +448,7 @@ function C:OpenMenu(key, anchor)
         root:CreateCheckbox("Count unread messages (red badge)",
             function() return C.Counts(th) end,
             function() th.count = not C.Counts(th); TG:RefreshUnread(); UI:RefreshList() end)
-        root:CreateCheckbox("Show in the All tab",
+        root:CreateCheckbox("Show under Channels (off: under More channels)",
             function() return th.inAll ~= false end,
             function() th.inAll = (th.inAll == false) and nil or false; TG:RefreshUnread(); UI:RefreshList() end)
         root:CreateCheckbox("Mute everything (alert words too)",
@@ -830,7 +830,7 @@ function C:RefreshFilterPage()
         self.filterNone:Show()
     elseif #keys > fit then
         self.filterNone:SetPoint("TOPLEFT", 16, self.filterListTop - fit * 24 - 2)
-        self.filterNone:SetText(("And %d more in the Channels tab."):format(#keys - fit))
+        self.filterNone:SetText(("And %d more under Channels in Chats."):format(#keys - fit))
         self.filterNone:Show()
     else
         self.filterNone:Hide()
@@ -917,7 +917,8 @@ end
 function C:OpenPanel(sub)
     if sub then self.sub = sub end
     UI:Show()
-    if UI.tab ~= "all" then UI:SetTab("channels") end
+    if UI.tab ~= "all" then UI:SetTab("all") end
+    if TG.NewChat then TG.NewChat:Close() end
     self:CreatePanel()
     TG.Settings:Close()
     TG.Picker:Close()

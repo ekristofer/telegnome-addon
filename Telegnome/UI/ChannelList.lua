@@ -258,6 +258,7 @@ function L:IsShown()
 end
 
 function L:Open()
+    if TG.NewChat then TG.NewChat:Close() end
     UI:Show()
     self:Create()
     TG.Settings:Close()

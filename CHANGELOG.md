@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.0
+
+Two tabs: Chats and Lobby
+- **Chats** (the old All tab) holds every conversation; the Direct, Channels and Groups tabs are gone. **Lobby** is the old Queue tab, still with LFM and Business. `/tg lobby` opens it (`/tg queue` still works).
+- New section order: **Pinned · Friends · Group chats · Channels · Others · Archive**. Direct messages from people you don't know sit under Others at the bottom, unread ones first.
+- Each section shows up to 8 conversations, then **Show N more** (Settings > Chats; 0 shows everything). Unread and open conversations always show.
+- Others go to Archive sooner than friends: after 1 day by default (Settings > Chats). Friends still after 7.
+- Right-click a section header > **Show only this section** hides the others until you click **Show all**.
+- Channels set not to show under Channels (right-click > Show under Channels) go to a folded **More channels** section.
+
+New chat
+- **+ New chat** opens a page with three choices: Direct message, Group chat or Channel. Each opens just what that kind needs (the player search, create / join a group, or follow / filtered channel / your chat channels).
+- Hover a section header for a small **+** that goes straight there: new message on Friends and Others, new group on Group chats, channel options on Channels.
+
 ## 0.9.2
 
 Queue: LFM and Business

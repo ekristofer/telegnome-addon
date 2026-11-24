@@ -180,7 +180,7 @@ function D:Start()
     UI.selected = nil
     UI:Show()
     UI:CloseOverlays()
-    UI:SetTab("dm")
+    UI:SetTab("all")
     UI:Select("W:tinkspark-gnomeregan")
     TG:RefreshUnread()
     TG:Print("Demo on: sample conversations for screenshots. Your own conversations are put aside and come back "
@@ -224,7 +224,7 @@ function D:Requests()
     if not self.on then self:Start() end
     TG.Requests:OpenPanel(nil, "requests")
     if TG.Toast then
-        TG.Toast:Notice("|cffffd100LFM is collecting|r", "Whispers from strangers go to Queue > LFM. Click to open.",
+        TG.Toast:Notice("|cffffd100LFM is collecting|r", "Whispers from strangers go to Lobby > LFM. Click to open.",
             function() TG.Requests:OpenPanel(nil, "requests") end)
     end
 end

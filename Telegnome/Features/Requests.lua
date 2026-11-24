@@ -37,7 +37,7 @@ function R:IsActive()
         or (TG.Business and TG.Business:IsOn()) or false
 end
 
--- Which side of the Queue tab is showing: "requests" (LFM: the group finder) or "business" (your ad).
+-- Which side of the Lobby tab is showing: "requests" (LFM: the group finder) or "business" (your ad).
 -- It's remembered between sessions.
 function R:View()
     local v = self.view or (TG.db and TG.db.queueView)
@@ -85,7 +85,7 @@ function R:SetRecruiting(on)
     if (s.recruiting and true or false) == on then return end
     s.recruiting = on
     s.recruitPausedByBiz = nil
-    TG:Print("Collect now (Queue > LFM): collecting strangers' whispers at any time, listed or not: " .. (on and "on" or "off"))
+    TG:Print("Collect now (Lobby > LFM): collecting strangers' whispers at any time, listed or not: " .. (on and "on" or "off"))
     TG.Business:SyncPause()
     TG:RefreshUnread()
     if UI.frame then UI:UpdateTabs() end
@@ -378,7 +378,7 @@ local function repliesFor(key)
     return s.quickReplies or {}, s.declineReply, s.declineReply -- Requests: Decline all sends the same message
 end
 
--- all: sent by Decline all, which in Queue > Business has its own message ("Sorry, I'm done for now.")
+-- all: sent by Decline all, which in Lobby > Business has its own message ("Sorry, I'm done for now.")
 function R:Decline(key, all)
     local _, one, every = repliesFor(key)
     local text = all and every or one
@@ -633,7 +633,7 @@ function R:Create()
     UI:Create()
 
     -- covers the list and the conversation: the overview has the whole width
-    -- the two sides of the Queue tab, in a bar above the overview: LFM | Business
+    -- the two sides of the Lobby tab, in a bar above the overview: LFM | Business
     local SEG_H = 36
     local seg = CreateFrame("Frame", nil, UI.right, "BackdropTemplate")
     seg:SetPoint("TOPLEFT", UI.body, "TOPLEFT", 0, 0)
@@ -710,7 +710,7 @@ function R:Create()
     end)
     S.Tooltip(manual, "Collect whispers", "While you're listed in the group finder (alone, or as the group's "
         .. "leader), whispers from people who aren't friends, guild members or favorites land here. Untick to "
-        .. "pause that and get them under Direct messages.")
+        .. "pause that and get them under Others in Chats.")
     self.manual = manual
 
     -- when not listed: collect anyway (the same as /tg recruit)
@@ -740,7 +740,7 @@ function R:Create()
     start:SetPoint("TOPRIGHT", -14, -8)
     start:SetScript("OnClick", function() TG.Business:Toggle() end)
     S.Tooltip(start, "Open for business", "While it's open, whispers from people who aren't friends, guild members or "
-        .. "favorites are collected here, with the quick replies from Settings > Queue.")
+        .. "favorites are collected here, with the quick replies from Settings > Lobby.")
     biz.start = start
     local dur = S.Button(f, "", 140, 22)
     dur:SetPoint("RIGHT", start, "LEFT", -8, 0)
@@ -919,8 +919,8 @@ function R:Create()
     decline:SetPoint("BOTTOMRIGHT", -30, 9) -- clear of the window's resize corner
     decline:SetScript("OnClick", function() R:ConfirmDeclineAll() end)
     S.Tooltip(decline, "Decline all", "Sends your decline message to everyone still on the list and takes them off it. "
-        .. "People you invited or who are in your group stay. In Queue > Business it sends the Decline all message "
-        .. "from Settings > Queue instead.")
+        .. "People you invited or who are in your group stay. In Lobby > Business it sends the Decline all message "
+        .. "from Settings > Lobby instead.")
     self.declineBtn = decline
 
     local clear = S.Link(f, "Clear all", "GameFontNormal")
@@ -1212,7 +1212,7 @@ function R:IsPanelShown()
     return self.panel and self.panel:IsShown() or false
 end
 
--- fromTab: called by UI:SetTab, which has already switched to the Queue tab. view: "requests" (LFM) or
+-- fromTab: called by UI:SetTab, which has already switched to the Lobby tab. view: "requests" (LFM) or
 -- "business" to switch sides; nil keeps the side you were on.
 function R:OpenPanel(fromTab, view)
     if view == "requests" or view == "business" then self:SetView(view) end
@@ -1257,9 +1257,9 @@ function R:CheckHosting()
         bizHandled = TG.Business:OnHostingChanged(hosting)
     end
     if hosting and not self.wasHosting and self:IsActive() and not bizHandled then
-        TG:Print("You're listed in the group finder. Whispers from people you don't know go to Queue > LFM.")
+        TG:Print("You're listed in the group finder. Whispers from people you don't know go to Lobby > LFM.")
         if TG.Toast then
-            TG.Toast:Notice("|cffffd100LFM is collecting|r", "Whispers from strangers go to Queue > LFM. Click to open.",
+            TG.Toast:Notice("|cffffd100LFM is collecting|r", "Whispers from strangers go to Lobby > LFM. Click to open.",
                 function() R:OpenPanel(nil, "requests") end)
         end
     end

@@ -11,7 +11,7 @@ TG.Settings = O
 local CATEGORIES = { "notify", "window", "chat", "requests", "data", "help" }
 -- Where the cog opens from each tab: page, and the section on it.
 local TAB_PAGE = {
-    all = { "notify" }, dm = { "notify" }, channels = { "chat", "out" }, groups = { "notify", "groups" },
+    all = { "chat" },
     queue = { "requests" }, -- the LFM or Business section, whichever side is showing (O:Open)
 }
 local LIST_W = 216
@@ -325,7 +325,7 @@ function O:Create()
     section("Group chats and channels", "groups")
     self.notifyGroups = check("Also pop up for group chat messages", 30,
         function() return s().notifyGroups end, function(v) s().notifyGroups = v end,
-        "Group chats", "Followed channels have their own Pop-up tick in the Followed channels tab.")
+        "Group chats", "Followed channels have their own Pop-up tick (right-click a channel).")
 
     check("Show who joins and leaves group chats", 30,
         function() return s().groupJoinLeave end, function(v) s().groupJoinLeave = v end,
@@ -548,9 +548,9 @@ function O:Create()
     check("Count people I grouped with in the last week as friends", 0,
         function() return s().groupedFriends ~= false end, function(v) s().groupedFriends = v; TG:QueueRefresh() end,
         "Grouped with", "Players you were in a group with in the last seven days are listed under Friends, and their "
-        .. "whispers don't go to the Queue. The conversation says when you last grouped.")
+        .. "whispers don't go to the Lobby. The conversation says when you last grouped.")
     local archTip = "Direct messages with no new messages for this many days move to Archive, a folded section at "
-        .. "the bottom of the All and Direct tabs. A new message brings them back. Right-click any conversation "
+        .. "the bottom of Chats. A new message brings them back. Right-click any conversation "
         .. "to archive it yourself, or to move it out."
     local arch = check("Archive direct messages after", 0,
         function() return s().archiveOn ~= false end, function(v) s().archiveOn = v; UI:RefreshList() end,
@@ -581,6 +581,43 @@ function O:Create()
     daysLabel:SetText("days without new messages")
     self.archiveDays = days
     gap(4)
+    -- small number settings: a label, a box, and a word after it
+    self.numBoxes = self.numBoxes or {}
+    local function numBox(label, key, default, min, after, tip)
+        index(label .. " " .. after, tip, y)
+        local l = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        l:SetPoint("TOPLEFT", 40, y - 4)
+        l:SetText(label)
+        local box = S.EditBox(content)
+        box:SetPoint("LEFT", l, "RIGHT", 8, -1)
+        box:SetSize(44, 22)
+        box:SetNumeric(true)
+        box:SetMaxLetters(3)
+        box:SetJustifyH("CENTER")
+        box.get = function() return tostring(s()[key] or default) end
+        box:SetScript("OnTextChanged", function(b, userInput)
+            if not userInput then return end
+            local n = tonumber(b:GetText())
+            if n and n >= min then s()[key] = n; UI:RefreshList() end
+        end)
+        box:SetScript("OnEnterPressed", function(b) b:SetText(b.get()); b:ClearFocus() end)
+        box:SetScript("OnEditFocusLost", function(b) b:SetText(b.get()) end)
+        S.Tooltip(box, label, tip)
+        local a = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        a:SetPoint("LEFT", box, "RIGHT", 6, 1)
+        a:SetText(after)
+        self.numBoxes[#self.numBoxes + 1] = box
+        y = y - 28
+        return box
+    end
+    numBox("Others (people you don't know) after", "archiveOthersDays", 1, 1, "days",
+        "People who aren't friends, guild members or people you grouped with go to Archive sooner, so strangers "
+        .. "you whispered once tidy themselves away. Friends use the number above.")
+    gap(4)
+    numBox("Show up to", "sectionLimit", 8, 0, "chats per section, then Show more",
+        "Each section in Chats shows this many conversations, then a Show more link. Pinned and unread "
+        .. "conversations always show. 0 shows everything.")
+    gap(4)
 
     section("Dungeons and raids")
     index("In dungeons and raids: ask, always follow, never", "Follow Party or Raid chat while you're inside.")
@@ -598,7 +635,7 @@ function O:Create()
             O:Refresh()
         end)
         S.Tooltip(r, "Dungeons and raids", "Follow Party chat in a dungeon, or Raid chat in a raid (and Instance "
-            .. "chat), until you leave. It's pinned at the top of the All tab while you're inside. Ask: a pop-up "
+            .. "chat), until you leave. It's pinned at the top of Chats while you're inside. Ask: a pop-up "
             .. "you click when you enter.")
         prevI = r.label
         self.instRadios[#self.instRadios + 1] = r
@@ -626,16 +663,16 @@ function O:Create()
     y = y - 30
 
     ---------------------------------------------------------------- Queue
-    page("requests", "Queue", "The Queue tab: whispers from people you don't know, for your group (LFM) or your ad (Business).")
-    check("Show the Queue tab", 0,
+    page("requests", "Lobby", "The Lobby tab: whispers from people you don't know, for your group (LFM) or your ad (Business).")
+    check("Show the Lobby tab", 0,
         function() return s().showRequestsTab ~= false end, function(v) s().showRequestsTab = v; UI:UpdateTabs() end,
-        "Queue tab", "On: the tab is always there, greyed out while nothing is collecting. Off: it only shows up "
+        "Lobby tab", "On: the tab is always there, greyed out while nothing is collecting. Off: it only shows up "
         .. "while LFM or Business is collecting, and while requests are waiting on it.")
     section("LFM")
     check("Collect strangers' whispers in LFM while I'm listed", 0,
         function() return s().requestsTab end, function(v) s().requestsTab = v end,
         "LFM", "While you or your group are listed in the group finder, whispers from people who aren't "
-        .. "friends, guild members or favorites go to Queue > LFM, as cards with their class and level and an "
+        .. "friends, guild members or favorites go to Lobby > LFM, as cards with their class and level and an "
         .. "Invite button. In a group, only the leader collects. To collect at other times: Collect now, or /tg lfm")
     gap(8)
     local qrHint = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -667,14 +704,14 @@ function O:Create()
     replyBox("Decline", function() return s().bizDecline or "" end, function(v) s().bizDecline = v end)
     local bdaBox = replyBox("Decline all", function() return s().bizDeclineAll or "" end,
         function(v) s().bizDeclineAll = v end)
-    S.Tooltip(bdaBox, "Decline all message", "The Decline all button in Queue > Business sends this to everyone "
+    S.Tooltip(bdaBox, "Decline all message", "The Decline all button in Lobby > Business sends this to everyone "
         .. "still waiting. Leave it empty to clear the list without a message.")
     gap(4)
     local bizNote = content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     bizNote:SetPoint("TOPLEFT", 18, y)
     bizNote:SetPoint("RIGHT", content, "RIGHT", -12, 0)
     bizNote:SetJustifyH("LEFT")
-    bizNote:SetText("Your ad, Start / Stop and how long it stays open are in Queue > Business. Only one of LFM "
+    bizNote:SetText("Your ad, Start / Stop and how long it stays open are in Lobby > Business. Only one of LFM "
         .. "and Business collects at a time, and the one started last wins: listing in the group finder or Collect "
         .. "now pauses Business, and starting Business pauses Collect now. Also: /tg business [minutes|off]")
     bizNote:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
@@ -710,7 +747,7 @@ function O:Create()
 
     ---------------------------------------------------------------- Help
     page("help", "Help", "What each tab is for. The ? next to the cog shows the same for the tab you're on.")
-    for _, tab in ipairs({ "all", "dm", "channels", "groups", "queue" }) do
+    for _, tab in ipairs({ "all", "queue" }) do
         local h = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         h:SetPoint("TOPLEFT", 18, y)
         h:SetText(TG.Help.Title(tab))
@@ -952,6 +989,9 @@ function O:Refresh()
     for _, box in ipairs(self.replyBoxes) do
         if not box:HasFocus() then box:SetText(box.get()) end
     end
+    for _, box in ipairs(self.numBoxes or {}) do
+        if not box:HasFocus() then box:SetText(box.get()) end
+    end
     self.refreshing = true
     self.opacity:SetValue(st.opacity or 100)
     self.refreshing = false
@@ -983,7 +1023,7 @@ function O:Open(page, section)
         if UI.tab == "queue" and TG.Requests:View() == "business" then section = "business" end
     end
     if TG.Help then TG.Help:Close() end
-    -- closing Settings goes back to the Queue overview if that was open
+    -- closing Settings goes back to the Lobby overview if that was open
     if not self:IsShown() then
         self.backTo = TG.Requests:IsPanelShown() and UI.tab or nil
     end

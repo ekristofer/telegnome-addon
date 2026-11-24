@@ -209,7 +209,8 @@ end
 ---------------------------------------------------------------------------
 
 function P:Open()
-    if UI.tab ~= "dm" and UI.tab ~= "all" then UI:SetTab("dm") end
+    if UI.tab ~= "all" then UI:SetTab("all") end
+    if TG.NewChat then TG.NewChat:Close() end
     self:Create()
     TG.Settings:Close()
     TG.Groups:ClosePanel()

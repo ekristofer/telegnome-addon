@@ -81,8 +81,8 @@ end
 -- Frame construction
 ---------------------------------------------------------------------------
 
-local TABS = { { "all", "All" }, { "dm", "Direct" }, { "channels", "Channels" }, { "groups", "Groups" },
-    { "queue", "Queue" } }
+-- 1.0: two tabs. Chats ("all") holds every conversation in sections; Lobby ("queue") collects strangers.
+local TABS = { { "all", "Chats" }, { "queue", "Lobby" } }
 
 -- The Queue tab (LFM and Business): while it's turned on in Settings, collecting, or has requests on it.
 function UI.QueueVisible()
@@ -316,27 +316,19 @@ function UI:Create()
         self.tabs[def[1]] = tab
         self.tabOrder[i] = tab
     end
-    -- A very short line on what each tab is for (Queue has its own, below)
-    local TAB_TIPS = {
-        all = "Everything in one list: pinned, direct messages, group chats and channels.",
-        dm = "Whispers and Battle.net messages, one conversation per person.",
-        channels = "Guild, Party, Trade and other channels you follow.",
-        groups = "Private group chats with your friends.",
-    }
-    for id, tip in pairs(TAB_TIPS) do
-        local t = self.tabs[id]
-        t:HookScript("OnEnter", function(b)
-            GameTooltip:SetOwner(b, "ANCHOR_BOTTOM")
-            GameTooltip:SetText(b.baseText or id)
-            GameTooltip:AddLine(tip, 1, 1, 1, true)
-            GameTooltip:Show()
-        end)
-        t:HookScript("OnLeave", function() GameTooltip:Hide() end)
-    end
-    -- Queue: what it's for, and what is collecting right now (the tab is greyed out when nothing is)
+    -- A very short line on what the Chats tab is for (Lobby has its own, below)
+    self.tabs.all:HookScript("OnEnter", function(b)
+        GameTooltip:SetOwner(b, "ANCHOR_BOTTOM")
+        GameTooltip:SetText("Chats")
+        GameTooltip:AddLine("Every conversation in one list: pinned, friends, group chats, channels and others.",
+            1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    self.tabs.all:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    -- Lobby: what it's for, and what is collecting right now (the tab is greyed out when nothing is)
     self.tabs.queue:HookScript("OnEnter", function(t)
         GameTooltip:SetOwner(t, "ANCHOR_BOTTOM")
-        GameTooltip:SetText("Queue")
+        GameTooltip:SetText("Lobby")
         GameTooltip:AddLine("Whispers from people you don't know, as cards: answers to your group finder "
             .. "listing (LFM) or to your ad (Business).", 1, 1, 1, true)
         local st = TG.db.settings
@@ -402,20 +394,16 @@ function UI:Create()
     newBtn:SetScript("OnClick", function()
         if UI.tab == "queue" then
             TG.Requests:TogglePanel()
-        elseif UI.tab == "groups" then
-            TG.Groups:TogglePanel()
-        elseif UI.tab == "channels" then
-            TG.Channels:TogglePanel()
-        elseif UI.tab == "all" and MenuUtil and MenuUtil.CreateContextMenu then
-            MenuUtil.CreateContextMenu(newBtn, function(_, root)
-                root:CreateButton("New message", function() TG.Picker:Open() end)
-                root:CreateButton("New group chat", function() TG.Groups:OpenPanel() end)
-                root:CreateButton("Follow a channel", function() TG.Channels:OpenPanel("follow") end)
-                root:CreateButton("Add a filtered channel", function() TG.Channels:OpenPanel("filter") end)
-                root:CreateButton("Open for business", function() TG.Requests:OpenPanel(nil, "business") end)
-            end)
+        elseif TG.Picker.frame and TG.Picker.frame:IsShown() then
+            TG.Picker:Close()
+        elseif TG.Groups:IsPanelShown() then
+            TG.Groups:ClosePanel()
+        elseif TG.Channels:IsPanelShown() then
+            TG.Channels:ClosePanel()
+        elseif TG.ChannelList:IsShown() then
+            TG.ChannelList:Close()
         else
-            TG.Picker:Toggle()
+            TG.NewChat:Toggle() -- the New chat page: Direct message, Group chat or Channel
         end
     end)
     self.newBtn = newBtn
@@ -486,8 +474,8 @@ function UI:Create()
         local th = UI.selected and TG.db.threads[UI.selected]
         GameTooltip:SetOwner(s, "ANCHOR_BOTTOM")
         GameTooltip:SetText(th and th.fav and "Unpin" or "Pin to the top")
-        GameTooltip:AddLine(th and th.req and "Keeps this person: they move from the Queue to your Direct messages."
-            or "Pinned conversations stay at the top of the All tab (and of Direct messages, for people).", 1, 1, 1, true)
+        GameTooltip:AddLine(th and th.req and "Keeps this person: they move from the Lobby to Pinned in Chats."
+            or "Pinned conversations stay at the top of Chats.", 1, 1, 1, true)
         GameTooltip:Show()
     end)
     favBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -680,6 +668,7 @@ function UI:Create()
         -- the Requests or Business overview comes back when you open the window again
         UI.reopenOverview = TG.Requests:IsPanelShown() or nil
         TG.Picker:Close(); TG.Settings:Close(); TG.Groups:ClosePanel(); TG.Channels:ClosePanel(); TG.ChannelList:Close(); TG.Requests:ClosePanel()
+        if TG.NewChat then TG.NewChat:Close() end
         TG.Search:Close()
     end)
 
@@ -692,7 +681,8 @@ end
 function UI:UpdateCovered()
     local settings = TG.Settings:IsShown() and true or false
     local whole = settings or TG.Requests:IsPanelShown() or false          -- these cover the list too
-    local otherPanel = TG.Groups:IsPanelShown() or TG.Channels:IsPanelShown() or TG.ChannelList:IsShown() or false
+    local otherPanel = TG.Groups:IsPanelShown() or TG.Channels:IsPanelShown() or TG.ChannelList:IsShown()
+        or (TG.NewChat and TG.NewChat:IsShown()) or false
     local picker = TG.Picker.frame and TG.Picker.frame:IsShown() or false  -- this one covers just the list
     -- Search gives way when another panel opens on top of it
     if TG.Search:IsShown() and (whole or otherPanel or picker) then TG.Search:Close() end
@@ -802,6 +792,7 @@ end
 
 -- Section headers with "Close all".
 UI.CLOSE_ALL = { others = "others", all_others = "others", archive = "archive", all_archive = "archive" }
+-- (UI.PLUS_FOR: the "+" on a section header, set with the sections further down)
 
 -- "Archive" / "Move out of Archive" (direct messages).
 function UI.AddArchiveEntry(root, key)
@@ -968,9 +959,10 @@ function UI:GetRow(i)
     x:SetScript("OnEnter", function(s)
         xi:SetVertexColor(1, 0.91, 0.69)
         GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
-        if UI.tab == "groups" then
+        local th = row.key and TG.db.threads[row.key]
+        if th and th.kind == "GROUP" then
             GameTooltip:SetText("Leave group")
-        elseif UI.tab == "channels" then
+        elseif th and th.kind == "CHANNEL" then
             GameTooltip:SetText("Unfollow channel")
         else
             GameTooltip:SetText("Close conversation")
@@ -1032,16 +1024,35 @@ function UI:GetRow(i)
     closeAll:HookScript("OnLeave", function() GameTooltip:Hide() end)
     closeAll:Hide()
     row.closeAll = closeAll
+    -- "+" on Friends, Others, Group chats and Channels while the mouse is over the header: start one of those
+    local plus = CreateFrame("Button", nil, row, "BackdropTemplate")
+    plus:SetSize(18, 18)
+    S.Flat(plus)
+    S.Paint(plus, "button")
+    local plusText = plus:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    plusText:SetPoint("CENTER", 0, 1)
+    plusText:SetText("+")
+    plus:SetScript("OnClick", function(s) UI:OpenSectionPlus(row.header, s) end)
+    plus:HookScript("OnEnter", function(s)
+        GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
+        GameTooltip:SetText(UI.PLUS_TIPS[UI.PLUS_FOR[row.header] or ""] or "New")
+        GameTooltip:Show()
+    end)
+    plus:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    plus:Hide()
+    row.plus = plus
     local function hover()
-        if not UI.CLOSE_ALL[row.header] then return end
+        if not (UI.CLOSE_ALL[row.header] or UI.PLUS_FOR[row.header]) then return end
         local over = row:IsMouseOver() and true or false
-        closeAll:SetShown(over)
+        closeAll:SetShown(over and UI.CLOSE_ALL[row.header] and true or false)
+        plus:SetShown(over and UI.PLUS_FOR[row.header] and true or false)
         row.headPill:SetShown(not over and (row.headUnread or 0) > 0)
         UI:LayoutHeaderRule(row)
     end
     row:HookScript("OnEnter", hover)
     row:HookScript("OnLeave", hover)
     closeAll:HookScript("OnLeave", hover)
+    plus:HookScript("OnLeave", hover)
 
     -- drag a pinned conversation onto another pinned one to reorder Pinned
     row:RegisterForDrag("LeftButton")
@@ -1065,6 +1076,15 @@ function UI:GetRow(i)
         end
     end)
     row:SetScript("OnClick", function(s, button)
+        if s.moreFor then -- "Show 14 more" / "Show less" / "Show all sections"
+            if s.moreFor == "__all" then
+                UI.focusSection = nil
+            else
+                UI.expanded[s.moreFor] = not UI.expanded[s.moreFor] or nil
+            end
+            UI:RefreshList()
+            return
+        end
         if s.header and button == "RightButton" then
             UI:OpenHeaderMenu(s)
             return
@@ -1091,8 +1111,17 @@ end
 -- The thin line of a section header runs from the label to whatever sits on the right.
 function UI:LayoutHeaderRule(row)
     local reserve = 6
+    row.plus:ClearAllPoints()
     if row.closeAll:IsShown() then
         reserve = reserve + num(row.closeAll:GetWidth(), 50) + 6
+        row.plus:SetPoint("RIGHT", row.closeAll, "LEFT", -6, 0)
+    else
+        row.plus:SetPoint("RIGHT", -6, 0)
+    end
+    if row.plus:IsShown() then
+        reserve = reserve + 24
+    elseif row.closeAll:IsShown() then
+        -- (already counted)
     elseif row.headPill:IsShown() then
         reserve = reserve + num(row.headPill:GetWidth(), 16) + 6
     end
@@ -1105,14 +1134,16 @@ local function showHint(row, e)
     row.key, row.headUnread, row.sectionKeys = nil, nil, nil
     row.dot:Hide(); row.name:Hide(); row.time:Hide(); row.preview:Hide(); row.pill:Hide(); row.close:Hide()
     row.chevDown:Hide(); row.chevRight:Hide(); row.caption:Hide(); row.rule:Hide(); row.headPill:Hide(); row.closeAll:Hide()
-    row.groupIcon:Hide(); row.hash:Hide(); row.quiet:Hide()
+    row.groupIcon:Hide(); row.hash:Hide(); row.quiet:Hide(); row.plus:Hide()
     row:SetSelected(false)
+    row.moreFor = e.more
     row.hint:SetText(e.hint)
+    if e.more then row.hint:SetTextColor(0.85, 0.66, 0.29) else row.hint:SetTextColor(0.55, 0.50, 0.42) end
     row.hint:Show()
 end
 
 local function showHeader(row, e)
-    row.key = nil
+    row.key, row.moreFor = nil, nil
     row.headUnread = e.unread
     row.sectionKeys = e.keys
     row.dot:Hide(); row.name:Hide(); row.time:Hide(); row.preview:Hide(); row.pill:Hide(); row.close:Hide()
@@ -1130,16 +1161,19 @@ local function showHeader(row, e)
     row.caption:Show()
     row.caption:SetText(("%s  |cff8a7a5c%d|r"):format(e.label:upper(), e.count))
     row.rule:Show()
-    local over = UI.CLOSE_ALL[e.header] and row:IsMouseOver() and true or false
+    local mouse = row:IsMouseOver() and true or false
+    local over = UI.CLOSE_ALL[e.header] and mouse or false
     row.closeAll:SetShown(over)
-    row.headPill:SetCount(over and 0 or e.unread)
+    row.plus:SetShown(UI.PLUS_FOR[e.header] and mouse or false)
+    row.headPill:SetCount((over or row.plus:IsShown()) and 0 or e.unread)
     UI:LayoutHeaderRule(row)
 end
 
 local function showChat(row, key, selected, width)
     local th = TG.db.threads[key]
-    row.key, row.headUnread = key, nil
+    row.key, row.headUnread, row.moreFor = key, nil, nil
     row.chevDown:Hide(); row.chevRight:Hide(); row.caption:Hide(); row.rule:Hide(); row.headPill:Hide(); row.closeAll:Hide()
+    row.plus:Hide()
     row.hint:Hide()
     row.sectionKeys = nil
     local name, color, online = TG:ThreadDisplay(key)
@@ -1166,11 +1200,9 @@ local function showChat(row, key, selected, width)
     row:SetSelected(selected)
 end
 
--- The All tab: everything except requests, and except channels set not to show there (unless pinned).
+-- The Chats tab: everything except requests (channels set not to show under Channels go to More channels).
 function UI.InAll(th)
-    if th.req then return false end
-    if th.kind == "CHANNEL" and th.inAll == false and not th.fav and not th.tempPin then return false end
-    return true
+    return not th.req
 end
 
 function UI.Belongs(th, tab)
@@ -1186,9 +1218,7 @@ end
 
 function UI.TabOf(th)
     if th.req then return "queue" end
-    if th.kind == "GROUP" then return "groups" end
-    if th.kind == "CHANNEL" then return "channels" end
-    return "dm"
+    return "all"
 end
 
 -- How the list is sorted inside each section (Settings > Look, right-click a section header, /tg sort).
@@ -1235,8 +1265,21 @@ end
 function UI:OpenHeaderMenu(row)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
     local keys = row.sectionKeys or {}
+    local id = row.header
     MenuUtil.CreateContextMenu(row, function(_, root)
         root:CreateButton("Mark all as read", function() TG:MarkRead(keys) end)
+        if UI.tab == "all" then
+            if UI.focusSection then
+                root:CreateButton("Show all sections", function() UI.focusSection = nil; UI:RefreshList() end)
+            else
+                root:CreateButton("Show only this section", function()
+                    UI.focusSection = id
+                    TG.db.collapsed[id] = nil
+                    UI.offset = 0
+                    UI:RefreshList()
+                end)
+            end
+        end
         root:CreateDivider()
         root:CreateTitle("Sort conversations")
         for _, how in ipairs(UI.SORT_ORDER) do
@@ -1279,11 +1322,40 @@ local SECTIONS = {
 -- What the list shows, top to bottom: { key = ... } rows and, on the Direct messages tab,
 local ALL_SECTIONS = {
     { id = "all_pinned", label = "Pinned" },
-    { id = "all_dm", label = "Direct messages" },
-    { id = "all_channels", label = "Channels" },
+    { id = "all_friends", label = "Friends" },
     { id = "all_groups", label = "Group chats" },
+    { id = "all_channels", label = "Channels" },
+    { id = "all_others", label = "Others" },
+    { id = "all_more", label = "More channels", folded = true }, -- channels set not to show under Channels
     { id = "all_archive", label = "Archive" },
 }
+
+-- The "+" on a section header, and what it starts.
+UI.PLUS_FOR = { all_friends = "dm", all_others = "dm", all_groups = "groups", all_channels = "channels",
+    all_more = "channels" }
+UI.PLUS_TIPS = { dm = "New message", groups = "New group chat or join with a code",
+    channels = "Follow a channel, filtered channel, your chat channels" }
+
+-- Sections opened past their limit with "Show more" (this session only), and the one section shown alone.
+UI.expanded = {}
+UI.focusSection = nil
+
+function UI:OpenSectionPlus(header, anchor)
+    local what = UI.PLUS_FOR[header]
+    if what == "dm" then
+        TG.Picker:Open()
+    elseif what == "groups" then
+        TG.Groups:OpenPanel()
+    elseif what == "channels" then
+        if not (MenuUtil and MenuUtil.CreateContextMenu) then TG.Channels:OpenPanel("follow") return end
+        MenuUtil.CreateContextMenu(anchor, function(_, root)
+            root:CreateTitle("Channels")
+            root:CreateButton("Follow a channel...", function() TG.Channels:OpenPanel("follow") end)
+            root:CreateButton("Filtered channel...", function() TG.Channels:OpenPanel("filter") end)
+            root:CreateButton("Your chat channels", function() TG.ChannelList:Open() end)
+        end)
+    end
+end
 
 -- Pinned is in your own order: a dungeon's chat first while you're inside, then by pinOrder (drag to change),
 -- then pins from before 0.9 in the list's sort order.
@@ -1359,41 +1431,76 @@ function UI:AddDMSubsections(entries, keys)
     end
 end
 
--- The All tab: Pinned (anything starred, and a dungeon's chat while you're inside), then each kind.
+-- The Chats tab: Pinned (anything starred, and a dungeon's chat while you're inside), Friends, Group chats,
+-- Channels, Others (people you don't know, unread first), More channels and Archive. Each section shows up to
+-- Settings > Chats' limit, then "Show N more"; unread and open conversations always show.
 function UI:BuildAllEntries(keys)
     local entries = {}
     if #keys == 0 then return entries end
     local threads = TG.db.threads
-    local buckets = { all_pinned = {}, all_dm = {}, all_groups = {}, all_channels = {}, all_archive = {} }
+    local buckets = {}
+    for _, sec in ipairs(ALL_SECTIONS) do buckets[sec.id] = {} end
     for _, k in ipairs(keys) do
         local th = threads[k]
-        local id = (th.fav or th.tempPin) and "all_pinned" or TG:IsArchived(th) and "all_archive"
-            or th.kind == "GROUP" and "all_groups"
-            or th.kind == "CHANNEL" and "all_channels" or "all_dm"
+        local id
+        if th.fav or th.tempPin then id = "all_pinned"
+        elseif TG:IsArchived(th) then id = "all_archive"
+        elseif th.kind == "GROUP" then id = "all_groups"
+        elseif th.kind == "CHANNEL" then id = th.inAll == false and "all_more" or "all_channels"
+        else id = TG:SectionOf(th) == "friends" and "all_friends" or "all_others" end
         local b = buckets[id]
         b[#b + 1] = k
     end
     sortPinned(buckets.all_pinned, threads)
+    -- Others: unread first, otherwise in the list's order
+    do
+        local b, pos = buckets.all_others, {}
+        for i, k in ipairs(b) do pos[k] = i end
+        table.sort(b, function(x, y)
+            local ux, uy = (threads[x].unread or 0) > 0, (threads[y].unread or 0) > 0
+            if ux ~= uy then return ux end
+            return pos[x] < pos[y]
+        end)
+    end
     local collapsed = TG.db.collapsed
+    local limit = tonumber(TG.db.settings.sectionLimit) or 8
+    local focus = self.focusSection
+    if focus and not buckets[focus] then focus, self.focusSection = nil, nil end
+    if focus then entries[#entries + 1] = { hint = "Showing one section.  Show all", more = "__all" } end
     for _, sec in ipairs(ALL_SECTIONS) do
         local b = buckets[sec.id]
-        if #b > 0 or sec.id == "all_pinned" then
+        if (not focus or focus == sec.id) and (#b > 0 or (sec.id == "all_pinned" and not focus)) then
             local unread = 0
             for _, k in ipairs(b) do
                 if k ~= self.selected then unread = unread + UI.UnreadOf(threads[k]) end
             end
+            local isCollapsed
+            if focus then isCollapsed = false
+            elseif collapsed[sec.id] == nil then isCollapsed = sec.folded or false
+            else isCollapsed = collapsed[sec.id] and true or false end
             entries[#entries + 1] = {
                 header = sec.id, label = sec.label, count = #b, unread = unread, keys = b,
-                collapsed = collapsed[sec.id] and true or false,
+                collapsed = isCollapsed,
             }
-            if not collapsed[sec.id] then
+            if not isCollapsed then
                 if #b == 0 then
                     entries[#entries + 1] = { hint = "Star a person, group or channel to pin it here." }
                 end
-                if sec.id == "all_dm" then
-                    self:AddDMSubsections(entries, b)
-                else
-                    for _, k in ipairs(b) do entries[#entries + 1] = { key = k } end
+                local capped = sec.id ~= "all_pinned" and not focus and limit > 0 and not self.expanded[sec.id]
+                local shown, hidden = 0, 0
+                for _, k in ipairs(b) do
+                    local th = threads[k]
+                    if not capped or shown < limit or (th.unread or 0) > 0 or k == self.selected then
+                        entries[#entries + 1] = { key = k }
+                        shown = shown + 1
+                    else
+                        hidden = hidden + 1
+                    end
+                end
+                if hidden > 0 then
+                    entries[#entries + 1] = { hint = ("Show %d more"):format(hidden), more = sec.id }
+                elseif self.expanded[sec.id] and limit > 0 and #b > limit and not focus then
+                    entries[#entries + 1] = { hint = "Show less", more = sec.id }
                 end
             end
         end
@@ -1464,10 +1571,7 @@ function UI:RefreshList()
     self.offset = math.max(0, math.min(self.offset or 0, maxOffset))
 
     local empties = {
-        all = "No conversations yet.\nWhispers, group chats and followed\nchannels will show up here.",
-        dm = "No conversations yet.\nWhispers will show up here.",
-        groups = "No group chats yet.\nClick + New group to create\none or join with a code.",
-        channels = "No followed channels yet.\nClick + Follow channel to\npick guild, party, Trade...",
+        all = "No conversations yet.\nWhispers, group chats and followed\nchannels will show up here.\nClick + New chat to start one.",
     }
     self.emptyText:SetText(empties[self.tab] or "")
     self.emptyText:SetShown(#entries == 0)
@@ -1556,6 +1660,7 @@ end
 -- Closes whatever panel is open over the conversation.
 function UI:CloseOverlays()
     TG.Picker:Close()
+    if TG.NewChat then TG.NewChat:Close() end
     TG.Settings:Close()
     TG.Groups:ClosePanel()
     TG.Channels:ClosePanel()
@@ -1573,12 +1678,10 @@ end
 
 function UI:UpdateTabs()
     if not self.tabs then return end
-    local counts = { all = 0, dm = 0, groups = 0, channels = 0, queue = 0 }
+    local counts = { all = 0, queue = 0 }
     for _, th in pairs(TG.db.threads) do
         local t = UI.TabOf(th)
-        local n = UI.UnreadOf(th)
-        counts[t] = counts[t] + n
-        if UI.InAll(th) then counts.all = counts.all + n end
+        counts[t] = counts[t] + UI.UnreadOf(th)
     end
     -- The Queue tab: hidden only when turned off in Settings and nothing is collecting or waiting.
     local showQ = UI.QueueVisible()
@@ -1623,9 +1726,8 @@ end
 
 function UI:UpdateNewButton()
     if not self.newBtn then return end
-    local labels = { all = "+ New", dm = "+ New message", groups = "+ New group", channels = "+ Follow channel",
-        queue = "All requests" }
-    self.newBtn:SetText(labels[self.tab] or "+ New message")
+    local labels = { all = "+ New chat", queue = "All requests" }
+    self.newBtn:SetText(labels[self.tab] or "+ New chat")
 end
 
 function UI:SetTab(tab)
@@ -1633,6 +1735,7 @@ function UI:SetTab(tab)
     if TG.Help then TG.Help:Close() end
     if self.tab ~= tab then
         TG.Picker:Close()
+        if TG.NewChat then TG.NewChat:Close() end
         TG.Groups:ClosePanel()
         TG.Channels:ClosePanel()
         TG.ChannelList:Close()
@@ -1845,6 +1948,7 @@ function UI:OnShow()
     if not self.tabRestored then
         self.tabRestored = true
         local last = TG.db.lastTab
+        if last == "dm" or last == "channels" or last == "groups" then last = "all" end -- the tabs before 1.0
         if last == "business" or last == "requests" then last = "queue" end -- the tabs before 0.9.2
         if last == "queue" and not UI.QueueVisible() then last = nil end
         if last and self.tabs and self.tabs[last] then self.tab = last end

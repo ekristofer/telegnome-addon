@@ -49,24 +49,26 @@ local DEFAULTS = {
         instancePopups = true, -- pop-ups for Party / Raid chat followed just for a dungeon or raid
         archiveOn = true,     -- direct messages with nothing new for archiveDays days go to Archive
         archiveDays = 7,
-        -- one-click answers for requests (Settings > Queue)
+        -- one-click answers for requests (Settings > Lobby)
         quickReplies = { "Inviting you now, {name}!", "What level and role are you?", "One moment, checking the group." },
         declineReply = "Sorry, the group is full.",
         requestsTab = true,   -- collect strangers' whispers under Requests while listed in the group finder
         requestsCollect = true, -- the tick in the Requests view: untick to pause collecting while listed
         recruiting = false,   -- collect at any time, listed or not (/tg recruit)
+        sectionLimit = 8,     -- Chats: chats shown per section before "Show N more" (0 = all)
+        archiveOthersDays = 1, -- Others (people you don't know) go to Archive sooner than friends
         showRequestsTab = true, -- the Requests tab is always there; off: only while collecting or with requests
         business = false,     -- Open for business: collecting whispers for your ad
         businessMinutes = 30, -- how long it stays on
         businessForever = false, -- ...or until you stop it
         businessTab = true,   -- show the Business tab
         ads = { "", "", "" },
-        savedAds = {},        -- ads saved for later (the Saved button in Queue > Business)
+        savedAds = {},        -- ads saved for later (the Saved button in Lobby > Business)
         adChannel = "Trade",
         bizReplies = { "Sure, {name}! Send me the mats and I'll open a trade.", "Meet me at the bank, I'll open a trade.",
             "One moment, I'm finishing another order." },
         bizDecline = "Sorry, I can't make that one.",
-        bizDeclineAll = "Sorry, I'm done for now.", -- sent by Decline all in Queue > Business
+        bizDeclineAll = "Sorry, I'm done for now.", -- sent by Decline all in Lobby > Business
     },
     collapsed = {}, -- folded sections of the Direct messages list
     minimap = { hide = false, angle = 200 },
@@ -164,7 +166,9 @@ local function migrate(db)
         db.soundReset060 = true
     end
     -- 0.9: the All tab is where new installs start; people who used Telegnome before keep Direct messages.
-    if db.lastTab == nil then db.lastTab = (db.seq or 0) > 0 and "dm" or "all" end
+    if db.lastTab == nil or db.lastTab == "dm" or db.lastTab == "channels" or db.lastTab == "groups" then
+        db.lastTab = "all" -- 1.0: Chats holds every conversation
+    end
     -- 0.9.2: the online list in each group replaces the "joined / left" lines (they can be turned back on)
     if not db.joinLeave092 then
         db.settings.groupJoinLeave = false
@@ -508,6 +512,7 @@ function TG:IsArchived(th)
     if th.archived then return true end
     local st = self.db.settings
     local days = tonumber(st.archiveDays) or 7
+    if self:SectionOf(th) ~= "friends" then days = tonumber(st.archiveOthersDays) or 1 end -- Others: sooner
     if st.archiveOn == false or days < 1 then return false end
     local last = self:LastActivity(th)
     return last > 0 and time() - last > days * 86400
@@ -1112,7 +1117,7 @@ function TG:TestStranger()
     self:AddMessage(key, info, false, text)
     self:MaybeAutoReply(key, text)
     if not self.Requests:IsActive() and not th.req then
-        self:Print("Test whisper added under Direct messages. Start Open for business, list in the group finder or use /tg recruit first to see it as a request.")
+        self:Print("Test whisper added under Others in Chats. Start Open for business, list in the group finder or use /tg lfm first to see it in the Lobby.")
     end
 end
 
@@ -1172,7 +1177,7 @@ SlashCmdList.TELEGNOME = function(input)
         if arg == "off" or arg == "stop" then TG.Business:Stop()
         elseif tonumber(arg) then TG.Business:Start(tonumber(arg))
         else TG.Business:Toggle() end
-    elseif cmd == "queue" then
+    elseif cmd == "lobby" or cmd == "queue" then
         TG.Requests:OpenPanel()
     elseif cmd == "lfm" or cmd == "recruit" or cmd == "requests" then
         TG.Requests:SetRecruiting(not s.recruiting)
@@ -1242,9 +1247,9 @@ SlashCmdList.TELEGNOME = function(input)
         print("  /tg opacity <30-100> - main window opacity (" .. (s.opacity or 100) .. "%)")
         print("  /tg dnd - do not disturb (" .. onOff(s.dnd) .. ")")
         print("  /tg theme <name> - colour theme (" .. TG.Style.theme.label .. ")")
-        print("  /tg business [minutes|off] - Open for business: collect whispers to your ad in Queue > Business")
-        print("  /tg queue - open the Queue tab (LFM and Business)")
-        print("  /tg lfm - Collect now: strangers' whispers go to Queue > LFM even when not listed (" .. onOff(s.recruiting) .. ")")
+        print("  /tg business [minutes|off] - Open for business: collect whispers to your ad in Lobby > Business")
+        print("  /tg lobby - open the Lobby tab (LFM and Business)")
+        print("  /tg lfm - Collect now: strangers' whispers go to Lobby > LFM even when not listed (" .. onOff(s.recruiting) .. ")")
         print("  /tg config - settings")
         print("  /tg counter - on-screen missed-messages counter (" .. onOff(s.counter) .. ")")
         print("  /tg hide - hide whispers from the main chat (" .. onOff(s.hideFromChat) .. ")")
@@ -1254,7 +1259,7 @@ SlashCmdList.TELEGNOME = function(input)
         print("  /tg minimap - minimap button (" .. onOff(not TG.db.minimap.hide) .. ")")
         print("  /tg clear - close the selected conversation")
         print("  /tg test - add a fake incoming whisper")
-        print("  /tg test stranger - a whisper from a made-up stranger, to try the Queue tab (LFM and Business)")
+        print("  /tg test stranger - a whisper from a made-up stranger, to try the Lobby tab (LFM and Business)")
         print("  /tg debug - print raw event info (" .. onOff(s.debug) .. ")")
     end
 end

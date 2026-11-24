@@ -10,12 +10,13 @@ local H = {}
 TG.Help = H
 
 H.TEXT = {
-    all = { "All", "Everything in one list: Pinned at the top, then Direct messages (Friends and Others), "
-        .. "Group chats and Channels. Direct messages with nothing new for a while move to Archive at the bottom.\n\n"
-        .. "- Click the star next to a name to pin it. Drag pinned conversations to reorder them.\n"
-        .. "- Right-click a conversation for a note, notifications, archive and more.\n"
-        .. "- Click a section header to fold it.\n"
-        .. "- + New starts a whisper, creates a group chat or follows a channel." },
+    all = { "Chats", "Every conversation in one list: Pinned, Friends, Group chats, Channels and Others (people "
+        .. "you don't know). Quiet direct messages move to Archive at the bottom.\n\n"
+        .. "- + New chat starts a direct message, a group chat or a channel. Hover a section for its + shortcut.\n"
+        .. "- Each section shows a few chats, then Show more. Unread chats always show.\n"
+        .. "- Click the star to pin a conversation; drag pinned ones to reorder them.\n"
+        .. "- Right-click a section for Show only this section, sorting and Mark all as read.\n"
+        .. "- Right-click a conversation for a note, notifications, archive and more." },
     dm = { "Direct messages", "Whispers and Battle.net messages, one conversation per person. Friends, guild "
         .. "members and people you grouped with this week are under Friends, everyone else under Others.\n\n"
         .. "- + New message starts a conversation with anyone.\n"
@@ -40,25 +41,25 @@ H.TEXT = {
         .. "(also /tg lfm).\n"
         .. "- Each card shows the class and level. Invite, Reply with a quick reply, or Decline.\n"
         .. "- Filter by class with the icons at the top. Decline all answers everyone still waiting.\n"
-        .. "- Quick replies and decline messages are in Settings > Queue." },
+        .. "- Quick replies and decline messages are in Settings > Lobby." },
     business = { "Business", "For crafters, sellers and guild ads: post an ad and collect the whispers you "
         .. "get back.\n\n"
         .. "- Write your ad (shift-click a profession or an item to add its link), choose where it goes and for "
         .. "how long, then press Start and Post.\n"
         .. "- The game needs a click for every post, so Post never repeats on its own.\n"
         .. "- Whispers from people you don't know land here as cards, with their own quick replies "
-        .. "(Settings > Queue).\n"
+        .. "(Settings > Lobby).\n"
         .. "- Saved ads keeps ads you use again. Listing in the group finder pauses it." },
 }
 
 -- The Queue tab: both sides in one card.
-H.TEXT.queue = { "Queue", "Whispers from people you don't know, collected as cards so they don't get lost "
+H.TEXT.queue = { "Lobby", "Whispers from people you don't know, collected as cards so they don't get lost "
     .. "among your friends' messages. Switch side at the top - only one collects at a time, the one started last.\n\n"
     .. "LFM: while you're listed in the group finder (as the leader), or with Collect now. Each card shows the class "
     .. "and level; Invite, Reply or Decline. Filter by class with the icons.\n\n"
     .. "Business: write an ad (shift-click a profession or item to link it), choose where and how long, press Start "
     .. "and Post. Saved ads keeps ads you use again.\n\n"
-    .. "Quick replies and decline messages for both are in Settings > Queue." }
+    .. "Quick replies and decline messages for both are in Settings > Lobby." }
 
 function H.Title(tab)
     local t = H.TEXT[tab]

@@ -10,13 +10,13 @@ Telegnome moves your private messages out of the busy main chat and into a messe
 ## Features
 
 - **Direct messages**: every whisper and Battle.net whisper gets its own conversation with saved history. Reply from the window. The list is grouped into **Pinned**, **Friends** and **Others**, so a flood of strangers never buries your friends.
-- **All tab**: everything in one list - pinned conversations on top, then direct messages, group chats and channels. Pin anything with the star.
-- **Queue**: whispers from people you don't know, collected as cards in one tab with two sides - **LFM** (while you're listed in the group finder: class, level and an Invite button) and **Business** (answers to your ad).
+- **Chats**: everything in one list - Pinned, Friends, Group chats, Channels and Others (people you don't know). **+ New chat** starts a direct message, a group chat or a channel. Pin anything with the star.
+- **Lobby**: whispers from people you don't know, collected as cards in one tab with two sides - **LFM** (while you're listed in the group finder: class, level and an Invite button) and **Business** (answers to your ad).
 - **Search**: find any saved message, in all conversations or in one.
 - **Notes**: a short private note per person, shown under their name.
 - **Recently grouped with**: people you grouped with in the last week sort under Friends.
 - **Group chats**: private, password-protected group chats you join with a friendly invite code like `sprocket-whistle-gizmo-427`.
-- **Followed channels**: mirror Guild, Officer, Party, Raid, Instance, Say, Yell or any joined channel (General, Trade, custom) into their own tab.
+- **Followed channels**: mirror Guild, Officer, Party, Raid, Instance, Say, Yell or any joined channel (General, Trade, custom) into their own conversations.
 - **Notifier**: a small on-screen cog shows how many messages you've missed. It grows to show new messages, then shrinks back.
 - **Minimap button** with an unread badge.
 - **Right-click a name** for the game's normal player menu (invite, add friend, ignore...).
@@ -52,7 +52,7 @@ Open Telegnome with the minimap button, the addons button by the minimap, or `/t
 | `/tg new` | Start a new conversation |
 | `/tg group <name>` | Create a group chat |
 | `/tg join <code>` | Join a group chat |
-| `/tg test stranger` | A pretend whisper from a stranger, to try the Queue tab (LFM and Business) |
+| `/tg test stranger` | A pretend whisper from a stranger, to try the Lobby tab (LFM and Business) |
 | `/tg channels` | Choose followed channels |
 | `/tg opacity <30-100>` | Main window opacity |
 | `/tg theme <name>` | Colour theme: brass, orange, horde, alliance, arcane, fel, steel |
@@ -61,8 +61,8 @@ Open Telegnome with the minimap button, the addons button by the minimap, or `/t
 | `/tg search <text>` | Search your saved messages |
 | `/tg sort recent\|name\|unread` | How the conversation list is sorted |
 | `/tg follow-instance` | Follow Party or Raid chat until you leave the dungeon or raid |
-| `/tg queue` | Open the Queue tab |
-| `/tg lfm` | Collect now: strangers' whispers go to Queue > LFM even when you're not listed (also `/tg recruit`) |
+| `/tg lobby` | Open the Lobby tab (also `/tg queue`) |
+| `/tg lfm` | Collect now: strangers' whispers go to Lobby > LFM even when you're not listed (also `/tg recruit`) |
 | `/tg dnd` | Toggle Do not disturb |
 | `/tg only` | Keep whispers, Battle.net whispers and followed channels out of the main chat |
 | `/tg hide` | Hide just whispers from the main chat |
@@ -75,40 +75,35 @@ Open Telegnome with the minimap button, the addons button by the minimap, or `/t
 
 **Notifier:** click to open the conversation, right-click to mark all as read, Shift-drag to move. In Settings you can choose who triggers it (everyone, friends & guild, friends only), whether it grows left or right, or turn it off.
 
-### The All tab
+### Chats
 
-The **All** tab shows everything in one list: **Pinned** on top, then Direct messages (split into Friends and Others), Group chats and Channels. Click any header to fold it. Group chats have a two-people icon and channels a **#**. The **Direct**, **Groups** and **Channels** tabs show just one kind. Telegnome opens on the tab you used last.
+Telegnome has two tabs: **Chats** and **Lobby**. Chats holds every conversation in one list, in sections:
 
-Click the star next to a conversation's name to pin it - a person, a group chat or a channel. Drag a pinned conversation onto another to reorder Pinned, or use Move up / Move down in its right-click menu.
-
-**Archive** is a folded section at the bottom of the All and Direct tabs. Direct messages with nothing new for a week move there by themselves (set the number of days, or turn it off, in Settings > Chats), and you can right-click one to archive it. A new message brings it straight back. Hover the Archive header for Close all. Group chats and channels are never archived.
-
-Right-click a section header or a tab to mark everything in it as read.
-
-### Pinned, Friends and Others
-
-The Direct list has three sections:
-
-- **Pinned**: click the star next to a conversation's name (or right-click > Pin to the top). Always on top.
+- **Pinned**: anything you star - a person, a group chat or a channel - plus a dungeon's chat while you're inside. Drag a pinned conversation onto another to reorder, or use Move up / Move down in its right-click menu.
 - **Friends**: Battle.net friends, your friends list, guild members and people you were in a group with in the last week - sorted in automatically.
-- **Others**: everyone else. Click the header to fold the section away; **Close all** closes every conversation in it and forgets those contacts.
+- **Group chats** (two-people icon) and **Channels** (**#**).
+- **Others**: people you don't know, with unread ones first. **Close all** (hover the header) closes every conversation in it and forgets those contacts.
+- **More channels**: followed channels you've set not to show under Channels (right-click a channel). Folded by default.
+- **Archive**: direct messages with nothing new for a while move here by themselves - after 7 days for friends and 1 day for Others (Settings > Chats; or turn it off). Right-click a conversation to archive it yourself. A new message brings it straight back. Group chats and channels are never archived.
 
-Right-click someone in **+ New message** and choose **Forget contact** to take them off that list.
+Each section shows up to 8 conversations, then **Show N more** (Settings > Chats; 0 shows everything). Unread and open conversations always show. Click a header to fold it. Right-click a header to mark it as read, sort it, or **Show only this section** - every other section hides until you click **Show all**.
 
-Inside each section, conversations are sorted by most recent by default. Right-click a section header (or go to Settings > Look) to sort by name or put unread conversations first.
+**+ New chat** opens a page with three choices: **Direct message** (search for any player or friend), **Group chat** (create one, or join with a code) and **Channel** (follow a channel, a filtered channel, or your chat channels). Hovering a section header shows a small **+** that goes straight there.
+
+Right-click someone in the Direct message search and choose **Forget contact** to take them off that list. Telegnome opens on the tab and conversation you used last.
 
 ### Search and notes
 
-- The magnifier next to **+ New message** searches every saved message (or type `/tg search <text>`). Click a result to open the conversation at that message.
+- The magnifier next to **+ New chat** searches every saved message (or type `/tg search <text>`). Click a result to open the conversation at that message.
 - **Search in this conversation** and **Add note...** are in the **...** menu next to a person's name. Notes are private and show under the name and on their request card.
 
 ### Help
 
 The **?** next to the Settings cog explains the tab you're on. A tab with nothing in it shows the same help, so it explains itself the first time you open it. Settings > Help has all of it in one place.
 
-### Queue: LFM and Business
+### Lobby: LFM and Business
 
-The **Queue** tab collects whispers from people who aren't friends, guild members or favorites as cards, so they don't flood your Direct messages. It has two sides, switched at the top: **LFM** for your group finder listing and **Business** for your ad. Each side shows a green dot while it collects (grey when not, yellow while paused) and how many are waiting. Only one side collects at a time, and the one started last wins: listing in the group finder or Collect now pauses Business, and starting Business pauses Collect now; the paused one comes back by itself. The tab is greyed out while nothing collects; hover it to see what's going on. You can hide it in Settings > Queue; then it only shows up while something collects or requests are waiting.
+The **Lobby** tab collects whispers from people who aren't friends, guild members or favorites as cards, so they don't flood Chats. It has two sides, switched at the top: **LFM** for your group finder listing and **Business** for your ad. Each side shows a green dot while it collects (grey when not, yellow while paused) and how many are waiting. Only one side collects at a time, and the one started last wins: listing in the group finder or Collect now pauses Business, and starting Business pauses Collect now; the paused one comes back by itself. The tab is greyed out while nothing collects; hover it to see what's going on. You can hide it in Settings > Lobby; then it only shows up while something collects or requests are waiting.
 
 #### LFM
 
@@ -119,19 +114,19 @@ List yourself or your group in the group finder (alone, or as the leader) and LF
 - Quick replies can use `{name}`, `{class}` and `{level}`, which are filled in for the person you answer.
 - **Invite** invites them to your group; **x** dismisses the request; clicking the row opens the conversation.
 - The level is read from the whisper ("70 mage", "lvl 45") or from their group finder application. **Check** looks the player up, also when a level looks wrong; the game only answers every few seconds, so the button counts down until you can ask again.
-- Click the star in a request's conversation to keep that person - they move to Direct messages.
+- Click the star in a request's conversation to keep that person - they move to Pinned in Chats.
 - **Decline all** sends your decline message to everyone still on the list and takes them off it. People you invited or who are in your group stay.
 - **Clear all** removes the remaining requests.
 
 #### Business
 
-For crafters, sellers and guild ads. Write your ad at the top (click in the box and shift-click your profession or an item to add the link), choose where it goes (Trade, Say, Guild or any channel you're in) and how long to stay open (15, 30, 60 or 120 minutes, or **Until I stop it**). The **Saved ads** button next to the ad keeps ads for another time (up to 15): save the one in the box, put a saved one back, or delete one. Press **Start**, then **Post** - the game needs a click for every post, so the ad never repeats on its own. While it's open, whispers from people you don't know land here as cards with Invite and Reply; the replies, decline and Decline all messages are in **Settings > Queue**. It tells you when it closes and how many whispers are waiting. Also `/tg business [minutes|off]`.
+For crafters, sellers and guild ads. Write your ad at the top (click in the box and shift-click your profession or an item to add the link), choose where it goes (Trade, Say, Guild or any channel you're in) and how long to stay open (15, 30, 60 or 120 minutes, or **Until I stop it**). The **Saved ads** button next to the ad keeps ads for another time (up to 15): save the one in the box, put a saved one back, or delete one. Press **Start**, then **Post** - the game needs a click for every post, so the ad never repeats on its own. While it's open, whispers from people you don't know land here as cards with Invite and Reply; the replies, decline and Decline all messages are in **Settings > Lobby**. It tells you when it closes and how many whispers are waiting. Also `/tg business [minutes|off]`.
 
 ### Group chats
 
 A group chat is a hidden, password-protected custom chat channel. Telegnome gives each group an invite code and turns it into the real channel name and password with a hash, so nobody has to see or type them and random players can't wander in.
 
-1. **Create**: Group chats tab > **+ New group** > name it > Create. A line like `Telegnome code: sprocket-whistle-gizmo-427` pops up ready to copy (Ctrl+C).
+1. **Create**: **+ New chat** > Group chat (or the **+** on the Group chats header) > name it > Create. A line like `Telegnome code: sprocket-whistle-gizmo-427` pops up ready to copy (Ctrl+C).
 2. **Share**: paste it in a whisper, party, guild or any other chat. Or right-click the group name > Invite > pick a friend to whisper it for you.
 3. **Join**: your friend's Telegnome picks up the code and shows a pop-up ("Thrall invited you to \"Raid team\". Click to join."). Clicking it opens the join panel with everything filled in - just press Join. Without the pop-up, **+ New group** is filled in the same way. (Typing or pasting the code, or `/tg join <code>`, also works.)
 4. **Rename**: right-click the group > Rename group, or use the Rename button.
@@ -142,9 +137,9 @@ Everyone in the group needs Telegnome. The **N online** button at the top of a g
 
 ### Followed channels
 
-Right-click a followed channel for two options: **Count unread messages** gives it a red badge that adds to the totals (on for Party, Raid and Instance; other channels show a quiet dot instead), and **Show in the All tab**.
+Right-click a followed channel for two options: **Count unread messages** gives it a red badge that adds to the totals (on for Party, Raid and Instance; other channels show a quiet dot instead), and **Show under Channels** (off: it moves to More channels).
 
-Followed channels tab > **+ Follow channel** > tick what you want. Messages are copied into the tab and you can reply from there. Followed channels don't count towards the missed-messages counter. Each channel has its own **Pop-up** tick (off by default). **Alert words** (Settings > Notifications) make a message pop up anyway when it contains one of your words, e.g. `LFM, tank`. A channel can also have its own alert words (right-click it > Alert words for this channel...).
+**+ New chat** > Channel > Follow a channel (or the **+** on the Channels header) > tick what you want. Messages are copied into their own conversation and you can reply from there. Followed channels don't count towards the missed-messages counter. Each channel has its own **Pop-up** tick (off by default). **Alert words** (Settings > Notifications) make a message pop up anyway when it contains one of your words, e.g. `LFM, tank`. A channel can also have its own alert words (right-click it > Alert words for this channel...).
 
 **Filtered copies:** Followed channels > **Filtered channels** page: choose a channel, type words, e.g. `enchant, ench`, and click **Add** (or right-click a followed channel > **New filtered copy...**). You get a separate conversation, "Trade [Enchant]", that keeps only the messages with those words and pops up when one arrives. Make as many as you like, with or without following the whole channel; the matching words are picked out in gold.
 
@@ -154,7 +149,7 @@ When mail arrives (or you log in with unread mail), a pop-up says who sent it, e
 
 ### Dungeons, raids and combat
 
-When you enter a dungeon, Telegnome offers to follow Party chat until you leave; in a raid, Raid chat. Instance chat (used by group finder groups) is followed too. While you're inside it's pinned at the top of the All tab, with an "Entered ..." line where the run starts. Choose **Ask**, **Always follow** or **Never** in Settings > Chats, or type `/tg follow-instance`. A chat followed just for the run has pop-up notifications on (untick **Pop-up notifications for the dungeon or raid chat** in Settings > Chats to only count messages); a chat you already follow keeps its own settings.
+When you enter a dungeon, Telegnome offers to follow Party chat until you leave; in a raid, Raid chat. Instance chat (used by group finder groups) is followed too. While you're inside it's pinned at the top of Chats, with an "Entered ..." line where the run starts. Choose **Ask**, **Always follow** or **Never** in Settings > Chats, or type `/tg follow-instance`. A chat followed just for the run has pop-up notifications on (untick **Pop-up notifications for the dungeon or raid chat** in Settings > Chats to only count messages); a chat you already follow keeps its own settings.
 
 In combat, pop-ups and sounds wait until the fight is over; then one pop-up says what came in. Settings > Notifications > In combat has two other choices: **Show everything** (pop-ups and sounds as usual) or **Only the count** (no pop-ups or summary; the notifier, minimap button and badges still count up).
 
@@ -225,9 +220,10 @@ Telegnome/               the addon folder (this is what goes into AddOns)
   UI/Notifier.lua        on-screen counter / notification
   UI/Minimap.lua         minimap button
   UI/Help.lua            the ? help card for each tab
+  UI/NewChat.lua         the New chat page
   Features/Groups.lua    group chats (invite codes, hashing, channels)
   Features/Channels.lua  followed channels
-  Features/Requests.lua  Queue tab (LFM and Business cards)
+  Features/Requests.lua  Lobby tab (LFM and Business cards)
   Features/Social.lua    recently grouped with, notes, reply blanks, login summary
   Features/Instances.lua dungeon and raid chat, quiet in combat
   Media/                 icon and cog textures (.tga)
