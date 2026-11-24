@@ -3,6 +3,7 @@
 ## 1.0.0
 
 Two tabs: Chats and Lobby
+- The Lobby tab is no longer greyed out. A dot before its name is green while LFM or Business collects, grey otherwise.
 - **Chats** (the old All tab) holds every conversation; the Direct, Channels and Groups tabs are gone. **Lobby** is the old Queue tab, still with LFM and Business. `/tg lobby` opens it (`/tg queue` still works).
 - New section order: **Pinned · Friends · Group chats · Channels · Others · Archive**. Direct messages from people you don't know sit under Others at the bottom, unread ones first.
 - Each section shows up to 8 conversations, then **Show N more** (Settings > Chats; 0 shows everything). Unread and open conversations always show.
@@ -13,10 +14,12 @@ Two tabs: Chats and Lobby
 New chat
 - **+ New chat** opens a page with three choices: Direct message, Group chat or Channel. Direct message shows the player search right on that page; Group chat opens create / join; Channel leads to Follow a channel, Filtered channels or Your chat channels, each its own page.
 - Every New chat page has a **< Back** button, so you can look around without starting over.
-- The player search lists people you've talked to, your group right now, online friends, people you grouped with this week, online guild members, then offline friends - with a label saying which. It finds Battle.net friends by BattleTag or the character they're playing (the game keeps real names unreadable for addons). Fixed: it showed only one name, sometimes a channel.
+- The player search lists people you might want to whisper and don't have a chat with yet: people you've talked to in the last two days, your group right now, friends, people you grouped with this week and online guild members - each person once, with a label saying where you know them from. Filters at the top show one kind at a time (All · Recent · Group · Friends · Grouped · Guild); Friends lists offline friends last. Typing searches everyone, including people you already have a chat with and older contacts. It finds Battle.net friends by BattleTag or the character they're playing (the game keeps real names unreadable for addons). A scroll bar shows when the list is long.
 - The Direct message page has a Close button like the other pages.
 - **Saved ads have names:** saving an ad asks for a short name, and the Saved ads menu shows that name (hover it for the whole ad).
 - The "Business paused" and "back on" pop-ups are shorter, so they fit.
+- **Recent searches:** Search shows your last searches before you type. A search is kept when you click one of its results, so you can go back and keep looking.
+- The Channel descriptions on New chat are shorter, so they fit.
 - Fixed: item links in search results showed colour codes like "|cnIQ3:" in front of the name.
 - Hover a section header for a small **+** that goes straight there: new message on Friends and Others, new group on Group chats, channel options on Channels.
 

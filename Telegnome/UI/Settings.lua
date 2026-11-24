@@ -666,7 +666,7 @@ function O:Create()
     page("requests", "Lobby", "The Lobby tab: whispers from people you don't know, for your group (LFM) or your ad (Business).")
     check("Show the Lobby tab", 0,
         function() return s().showRequestsTab ~= false end, function(v) s().showRequestsTab = v; UI:UpdateTabs() end,
-        "Lobby tab", "On: the tab is always there, greyed out while nothing is collecting. Off: it only shows up "
+        "Lobby tab", "On: the tab is always there, with a grey dot while nothing is collecting. Off: it only shows up "
         .. "while LFM or Business is collecting, and while requests are waiting on it.")
     section("LFM")
     check("Collect strangers' whispers in LFM while I'm listed", 0,

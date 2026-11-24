@@ -325,7 +325,17 @@ function UI:Create()
         GameTooltip:Show()
     end)
     self.tabs.all:HookScript("OnLeave", function() GameTooltip:Hide() end)
-    -- Lobby: what it's for, and what is collecting right now (the tab is greyed out when nothing is)
+    -- Lobby: a dot before the name, green while LFM or Business collects, grey otherwise
+    do
+        local q = self.tabs.queue
+        local dot = q:CreateTexture(nil, "OVERLAY")
+        dot:SetSize(14, 14)
+        dot:SetPoint("LEFT", 8, 0)
+        self.lobbyDot = dot
+        q.fs:ClearAllPoints()
+        q.fs:SetPoint("LEFT", dot, "RIGHT", 3, 0)
+    end
+    -- Lobby: what it's for, and what is collecting right now
     self.tabs.queue:HookScript("OnEnter", function(t)
         GameTooltip:SetOwner(t, "ANCHOR_BOTTOM")
         GameTooltip:SetText("Lobby")
@@ -1705,11 +1715,13 @@ function UI:UpdateTabs()
         else
             tab:SetBackdropColor(S.PANEL[1] * 0.9, S.PANEL[2] * 0.9, S.PANEL[3] * 0.9, 1)
             tab:SetBackdropBorderColor(e[1], e[2], e[3], 0.35)
-            -- Requests and Business are greyed out while they aren't collecting
-            local idle = tab.id == "queue" and not TG.Requests:Collecting() and not TG.Business:IsOn()
-            if idle then tab.fs:SetTextColor(0.42, 0.39, 0.33) else tab.fs:SetTextColor(0.62, 0.57, 0.48) end
+            tab.fs:SetTextColor(0.62, 0.57, 0.48)
         end
-        tab:SetWidth(num(tab.fs:GetStringWidth(), 90) + 24
+        if tab.id == "queue" and self.lobbyDot then
+            local active = TG.Requests:Collecting() or TG.Business:IsOn()
+            self.lobbyDot:SetTexture(active and "Interface\\COMMON\\Indicator-Green" or "Interface\\COMMON\\Indicator-Gray")
+        end
+        tab:SetWidth(num(tab.fs:GetStringWidth(), 90) + 24 + (tab.id == "queue" and 17 or 0)
             + (tab.pill:IsShown() and num(tab.pill:GetWidth(), 16) + 6 or 0))
         if tab:IsShown() then -- hidden tabs leave no gap
             tab:ClearAllPoints()

@@ -13,14 +13,14 @@ TG.NewChat = N
 
 local CARDS = {
     { id = "dm", title = "Direct message", text = "Whisper a player or a Battle.net friend." },
-    { id = "group", title = "Group chat", text = "A private room for your friends. Create one, or join with a code." },
-    { id = "channel", title = "Channel", text = "Follow Guild, Party, Trade... or keep only the messages with your words." },
+    { id = "group", title = "Group chat", text = "A private room for friends: create or join." },
+    { id = "channel", title = "Channel", text = "Follow channels, or only messages with your words." },
 }
 
 local CHANNEL_STEPS = {
-    { id = "follow", title = "Follow a channel", text = "Bring Guild, Party, Trade or any channel you're in into Telegnome." },
-    { id = "filter", title = "Filtered channel", text = "Only the messages with your words, e.g. Trade with \"enchant\"." },
-    { id = "mine", title = "Your chat channels", text = "Every channel your character is in, with a Leave button." },
+    { id = "follow", title = "Follow a channel", text = "Guild, Party, Trade or any channel you're in." },
+    { id = "filter", title = "Filtered channel", text = "Only messages with your words, like \"enchant\"." },
+    { id = "mine", title = "Your chat channels", text = "Every channel you're in." },
 }
 
 -- Where Back goes from each page.

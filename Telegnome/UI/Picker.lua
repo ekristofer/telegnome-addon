@@ -1,14 +1,30 @@
--- Telegnome: the player search on New chat > Direct message. Lists remembered contacts, Battle.net friends
--- and character friends, with a search box. Typing an unknown name starts a whisper to it.
+-- Telegnome: the player search on New chat > Direct message.
+--   Shows people you might want to whisper and don't have a conversation with yet: people you talked to in
+--   the last two days, your group, friends, people you grouped with this week and guild members online.
+--   A row of filters picks one kind; typing searches everyone (open conversations too). Typing a name nobody
+--   matches offers to start a whisper to it.
 
 local _, ns = ...
 local TG = ns.TG
 local S = TG.Style
 local UI = TG.UI
-local P = { rows = {}, offset = 0, results = {} }
+local P = { rows = {}, offset = 0, results = {}, cat = "all" }
 TG.Picker = P
 
 local SEARCH_H = 28
+local CHIPS_H = 30
+local TOP = SEARCH_H + CHIPS_H
+local RECENT_DAYS = 2
+
+-- The filters along the top.
+P.CATS = {
+    { id = "all", label = "All", tip = "Everyone below who isn't in your chats yet. Offline friends are under Friends." },
+    { id = "recent", label = "Recent", tip = "People you've talked to in the last two days." },
+    { id = "group", label = "Group", tip = "Your group or raid right now." },
+    { id = "friends", label = "Friends", tip = "Battle.net and character friends. Online first, offline last." },
+    { id = "grouped", label = "Grouped", tip = "People you were in a group with this week." },
+    { id = "guild", label = "Guild", tip = "Guild members who are online." },
+}
 
 function P:Create()
     if self.frame then return end
@@ -20,7 +36,7 @@ function P:Create()
     f:SetScript("OnSizeChanged", function() P:Refresh() end)
     f:EnableMouseWheel(true)
     f:SetScript("OnMouseWheel", function(_, delta)
-        P.offset = math.max(0, P.offset - delta)
+        P.offset = math.max(0, P.offset - delta * 2)
         P:Refresh()
     end)
     local bg = f:CreateTexture(nil, "BACKGROUND")
@@ -49,48 +65,99 @@ function P:Create()
     placeholder:SetText("Character name, BattleTag or friend")
     self.placeholder = placeholder
 
+    -- filter chips: one kind of people at a time
+    self.chips = {}
+    local prev
+    for _, c in ipairs(P.CATS) do
+        local b = S.Button(f, c.label, 40, 22)
+        b.fs:SetFontObject("GameFontNormalSmall")
+        b:SetWidth(math.floor(S.Num(b.fs:GetStringWidth(), 30) + 18))
+        if prev then b:SetPoint("LEFT", prev, "RIGHT", 4, 0) else b:SetPoint("TOPLEFT", 2, -SEARCH_H - 2) end
+        local bar = b:CreateTexture(nil, "OVERLAY")
+        bar:SetHeight(2)
+        bar:SetPoint("BOTTOMLEFT", 2, 2)
+        bar:SetPoint("BOTTOMRIGHT", -2, 2)
+        bar:SetColorTexture(1, 0.82, 0, 1)
+        b.bar = bar
+        b.cat = c.id
+        b:SetScript("OnClick", function() P.cat = c.id; P.offset = 0; P:Refresh() end)
+        S.Tooltip(b, c.label, c.tip)
+        self.chips[#self.chips + 1] = b
+        prev = b
+    end
+
     local none = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    none:SetPoint("TOPLEFT", 8, -SEARCH_H - 6)
+    none:SetPoint("TOPLEFT", 8, -TOP - 6)
     none:SetPoint("RIGHT", -8, 0)
     none:SetJustifyH("LEFT")
-    none:SetText("No contacts yet. Type a character name and press Enter.")
     self.none = none
+
+    -- a thin scroll indicator at the right edge, shown when not everything fits
+    local track = CreateFrame("Frame", nil, f)
+    track:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -TOP)
+    track:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1, 2)
+    track:SetWidth(3)
+    local trackBg = track:CreateTexture(nil, "BACKGROUND")
+    trackBg:SetAllPoints()
+    trackBg:SetColorTexture(0, 0, 0, 0.35)
+    local thumb = track:CreateTexture(nil, "ARTWORK")
+    thumb:SetWidth(3)
+    thumb:SetColorTexture(S.BRONZE[1], S.BRONZE[2], S.BRONZE[3], 0.9)
+    track:Hide()
+    self.track, self.thumb = track, thumb
 end
 
 ---------------------------------------------------------------------------
--- Gathering contacts
+-- Gathering people
 ---------------------------------------------------------------------------
 
+-- Everyone worth listing, each person once, in this order: recent, group, online friends, grouped with,
+-- guild, offline friends. Each entry has cat (its filter) and sub (the label on the right).
+-- Without a search, people who already have a conversation are left out: they're in the list on the left.
 function P:Gather(filter)
-    local out, seen = {}, {}
+    filter = filter or ""
+    local searching = filter ~= ""
+    local out, seen, seenName = {}, {}, {}
     local exact = false
+    local threads = TG.db.threads or {}
 
-    local function add(key, info, match, sub, shortMatch)
+    local function add(key, info, match, cat, sub, shortMatch, offline)
         if seen[key] then return end
+        local th = threads[key]
+        local hasChat = th and not th.req
+        if hasChat and not searching then return end
         local name, color, online = TG:DisplayFor(key, info)
-        if filter ~= "" then
-            -- the name you see too, when the game lets addons read it (Battle.net real names it doesn't)
-            local shown = (type(name) == "string" and not name:find("|K", 1, true)) and name:lower() or ""
+        local readable = type(name) == "string" and not name:find("|K", 1, true)
+        if searching then
+            local shown = readable and name:lower() or ""
             if not match:find(filter, 1, true) and not shown:find(filter, 1, true) then return end
         end
+        -- the same character twice (a contact and a guild member with the realm written differently): once
+        local nameKey = (readable and info.kind ~= "BN") and name:lower():gsub("|c%x%x%x%x%x%x%x%x", "")
+            :gsub("|r", ""):gsub("%-.*$", "") or nil
+        if nameKey and seenName[nameKey] then return end
         seen[key] = true
+        if nameKey then seenName[nameKey] = true end
         if match == filter or shortMatch == filter then exact = true end
-        out[#out + 1] = { key = key, info = info, name = name, color = color, online = online, sub = sub }
+        out[#out + 1] = { key = key, info = info, name = name, color = color, online = online,
+            sub = hasChat and "in your chats" or sub, cat = cat, offline = offline }
     end
-
-    local function addName(fullName, sub, class)
+    local function addName(fullName, cat, sub, class)
         if type(fullName) ~= "string" or fullName == "" or (TG.isSecret and TG.isSecret(fullName)) then return end
         local key, info = TG:WhisperInfo(fullName)
         if not key then return end
         info.class = info.class or class
-        add(key, info, info.name:lower(), sub, fullName:lower():match("^[^%-]+"))
+        add(key, info, info.name:lower(), cat, sub, fullName:lower():match("^[^%-]+"))
     end
     local myName = UnitName and UnitName("player")
+    local now = time()
 
-    -- 1. People you've talked to, most recent first (people only: no channels or groups)
+    -- 1. People you've talked to in the last two days (when searching: anyone you've ever talked to)
     local recent = {}
-    for key, c in pairs(TG.db.contacts) do
-        if c.kind == "WHISPER" or c.kind == "BN" then recent[#recent + 1] = { key = key, c = c } end
+    for key, c in pairs(TG.db.contacts or {}) do
+        if (c.kind == "WHISPER" or c.kind == "BN") and (searching or now - (c.last or 0) < RECENT_DAYS * 86400) then
+            recent[#recent + 1] = { key = key, c = c }
+        end
     end
     table.sort(recent, function(a, b) return (a.c.last or 0) > (b.c.last or 0) end)
     for _, r in ipairs(recent) do
@@ -98,7 +165,8 @@ function P:Gather(filter)
         local info = { kind = c.kind, name = c.name, battleTag = c.battleTag, class = c.class, guid = c.guid }
         local match = ((c.kind == "BN" and c.battleTag) or c.name or ""):lower()
         local short = (c.name or ""):lower():match("^[^%-#]+")
-        add(r.key, info, match, "recent", short)
+        local recentNow = now - (c.last or 0) < RECENT_DAYS * 86400
+        add(r.key, info, match, recentNow and "recent" or "older", "talked " .. UI.ShortTime(c.last or now), short)
     end
 
     -- 2. Your group right now
@@ -112,12 +180,12 @@ function P:Gather(filter)
             if ok and type(name) == "string" and name ~= myName and name ~= UNKNOWNOBJECT then
                 local _, class = UnitClass(unit)
                 addName((type(realm) == "string" and realm ~= "") and (name .. "-" .. realm:gsub("[%s%-]", "")) or name,
-                    "in your group", class)
+                    "group", "in your group", class)
             end
         end
     end
 
-    -- 3. Battle.net friends and character friends who are online
+    -- 3. Friends who are online (Battle.net, then characters)
     local bnOnline, bnOffline = {}, {}
     if BNGetNumFriends and C_BattleNet and C_BattleNet.GetFriendAccountInfo then
         for i = 1, (BNGetNumFriends() or 0) do
@@ -128,14 +196,15 @@ function P:Gather(filter)
             end
         end
     end
-    local function addBN(list)
+    local function addBN(list, offline)
         for _, acct in ipairs(list) do
             local key, info = TG:BNInfoFromAccount(acct)
             TG.bnIDs[key] = acct.bnetAccountID
             -- BattleTag, and the character they're playing if they're in WoW
             local g = acct.gameAccountInfo
             local char = g and type(g.characterName) == "string" and g.characterName or ""
-            add(key, info, (acct.battleTag .. " " .. char):lower(), "Battle.net", acct.battleTag:lower():match("^[^#]+"))
+            add(key, info, (acct.battleTag .. " " .. char):lower(), "friends",
+                offline and "Battle.net, offline" or "Battle.net", acct.battleTag:lower():match("^[^#]+"), offline)
         end
     end
     local friendsOn, friendsOff = {}, {}
@@ -145,10 +214,13 @@ function P:Gather(filter)
             if fi and fi.name then table.insert(fi.connected and friendsOn or friendsOff, fi) end
         end
     end
-    local function addFriends(list)
+    local function addFriends(list, offline)
         for _, fi in ipairs(list) do
             local key, info = TG:WhisperInfo(fi.name, fi.guid)
-            if key then add(key, info, info.name:lower(), "friend", fi.name:lower():match("^[^%-]+")) end
+            if key then
+                add(key, info, info.name:lower(), "friends", offline and "friend, offline" or "friend",
+                    fi.name:lower():match("^[^%-]+"), offline)
+            end
         end
     end
     addBN(bnOnline)
@@ -157,12 +229,12 @@ function P:Gather(filter)
     -- 4. People you were in a group with this week
     local grouped = {}
     for key, t in pairs(TG.db.grouped or {}) do
-        if type(t) == "number" and time() - t < 7 * 86400 then grouped[#grouped + 1] = { key = key, t = t } end
+        if type(t) == "number" and now - t < 7 * 86400 then grouped[#grouped + 1] = { key = key, t = t } end
     end
     table.sort(grouped, function(a, b) return a.t > b.t end)
     for _, g in ipairs(grouped) do
         local name = g.key:gsub("^W:", ""):gsub("^%l", string.upper):gsub("%-(%l)", function(c) return "-" .. c:upper() end)
-        addName(name, "grouped " .. UI.ShortTime(g.t))
+        addName(name, "grouped", "grouped " .. UI.ShortTime(g.t))
     end
 
     -- 5. Guild members online
@@ -171,24 +243,39 @@ function P:Gather(filter)
         for i = 1, math.min(total, 1000) do
             local name, _, _, _, _, _, _, _, online, _, class = GetGuildRosterInfo(i)
             if online and type(name) == "string" and Ambiguate and Ambiguate(name, "short") ~= myName then
-                addName(name, "guild", class)
+                addName(name, "guild", "guild", class)
             end
         end
     end
 
-    -- 6. Everyone else on your friends lists (offline)
-    addBN(bnOffline)
-    addFriends(friendsOff)
+    -- 6. Friends who are offline (last)
+    addBN(bnOffline, true)
+    addFriends(friendsOff, true)
 
-    -- 4. Start a whisper to whatever was typed
-    if filter ~= "" and not exact and not filter:find("#", 1, true) and not filter:find("%s") then
-        local typed = strtrim(self.search:GetText()):gsub("^%l", string.upper)
+    -- 7. Start a whisper to whatever was typed
+    if searching and not exact and not filter:find("#", 1, true) and not filter:find("%s") then
+        local typed = strtrim(self.search and self.search:GetText() or filter):gsub("^%l", string.upper)
         local key, info = TG:WhisperInfo(typed)
         if key and not seen[key] then
-            out[#out + 1] = { key = key, info = info, name = "Whisper " .. typed, color = { 1, 0.82, 0 }, sub = "new" }
+            out[#out + 1] = { key = key, info = info, name = "Whisper " .. typed, color = { 1, 0.82, 0 },
+                sub = "new", cat = "new" }
         end
     end
 
+    return out
+end
+
+-- The entries the chosen filter shows. All leaves out offline friends, unless you're searching.
+function P:Filtered(all, searching)
+    local out = {}
+    for _, e in ipairs(all) do
+        local keep
+        if e.cat == "new" then keep = true
+        elseif self.cat == "all" then keep = searching or not e.offline
+        elseif self.cat == "recent" then keep = e.cat == "recent" or (searching and e.cat == "older")
+        else keep = e.cat == self.cat end
+        if keep then out[#out + 1] = e end
+    end
     return out
 end
 
@@ -199,9 +286,9 @@ end
 function P:GetRow(i)
     local row = self.rows[i]
     if row then return row end
-    row = UI:MakeRow(self.frame, -SEARCH_H, i)
+    row = UI:MakeRow(self.frame, -TOP, i)
     row.right:ClearAllPoints()
-    row.right:SetPoint("RIGHT", -6, 0)
+    row.right:SetPoint("RIGHT", -10, 0)
     row.right:SetFontObject("GameFontDisableSmall")
     row:SetScript("OnClick", function(s, button)
         local e = s.entry
@@ -222,19 +309,37 @@ function P:GetRow(i)
     return row
 end
 
+P.NONE = {
+    all = "Nobody new to show. Type a character name and press Enter to whisper anyone.",
+    recent = "Nobody from the last two days who isn't already in your chats.",
+    group = "You're not in a group, or everyone in it is already in your chats.",
+    friends = "No friends to show: they're all in your chats already.",
+    grouped = "Nobody you grouped with this week who isn't already in your chats.",
+    guild = "No guild members online who aren't already in your chats.",
+}
+
 function P:Refresh()
     if not self.frame or not self.frame:IsShown() then return end
     local filter = strtrim(self.search:GetText() or ""):lower()
-    local results = self:Gather(filter)
+    local results = self:Filtered(self:Gather(filter), filter ~= "")
     self.results = results
+
+    for _, b in ipairs(self.chips or {}) do
+        local on = b.cat == self.cat
+        b.bar:SetShown(on)
+        if on then b.fs:SetTextColor(1, 0.95, 0.8) else b.fs:SetTextColor(0.62, 0.57, 0.48) end
+    end
 
     -- right after the page opens the game may not have sized the frame yet: assume a full page then
     local fh = S.Num(self.frame:GetHeight(), 0)
-    if fh < SEARCH_H + UI.ROW_H then fh = 360 end
-    local h = fh - SEARCH_H
+    if fh < TOP + UI.ROW_H then fh = 360 end
+    local h = fh - TOP
     local visible = math.max(1, math.floor(h / UI.ROW_H))
-    self.offset = math.min(self.offset, math.max(0, #results - visible))
-    self.none:SetShown(#results == 0 and filter == "")
+    local maxOffset = math.max(0, #results - visible)
+    self.offset = math.min(self.offset, maxOffset)
+    self.none:SetText(filter ~= "" and "Nobody matches here. Try All, or press Enter to whisper that name."
+        or P.NONE[self.cat] or "")
+    self.none:SetShown(#results == 0)
 
     for i = 1, visible do
         local row = self:GetRow(i)
@@ -253,6 +358,18 @@ function P:Refresh()
     for i = visible + 1, #self.rows do
         self.rows[i].entry = nil
         self.rows[i]:Hide()
+    end
+
+    if maxOffset > 0 then
+        local trackH = S.Num(self.track:GetHeight(), 0)
+        if trackH < 20 then trackH = h end
+        local th = math.max(16, trackH * visible / #results)
+        self.thumb:ClearAllPoints()
+        self.thumb:SetPoint("TOP", self.track, "TOP", 0, -(self.offset / maxOffset) * (trackH - th))
+        self.thumb:SetHeight(th)
+        self.track:Show()
+    else
+        self.track:Hide()
     end
 end
 
@@ -285,6 +402,7 @@ function P:ShowIn(area)
     self.frame:SetAllPoints(area)
     self.frame:SetFrameLevel(area:GetFrameLevel() + 2)
     self.offset = 0
+    self.cat = "all"
     self.frame:Show()
     self.search:SetText("")
     self.placeholder:Hide()

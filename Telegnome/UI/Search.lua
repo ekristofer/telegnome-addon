@@ -11,6 +11,33 @@ TG.Search = F
 
 local ROW_H = 40
 local MAX_RESULTS = 200
+F.MAX_RECENT = 8
+
+-- Keeps a search you found something with (you clicked a result), newest first, each once.
+function F:Remember(query)
+    local q = type(query) == "string" and query:gsub("^%s+", ""):gsub("%s+$", "") or ""
+    if #q < 2 then return end
+    local list = TG.db.recentSearches or {}
+    for i = #list, 1, -1 do
+        if type(list[i]) ~= "string" or list[i]:lower() == q:lower() then table.remove(list, i) end
+    end
+    table.insert(list, 1, q)
+    for i = #list, F.MAX_RECENT + 1, -1 do list[i] = nil end
+    TG.db.recentSearches = list
+end
+
+function F:ShowRecent(show)
+    if not self.recent then return end
+    local list = TG.db.recentSearches or {}
+    show = show and #list > 0
+    self.recent:SetShown(show)
+    if not show then return end
+    for i, b in ipairs(self.recentRows) do
+        b.query = list[i]
+        b.fs:SetText(list[i] and (list[i]:gsub("|", "||")) or "")
+        b:SetShown(list[i] ~= nil)
+    end
+end
 
 -- The text without colours, links and icons, as it reads on screen.
 local function plain(text)
@@ -108,6 +135,7 @@ local function createRow(parent, i)
     row:SetScript("OnClick", function(s)
         local r = s.result
         if not r or not TG.db.threads[r.key] then return end
+        F:Remember(F.box:GetText())
         F:Close()
         UI:Select(r.key)
         UI.msgs:Reveal(r.idx)
@@ -197,6 +225,49 @@ function F:Create()
     empty:SetJustifyH("LEFT")
     self.empty = empty
 
+    -- Recent searches: shown before you type, so you can pick up a search where you left it
+    local recent = CreateFrame("Frame", nil, list)
+    recent:SetPoint("TOPLEFT", 0, -34)
+    recent:SetPoint("RIGHT", 0, 0)
+    recent:SetHeight(F.MAX_RECENT * 24 + 24)
+    recent:Hide()
+    self.recent = recent
+    local rTitle = recent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    rTitle:SetPoint("TOPLEFT", 8, 0)
+    rTitle:SetText("Recent searches")
+    local clear = S.Link(recent, "Clear")
+    clear:SetPoint("LEFT", rTitle, "RIGHT", 10, 0)
+    clear:SetScript("OnClick", function()
+        TG.db.recentSearches = {}
+        F:Run()
+    end)
+    self.recentRows = {}
+    for i = 1, F.MAX_RECENT do
+        local b = CreateFrame("Button", nil, recent)
+        b:SetHeight(24)
+        b:SetPoint("TOPLEFT", 0, -20 - (i - 1) * 24)
+        b:SetPoint("RIGHT", 0, 0)
+        local hl = b:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints()
+        S.Paint(hl, "hi", 0.10)
+        local ico = S.Icon(b, S.SEARCH, 12)
+        ico:SetPoint("LEFT", 10, 0)
+        ico:SetVertexColor(S.DIM[1], S.DIM[2], S.DIM[3])
+        local fs = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        fs:SetPoint("LEFT", 30, 0)
+        fs:SetPoint("RIGHT", -8, 0)
+        fs:SetJustifyH("LEFT")
+        fs:SetWordWrap(false)
+        b.fs = fs
+        b:SetScript("OnClick", function(s)
+            if not s.query then return end
+            F.box:SetText(s.query)
+            F.box:SetCursorPosition(#s.query)
+            F:Run()
+        end)
+        self.recentRows[i] = b
+    end
+
     local done = S.Button(f, "Close", 80, 24)
     done:SetPoint("BOTTOMRIGHT", -26, 10)
     done:SetScript("OnClick", function() F:Close() end)
@@ -216,9 +287,11 @@ function F:Run()
         self.allLink:Hide()
     end
     local q = query:gsub("^%s+", ""):gsub("%s+$", "")
+    self:ShowRecent(false)
     if #q < 2 then
         self.count:SetText("")
         self.empty:SetText("Search your saved messages: names of items, places, anything someone wrote.")
+        self:ShowRecent(true)
     elseif #self.results == 0 then
         self.count:SetText("")
         self.empty:SetText("No messages with \"" .. esc(q) .. "\".")
