@@ -1,32 +1,37 @@
 # Changelog
 
 ## 0.9.2
-- **Open for business**, in the Queue tab's **Business** side, for crafters, sellers and recruiters. Write your ad right there (shift-click your profession or an item to add the link), choose where it goes (Trade, Say, Guild...) and how long to stay open (15 minutes to 2 hours, or until you stop it), then press Start and Post. While it's open, whispers from people you don't know are collected in the tab as cards, with their own quick replies and decline message (Settings > Queue). It tells you when it closes and how many whispers are waiting. Listing in the group finder pauses it, with a pop-up, and it opens again when you stop listing. Also `/tg business [minutes|off]`; the Queue tab can be hidden in Settings.
-- **Saved ads:** the Saved ads button next to the ad saves it for another time (up to 15), puts a saved one back in the box, or deletes one.
-- While you're open for business, the on-screen counter shows a gold coin and the minutes left (grey while paused). Its tooltip says how long is left.
-- Telegnome opens where you left it: on the tab and conversation you had open, or on the Queue overview if that's where you were. Closing Settings also goes back to that overview.
-- Business's list buttons (how long, saved ads, where the ad goes) have a down arrow.
-- **Filtered channels:** Channels tab > + Follow channel > **Filtered channels**: pick a channel, type words (e.g. `enchant, ench`) and click Add - no need to follow the whole channel. Or right-click a followed channel > New filtered copy.... You get a separate conversation like "Trade [Enchant]" that keeps only the messages with those words, and pops up when one comes in. Make as many as you like ("Trade [Enchant]", "Trade [Boost]"...), with or without following the whole channel. Change the words later from the same menu. Matching ignores upper and lower case; the name keeps your spelling ("Trade [LFW]"). Rename a filtered channel from its right-click menu, e.g. to just "LFW" - the menu still says it's Trade [LFW].
-- Alert words per channel: right-click a followed channel > Alert words for this channel... (the words in Settings still count everywhere).
-- Matching words are picked out in gold in channel messages.
-- **New mail:** a pop-up when mail arrives, and when you log in with unread mail, saying who sent it ("New mail from Thrall and Stormwind Auction House (2)"). Change the text or turn it off in the new Settings > Notifications. The game names the latest three senders only; open a mailbox to read the mail.
-- Right-click menus: Mute is now a tick box like the other settings. People and group chats have **Pop-up notifications and sound** (on unless you turn it off); followed channels keep their Pop-up notifications tick and get **Mute everything (alert words too)**.
-- **Decline all in Business has its own message**, separate from the one-person Decline: "Sorry, I'm done for now." Change it in Settings > Queue, or leave it empty to clear the list without a message. LFM still sends its decline message for both. Fixed: in Business, the Decline all pop-up showed the LFM decline message.
-- Settings > Chats: hovering the greyed-out **Group chats (always)** tick now explains why it can't be turned off.
-- **Queue tab:** Requests and Business are now one tab, **Queue**, with two sides switched at the top: **LFM** (your group finder listing, or Collect now) and **Business** (your ad). Each side shows a green dot while it collects and how many are waiting; the tab remembers which side you were on, and pop-ups open the right one. One fewer tab, and `/tg queue` / `/tg lfm` open and start it.
-- Every tab has a short description when you hover it.
-- The **N online** button in a group has a green dot (grey when nobody is online) and a drop-down arrow. The help button is now the game's yellow question mark.
-- **Settings, reorganised:** six pages instead of nine - Notifications (pop-ups, sound, combat, Do not disturb, group chats, mail), Look (window, counter, minimap), Chats, Queue, Your data and Help - each with headings. A **search box** at the top finds any setting by a word (sound, archive, decline...) and takes you to it. The cog opens on the page for the tab you're on: from Business you get the Business replies, from Groups the group chat settings.
-- **LFM and Business don't clash any more:** only one collects at a time, and the one started last wins. Listing in the group finder or Collect now pauses Business (it comes back when they stop), and starting Business pauses Collect now (it comes back when Business closes). A pop-up says what happened.
-- **Help for every tab:** a **?** next to the Settings cog explains the tab you're on, and an empty tab shows the same text instead of a blank page. Settings > Help has all of it in one place.
-- **Who's online in a group:** the button at the top of a group chat now says how many members are online ("3 online") and opens a list: a green dot for who's online, a grey dot for members seen before. Click a name to whisper them. The "X joined / left" lines are now off by default, so the chat is just messages (turn them back on in Settings > Notifications).
-- **Group finder eye on the counter:** while LFM is collecting (listed in the group finder, or Collect now), the on-screen counter shows the group finder's eye, next to the Business coin.
-- **The Queue tab is always there**, greyed out while nothing is collecting (hover it to see what's going on). LFM starts by itself when you list in the group finder, and a new **Collect now** button collects at any time (the same as `/tg lfm`). Hide the tab in Settings > Queue to only see it while something collects.
-- **Group chat invites pop up:** when someone sends you a group chat code, a pop-up says who invited you to which group. Click it and the join panel opens with the code and name filled in, so you only press Join.
-- **Dungeon and raid chat pops up:** Party or Raid chat followed just for a dungeon or raid now has pop-up notifications on. New setting in Settings > Chats to turn them off (it still counts unread messages). A chat you already follow keeps its own settings.
-- `/tg test stranger`: a whisper from a made-up player you don't know, handled like a real one, so you can try both sides of the Queue tab without waiting for someone to whisper you. Replies and invites to them stay on your computer.
-- Fixed: Who's online in a group chat split names with a space in them (first and last name) into separate names. Whole names are now listed in alphabetical order.
-- `/tg demo`: the window stays solid while the sample conversations are shown, whatever your opacity setting, so screenshots come out clean. Your opacity is back as soon as the demo is off.
+
+Queue: LFM and Business
+- **Queue tab:** the Requests tab is now **Queue**, with two sides switched at the top: **LFM** (whispers from strangers while you're listed in the group finder) and **Business** (whispers to your ad). Each side shows a green dot while it collects and how many are waiting. The tab is always there, greyed out while nothing collects; hover it to see what's going on, or hide it in Settings > Queue.
+- **Collect now:** LFM can collect at any time, listed or not, for example while you recruit in a chat channel (also `/tg lfm`).
+- **Open for business:** write your ad (shift-click a profession or item to link it), choose where it goes (Trade, Say, Guild...) and how long to stay open (15 minutes to 2 hours, or until you stop it), then press Start and Post. Replies from people you don't know land as cards with their own quick replies, decline and Decline all messages. **Saved ads** keeps up to 15 ads for another time. Also `/tg business [minutes|off]`.
+- Only one side collects at a time, and the one started last wins: listing in the group finder or Collect now pauses Business, starting Business pauses Collect now, and the paused one comes back by itself.
+- The on-screen counter shows the group finder eye while LFM collects, and a gold coin with the minutes left while you're open for business.
+- `/tg test stranger` sends a pretend whisper from a made-up stranger, so you can try both sides without waiting. Nothing is sent to them.
+
+Channels
+- **Filtered channels:** keep only the messages with your words, e.g. "Trade [Enchant]" next to "Trade [Boost]", each its own conversation that pops up when something matches. Add one from + Follow channel > Filtered channels (no need to follow the whole channel) or right-click a followed channel > New filtered copy. Matching ignores upper and lower case, the name keeps your spelling, and you can rename it.
+- Alert words per channel (right-click > Alert words for this channel), and matching words are picked out in gold.
+
+Group chats
+- **Invites pop up:** when someone sends you a group chat code, a pop-up says who invited you to which group. Click it and the join panel opens filled in - just press Join.
+- **Who's online:** the button at the top of a group says how many are online ("3 online", with a green dot) and opens a list - green for online, grey for members seen before. Click a name to whisper them. The "X joined / left" lines are now off by default (Settings > Notifications).
+- Fixed: Who's online split names with a space in them into separate names.
+
+Notifications
+- **New mail:** a pop-up when mail arrives or when you log in with unread mail, saying who sent it. Change the text or turn it off in Settings > Notifications.
+- Party or Raid chat followed just for a dungeon or raid now pops up by default (a new setting turns it off).
+- Right-click menus use tick boxes for notifications: **Pop-up notifications and sound** for people and groups; channels get **Mute everything (alert words too)**.
+
+Settings and help
+- **Settings, reorganised:** six pages instead of nine - Notifications, Look, Chats, Queue, Your data and Help - each with headings. A **search box** finds any setting by a word and takes you to it. The cog opens on the page for the tab you're on.
+- **Help:** the yellow question mark next to the cog explains the tab you're on, an empty tab explains itself, and Settings > Help has it all in one place. Every tab has a short description when you hover it.
+
+Smaller things
+- Telegnome opens where you left it, including the Queue overview; closing Settings goes back there too.
+- Drop-down buttons have a down arrow.
+- `/tg demo` keeps the window solid whatever your opacity, so screenshots come out clean.
 
 ## 0.9.1
 - New setting, Settings > Notifications > In combat: **Show everything** (pop-ups and sounds as usual), **Summary afterwards** (one pop-up when the fight is over - the default, as before) or **Only the count** (no pop-ups or summary; the notifier, minimap button and badges still count up).
