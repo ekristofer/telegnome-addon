@@ -78,9 +78,20 @@ function P:Gather(filter)
         out[#out + 1] = { key = key, info = info, name = name, color = color, online = online, sub = sub }
     end
 
-    -- 1. People you've talked to, most recent first
+    local function addName(fullName, sub, class)
+        if type(fullName) ~= "string" or fullName == "" or (TG.isSecret and TG.isSecret(fullName)) then return end
+        local key, info = TG:WhisperInfo(fullName)
+        if not key then return end
+        info.class = info.class or class
+        add(key, info, info.name:lower(), sub, fullName:lower():match("^[^%-]+"))
+    end
+    local myName = UnitName and UnitName("player")
+
+    -- 1. People you've talked to, most recent first (people only: no channels or groups)
     local recent = {}
-    for key, c in pairs(TG.db.contacts) do recent[#recent + 1] = { key = key, c = c } end
+    for key, c in pairs(TG.db.contacts) do
+        if c.kind == "WHISPER" or c.kind == "BN" then recent[#recent + 1] = { key = key, c = c } end
+    end
     table.sort(recent, function(a, b) return (a.c.last or 0) > (b.c.last or 0) end)
     for _, r in ipairs(recent) do
         local c = r.c
@@ -90,40 +101,84 @@ function P:Gather(filter)
         add(r.key, info, match, "recent", short)
     end
 
-    -- 2. Battle.net friends, online first
-    if BNGetNumFriends and C_BattleNet and C_BattleNet.GetFriendAccountInfo then
-        local online, offline = {}, {}
-        for i = 1, (BNGetNumFriends() or 0) do
-            local a = C_BattleNet.GetFriendAccountInfo(i)
-            if a and a.battleTag then
-                local isOn = a.gameAccountInfo and a.gameAccountInfo.isOnline
-                table.insert(isOn and online or offline, a)
-            end
-        end
-        for _, list in ipairs({ online, offline }) do
-            for _, a in ipairs(list) do
-                local key, info = TG:BNInfoFromAccount(a)
-                TG.bnIDs[key] = a.bnetAccountID
-                -- BattleTag, and the character they're playing if they're in WoW
-                local g = a.gameAccountInfo
-                local char = g and type(g.characterName) == "string" and g.characterName or ""
-                add(key, info, (a.battleTag .. " " .. char):lower(), "Battle.net", a.battleTag:lower():match("^[^#]+"))
+    -- 2. Your group right now
+    if IsInGroup and IsInGroup() then
+        local raid = IsInRaid and IsInRaid()
+        local n = raid and (GetNumGroupMembers and GetNumGroupMembers() or 0)
+            or (GetNumSubgroupMembers and GetNumSubgroupMembers() or 0)
+        for i = 1, n do
+            local unit = (raid and "raid" or "party") .. i
+            local ok, name, realm = pcall(UnitName, unit)
+            if ok and type(name) == "string" and name ~= myName and name ~= UNKNOWNOBJECT then
+                local _, class = UnitClass(unit)
+                addName((type(realm) == "string" and realm ~= "") and (name .. "-" .. realm:gsub("[%s%-]", "")) or name,
+                    "in your group", class)
             end
         end
     end
 
-    -- 3. Character friends
-    if C_FriendList and C_FriendList.GetNumFriends then
-        for i = 1, (C_FriendList.GetNumFriends() or 0) do
-            local fi = C_FriendList.GetFriendInfoByIndex(i)
-            if fi and fi.name then
-                local key, info = TG:WhisperInfo(fi.name, fi.guid)
-                if key then
-                    add(key, info, info.name:lower(), "friend", fi.name:lower():match("^[^%-]+"))
-                end
+    -- 3. Battle.net friends and character friends who are online
+    local bnOnline, bnOffline = {}, {}
+    if BNGetNumFriends and C_BattleNet and C_BattleNet.GetFriendAccountInfo then
+        for i = 1, (BNGetNumFriends() or 0) do
+            local acct = C_BattleNet.GetFriendAccountInfo(i)
+            if acct and acct.battleTag then
+                local isOn = acct.gameAccountInfo and acct.gameAccountInfo.isOnline
+                table.insert(isOn and bnOnline or bnOffline, acct)
             end
         end
     end
+    local function addBN(list)
+        for _, acct in ipairs(list) do
+            local key, info = TG:BNInfoFromAccount(acct)
+            TG.bnIDs[key] = acct.bnetAccountID
+            -- BattleTag, and the character they're playing if they're in WoW
+            local g = acct.gameAccountInfo
+            local char = g and type(g.characterName) == "string" and g.characterName or ""
+            add(key, info, (acct.battleTag .. " " .. char):lower(), "Battle.net", acct.battleTag:lower():match("^[^#]+"))
+        end
+    end
+    local friendsOn, friendsOff = {}, {}
+    if C_FriendList and C_FriendList.GetNumFriends then
+        for i = 1, (C_FriendList.GetNumFriends() or 0) do
+            local fi = C_FriendList.GetFriendInfoByIndex(i)
+            if fi and fi.name then table.insert(fi.connected and friendsOn or friendsOff, fi) end
+        end
+    end
+    local function addFriends(list)
+        for _, fi in ipairs(list) do
+            local key, info = TG:WhisperInfo(fi.name, fi.guid)
+            if key then add(key, info, info.name:lower(), "friend", fi.name:lower():match("^[^%-]+")) end
+        end
+    end
+    addBN(bnOnline)
+    addFriends(friendsOn)
+
+    -- 4. People you were in a group with this week
+    local grouped = {}
+    for key, t in pairs(TG.db.grouped or {}) do
+        if type(t) == "number" and time() - t < 7 * 86400 then grouped[#grouped + 1] = { key = key, t = t } end
+    end
+    table.sort(grouped, function(a, b) return a.t > b.t end)
+    for _, g in ipairs(grouped) do
+        local name = g.key:gsub("^W:", ""):gsub("^%l", string.upper):gsub("%-(%l)", function(c) return "-" .. c:upper() end)
+        addName(name, "grouped " .. UI.ShortTime(g.t))
+    end
+
+    -- 5. Guild members online
+    if IsInGuild and IsInGuild() and GetNumGuildMembers and GetGuildRosterInfo then
+        local total = GetNumGuildMembers() or 0
+        for i = 1, math.min(total, 1000) do
+            local name, _, _, _, _, _, _, _, online, _, class = GetGuildRosterInfo(i)
+            if online and type(name) == "string" and Ambiguate and Ambiguate(name, "short") ~= myName then
+                addName(name, "guild", class)
+            end
+        end
+    end
+
+    -- 6. Everyone else on your friends lists (offline)
+    addBN(bnOffline)
+    addFriends(friendsOff)
 
     -- 4. Start a whisper to whatever was typed
     if filter ~= "" and not exact and not filter:find("#", 1, true) and not filter:find("%s") then
@@ -188,7 +243,7 @@ function P:Refresh()
             row.entry = e
             UI.SetRowContact(row, e.name, e.color, e.online)
             row.right:SetText(e.sub or "")
-            row.sel:SetShown(i + self.offset == 1 and filter ~= "") -- Enter picks this one
+            row:SetSelected(i + self.offset == 1 and filter ~= "") -- Enter picks this one
             row:Show()
         else
             row.entry = nil

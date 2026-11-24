@@ -133,17 +133,21 @@ function N:Create()
     -- Direct message: the player search fills this space
     local dm = CreateFrame("Frame", nil, f)
     dm:SetPoint("TOPLEFT", 10, -68)
-    dm:SetPoint("BOTTOMRIGHT", -10, 10)
+    dm:SetPoint("BOTTOMRIGHT", -10, 42)
     dm:Hide()
     self.pages.dm = dm
 
     local tip = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     tip:SetPoint("BOTTOMLEFT", 14, 12)
-    tip:SetPoint("RIGHT", -30, 0)
+    tip:SetPoint("RIGHT", -100, 0)
     tip:SetJustifyH("LEFT")
     tip:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
     tip:SetText("Tip: hover a section in the list for its + shortcut. Recruiting or selling? That's the Lobby tab.")
     self.tip = tip
+
+    local close = S.Button(f, "Close", 80, 24)
+    close:SetPoint("BOTTOMRIGHT", -10, 10)
+    close:SetScript("OnClick", function() N:Close() end)
 end
 
 function N:IsShown()

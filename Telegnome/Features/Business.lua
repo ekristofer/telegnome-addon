@@ -105,8 +105,8 @@ function B:SyncPause()
         changed()
         local why = hosting and "You're listed in the group finder" or "Collect now is on"
         if TG.Toast then
-            TG.Toast:Notice("|cffffd100Open for business paused|r", why .. ", so whispers from people you don't "
-                .. "know go to LFM. Business comes back when " .. (hosting and "you stop listing." or "you stop collecting."),
+            TG.Toast:Notice("|cffffd100Business paused|r", hosting and "While you're listed in the group finder."
+                or "While Collect now is on.",
                 function() TG.Requests:OpenPanel(nil, "requests") end)
         end
         TG:Print("Open for business is paused while " .. (hosting and "you're listed in the group finder." or "Collect now is on."))
@@ -118,8 +118,8 @@ function B:SyncPause()
         else
             changed()
             if TG.Toast then
-                TG.Toast:Notice("|cffffd100Open for business is back on|r",
-                    "Whispers from people you don't know go to Lobby > Business again.",
+                TG.Toast:Notice("|cffffd100Business is back on|r",
+                    "Replies to your ad go to Business again.",
                     function() TG.Requests:OpenPanel(nil, "business") end)
             end
             TG:Print("Open for business is back on.")
@@ -184,27 +184,64 @@ end
 B.MAX_SAVED = 15
 
 -- An ad as plain text, for menus: links become their names.
+-- A saved ad is its text, or { name = "Boost run", text = "..." } once named.
+function B.AdText(a) return type(a) == "table" and a.text or a end
+function B.AdName(a)
+    if type(a) == "table" and type(a.name) == "string" and a.name:match("%S") then return a.name end
+    return B.PlainAd(B.AdText(a), 40)
+end
+
 function B.PlainAd(text, max)
-    local t = (text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1")
+    local t = (text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[^:]*:", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1")
     max = max or 60
     if #t > max then t = TG.Utf8Left(t, max - 3) .. "..." end
     return t
 end
 
-function B:SaveAd(text)
+-- Saves the ad under a name you choose (asked in a pop-up), so long ads stay short in the Saved ads menu.
+function B:SaveAd(text, name)
     text = strtrim(text or "")
     if text == "" then
         TG:Print("Write the ad first, then save it.")
         return
     end
+    if not name then
+        if not StaticPopupDialogs.TELEGNOME_AD_NAME then
+            StaticPopupDialogs.TELEGNOME_AD_NAME = {
+                text = "Name this ad\n|cff999999A short name for the Saved ads menu.|r",
+                button1 = SAVE or "Save",
+                button2 = CANCEL or "Cancel",
+                hasEditBox = true,
+                maxLetters = 32,
+                OnShow = function(self, data)
+                    local box = self.editBox or self.EditBox
+                    if box then box:SetText(B.PlainAd(data or self.data, 28)); box:HighlightText() end
+                end,
+                OnAccept = function(self, data)
+                    local box = self.editBox or self.EditBox
+                    B:SaveAd(data or self.data, box and box:GetText() or "")
+                end,
+                EditBoxOnEnterPressed = function(box)
+                    local p = box:GetParent()
+                    B:SaveAd(p.data, box:GetText())
+                    p:Hide()
+                end,
+                EditBoxOnEscapePressed = function(box) box:GetParent():Hide() end,
+                timeout = 0, whileDead = true, hideOnEscape = true,
+            }
+        end
+        StaticPopup_Show("TELEGNOME_AD_NAME", nil, nil, text)
+        return
+    end
+    name = strtrim(name or "")
     local list = S().savedAds or {}
     S().savedAds = list
     for i, a in ipairs(list) do
-        if a == text then table.remove(list, i) break end -- saved again: moves to the top
+        if B.AdText(a) == text then table.remove(list, i) break end -- saved again: moves to the top
     end
-    table.insert(list, 1, text)
+    table.insert(list, 1, name ~= "" and { name = name, text = text } or text)
     while #list > B.MAX_SAVED do table.remove(list) end
-    TG:Print("Ad saved.")
+    TG:Print("Ad saved" .. (name ~= "" and (": " .. name) or "") .. ".")
 end
 
 function B:DeleteSaved(i)
@@ -225,12 +262,15 @@ function B:OpenSavedMenu(anchor, current, use)
         end
         root:CreateTitle("Use a saved ad")
         for _, a in ipairs(list) do
-            root:CreateButton(B.PlainAd(a), function() use(a) end)
+            local b = root:CreateButton(B.AdName(a), function() use(B.AdText(a)) end)
+            if b and b.SetTooltip then
+                b:SetTooltip(function(tip) tip:SetText(B.PlainAd(B.AdText(a), 200), 1, 1, 1, 1, true) end)
+            end
         end
         root:CreateDivider()
         local del = root:CreateButton("Delete a saved ad")
         for i, a in ipairs(list) do
-            del:CreateButton(B.PlainAd(a), function() B:DeleteSaved(i) end)
+            del:CreateButton(B.AdName(a), function() B:DeleteSaved(i) end)
         end
     end)
 end

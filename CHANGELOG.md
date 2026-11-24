@@ -13,7 +13,11 @@ Two tabs: Chats and Lobby
 New chat
 - **+ New chat** opens a page with three choices: Direct message, Group chat or Channel. Direct message shows the player search right on that page; Group chat opens create / join; Channel leads to Follow a channel, Filtered channels or Your chat channels, each its own page.
 - Every New chat page has a **< Back** button, so you can look around without starting over.
-- The player search lists all your friends from the start (it showed only one until you typed), and finds Battle.net friends by BattleTag or the character they're playing as well as by name.
+- The player search lists people you've talked to, your group right now, online friends, people you grouped with this week, online guild members, then offline friends - with a label saying which. It finds Battle.net friends by BattleTag or the character they're playing (the game keeps real names unreadable for addons). Fixed: it showed only one name, sometimes a channel.
+- The Direct message page has a Close button like the other pages.
+- **Saved ads have names:** saving an ad asks for a short name, and the Saved ads menu shows that name (hover it for the whole ad).
+- The "Business paused" and "back on" pop-ups are shorter, so they fit.
+- Fixed: item links in search results showed colour codes like "|cnIQ3:" in front of the name.
 - Hover a section header for a small **+** that goes straight there: new message on Friends and Others, new group on Group chats, channel options on Channels.
 
 ## 0.9.2

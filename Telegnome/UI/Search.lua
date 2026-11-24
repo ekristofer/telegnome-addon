@@ -15,7 +15,7 @@ local MAX_RESULTS = 200
 -- The text without colours, links and icons, as it reads on screen.
 local function plain(text)
     if type(text) ~= "string" then return "" end
-    text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[^:]*:", ""):gsub("|r", "") -- also named colours (|cnIQ3:)
     text = text:gsub("|H.-|h(.-)|h", "%1"):gsub("|T.-|t", ""):gsub("|A.-|a", "")
     return (text:gsub("[\r\n]+", " "))
 end
