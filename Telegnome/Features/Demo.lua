@@ -2,6 +2,7 @@
 --   /tg demo        show them (your real conversations are put aside, untouched)
 --   /tg demo msg    a sample friend writes, so the notifier pops up
 --   /tg demo requests   the Requests tab with sample requests, and the "Requests are on" pop-up
+--   /tg demo business   Lobby > Business, open for business with a sample ad and customers
 --   /tg demo off    back to your real conversations (also happens on logout or /reload)
 -- Nothing typed in demo mode is sent to anyone. Not listed in /tg help.
 
@@ -78,6 +79,17 @@ local REQUESTS = {
       msgs = { { 12, false, "Prot warrior, done this many times" }, { 11, true, "Inviting you now." } } },
 }
 
+-- Shown under Lobby > Business (whispers to your ad).
+local BIZ_AD = "Enchanting: Crusader, Fiery Weapon, +15 Agility to gloves. Your mats, tips welcome. /w me!"
+local BUSINESS = {
+    { key = "W:glimmerfizz-gnomeregan", name = "Glimmerfizz-Gnomeregan", class = "MAGE", level = 60,
+      msgs = { { 1, false, "Crusader on my sword? Have all the mats" } }, unread = 1 },
+    { key = "W:hammerstout-gnomeregan", name = "Hammerstout-Gnomeregan", class = "PALADIN", level = 54,
+      msgs = { { 3, false, "how much for +7 agility on boots?" } }, unread = 1 },
+    { key = "W:ruskwind-gnomeregan", name = "Ruskwind-Gnomeregan", class = "WARRIOR", level = 60,
+      msgs = { { 7, false, "Fiery Weapon pls, I can tip 5g" }, { 6, true, "Sure, meet me at the bank?" } } },
+}
+
 local GROUPS = {
     { key = "G:tgn0000000000a1", name = "Raid night", code = "cog-gear-flux-417", msgs = {
         { 95, false, "Who's bringing the feast?", "Mirelle", "PRIEST" },
@@ -150,6 +162,11 @@ local function build()
             applied = r.applied, role = r.role, ilvl = r.ilvl, invited = r.invited and now or nil, joined = r.joined, demoSec = "others", unread = r.unread }, r.msgs)
         contacts[r.key] = { kind = "WHISPER", name = r.name, class = r.class, last = now, demo = true }
     end
+    for _, r in ipairs(BUSINESS) do
+        add(r.key, { kind = "WHISPER", name = r.name, class = r.class, level = r.level, req = true, biz = true,
+            demoSec = "others", unread = r.unread }, r.msgs)
+        contacts[r.key] = { kind = "WHISPER", name = r.name, class = r.class, last = now, demo = true }
+    end
     for _, g in ipairs(GROUPS) do
         add(g.key, { kind = "GROUP", name = g.name, code = g.code, channel = g.key:sub(3), unread = g.unread }, g.msgs)
     end
@@ -174,6 +191,12 @@ function D:Start()
         threads = db.threads, contacts = db.contacts, seq = db.seq, collapsed = db.collapsed,
         pendingInvite = db.pendingInvite,
     }
+    -- open for business with a sample ad (your own ad and Business setting come back afterwards)
+    local s = db.settings
+    self.saved.biz = { business = s.business, businessUntil = s.businessUntil, businessPaused = s.businessPaused,
+        ads = s.ads }
+    s.business, s.businessUntil, s.businessPaused = true, time() + 25 * MIN, nil
+    s.ads = { BIZ_AD }
     db.threads, db.contacts, db.seq = build()
     db.collapsed, db.pendingInvite = { archive = true, all_archive = true }, nil
     self.on, self.ping = true, 0
@@ -193,6 +216,11 @@ function D:Stop(quiet)
     if not self.on then return end
     local db, s = TG.db, self.saved
     db.threads, db.contacts, db.seq, db.collapsed, db.pendingInvite = s.threads, s.contacts, s.seq, s.collapsed, s.pendingInvite
+    if s.biz then
+        local st = db.settings
+        st.business, st.businessUntil, st.businessPaused, st.ads = s.biz.business, s.biz.businessUntil,
+            s.biz.businessPaused, s.biz.ads
+    end
     self.on, self.saved = false, nil
     if quiet then return end
     UI.selected = nil
@@ -229,11 +257,19 @@ function D:Requests()
     end
 end
 
+-- Lobby > Business, open for business with a sample ad and a few customers.
+function D:Business()
+    if not self.on then self:Start() end
+    TG.Requests:OpenPanel(nil, "business")
+end
+
 function D:Command(arg)
     if arg == "msg" or arg == "message" or arg == "ping" then
         self:Ping()
     elseif arg == "requests" or arg == "request" or arg == "req" or arg == "lfm" or arg == "queue" then
         self:Requests()
+    elseif arg == "business" or arg == "biz" then
+        self:Business()
     elseif arg == "off" or arg == "stop" then
         self:Stop()
     elseif arg == "on" or arg == "start" then

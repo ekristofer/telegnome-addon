@@ -939,8 +939,9 @@ function UI:GetRow(i)
     row.preview:SetWordWrap(false)
     row.preview:SetTextColor(S.DIM[1], S.DIM[2], S.DIM[3])
 
-    row.pill = S.Pill(row, 16)
-    row.pill:SetPoint("BOTTOMRIGHT", -8, 5)
+    -- the badge sits on the preview line, clear of the time above it
+    row.pill = S.Pill(row, 14)
+    row.pill:SetPoint("BOTTOMRIGHT", -8, 4)
 
     -- what kind of conversation: people have the online dot, groups a two-people icon, channels a #
     row.groupIcon = S.Icon(row, S.GROUP, 14)
@@ -952,7 +953,7 @@ function UI:GetRow(i)
     row.hash:SetTextColor(0.56, 0.65, 0.79)
     -- a quiet channel's new messages: a dot instead of a number
     row.quiet = S.Dot(row, 7)
-    row.quiet:SetPoint("BOTTOMRIGHT", -12, 10)
+    row.quiet:SetPoint("BOTTOMRIGHT", -11, 8)
     row.quiet:SetVertexColor(0.79, 0.64, 0.29)
     -- the grey line under an empty Pinned section
     row.hint = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -1211,7 +1212,7 @@ local function placeTop(row, short)
     local t = short and -4 or -5
     row.dot:ClearAllPoints(); row.dot:SetPoint("TOPLEFT", 8, t - 3)
     row.name:ClearAllPoints(); row.name:SetPoint("TOPLEFT", NAME_X, t)
-    row.time:ClearAllPoints(); row.time:SetPoint("TOPRIGHT", -8, t - 2)
+    row.time:ClearAllPoints(); row.time:SetPoint("TOPRIGHT", -8, t - 1)
     row.hash:ClearAllPoints(); row.hash:SetPoint("TOPLEFT", 7, t)
     row.groupIcon:ClearAllPoints(); row.groupIcon:SetPoint("TOPLEFT", 5, t - 1)
     row.close:ClearAllPoints(); row.close:SetPoint("TOPRIGHT", -6, short and -3 or -4)
@@ -1247,7 +1248,9 @@ local function showChat(row, key, selected, width, short)
     row.preview:SetText(UI.PreviewOf(th))
     row.preview:SetShown(not short)
     if short then row.pill:SetCount(0); row.quiet:Hide() end
-    row.preview:SetWidth(math.max(40, width - NAME_X - 8 - (row.pill:IsShown() and num(row.pill:GetWidth(), 16) + 6 or 0)))
+    -- leave room for the badge or the quiet dot, so the preview never runs under them
+    local badgeW = row.pill:IsShown() and num(row.pill:GetWidth(), 14) + 6 or row.quiet:IsShown() and 14 or 0
+    row.preview:SetWidth(math.max(40, width - NAME_X - 8 - badgeW))
     row:SetSelected(selected)
 end
 
@@ -1618,6 +1621,21 @@ function UI:BuildAllEntries(keys)
                 -- one line each.
                 local pinned, archive = sec.id == "all_pinned", sec.id == "all_archive"
                 local capped = not pinned and not archive and not focus and limit > 0 and not self.expanded[sec.id]
+                -- just one to hide: a "Show 1 earlier" line takes as much room as the chat itself, so show it
+                local toHide, seenRecent = 0, 0
+                if not pinned and not archive and limit > 0 then
+                    for _, k in ipairs(b) do
+                        local th = threads[k]
+                        local always = (th.unread or 0) > 0 or k == self.selected
+                        local recent = UI.IsRecent(th)
+                        if not always then
+                            if recent and seenRecent < limit then seenRecent = seenRecent + 1 else toHide = toHide + 1 end
+                        elseif recent then
+                            seenRecent = seenRecent + 1
+                        end
+                    end
+                end
+                if toHide <= 1 then capped = false end
                 local shown, hidden, hiddenRecent, wouldHide = 0, 0, 0, 0
                 for _, k in ipairs(b) do
                     local th = threads[k]
@@ -1638,7 +1656,7 @@ function UI:BuildAllEntries(keys)
                 if hidden > 0 then
                     entries[#entries + 1] = { hint = (hiddenRecent > 0 and "Show %d more" or "Show %d earlier"):format(hidden),
                         more = sec.id }
-                elseif self.expanded[sec.id] and wouldHide > 0 and not focus then
+                elseif self.expanded[sec.id] and wouldHide > 1 and not focus then
                     entries[#entries + 1] = { hint = "Show less", more = sec.id }
                 end
             end

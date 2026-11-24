@@ -6,7 +6,7 @@ Two tabs: Chats and Lobby
 - The Lobby tab is no longer greyed out. A dot before its name is green while LFM or Business collects, grey otherwise.
 - **Chats** (the old All tab) holds every conversation; the Direct, Channels and Groups tabs are gone. **Lobby** is the old Queue tab, still with LFM and Business. `/tg lobby` opens it (`/tg queue` still works).
 - New section order: **Pinned · Friends · Group chats · Channels · Others · Archive**. Direct messages from people you don't know sit under Others at the bottom, unread ones first.
-- **A shorter list:** each section shows today's conversations, up to 5 (Settings > Chats; 0 shows everything), plus anything unread or open. Older ones wait behind **Show N earlier** and then show as one line each - name and when. Archive shows one line per conversation too, and rows and headers are a little tighter.
+- **A shorter list:** each section shows today's conversations, up to 5 (Settings > Chats; 0 shows everything), plus anything unread or open. Older ones wait behind **Show N earlier** and then show as one line each - name and when. When only one would be hidden, it just shows (the link would take the same room). Archive shows one line per conversation too, and rows and headers are a little tighter.
 - Others go to Archive sooner than friends: after 1 day by default (Settings > Chats). Friends still after 7.
 - Right-click a section header > **Show only this section** hides the others until you click **Show all**.
 - **Your own section order:** drag a section header onto another one (or right-click > Move section up / down) to put, say, Channels above Friends. Pinned stays on top and Archive at the bottom; right-click > Reset section order puts it back.
@@ -26,6 +26,7 @@ New chat
 - The "Business paused" and "back on" pop-ups are shorter, so they fit.
 - **Recent searches:** Search shows your last searches before you type. A search is kept when you click one of its results, so you can go back and keep looking.
 - The Channel descriptions on New chat are shorter, so they fit.
+- Fixed: unread badges and the gold dot overlapped the time and the preview text in the Chats list.
 - Fixed: item links in search results showed colour codes like "|cnIQ3:" in front of the name.
 - Hover a section header for a small **+** that goes straight there: new message on Friends and Others, new group on Group chats, channel options on Channels.
 
