@@ -13,7 +13,7 @@ H.TEXT = {
     all = { "Chats", "Every conversation in one list: Pinned, Friends, Group chats, Channels and Others (people "
         .. "you don't know). Quiet direct messages move to Archive at the bottom.\n\n"
         .. "- + New chat starts a direct message, a group chat or a channel. Hover a section for its + shortcut.\n"
-        .. "- Each section shows a few chats, then Show more. Unread chats always show.\n"
+        .. "- Each section shows today's chats (up to 5); older ones wait behind Show earlier, one line each. Unread chats always show.\n"
         .. "- Click the star or drag a conversation onto Pinned to pin it; drag pinned ones to reorder them.\n"
         .. "- Drag a section header (or right-click > Move section up) to put the sections in your order.\n"
         .. "- Right-click a section for Show only this section, sorting and Mark all as read.\n"
@@ -70,7 +70,7 @@ H.WHATS_NEW = { "Welcome to Telegnome 1.0", "Two tabs now instead of five.\n\n"
     .. "- + New chat starts a direct message, a group chat or a channel. Hover a section header for its "
     .. "own + shortcut.\n"
     .. "- Drag a chat onto Pinned to pin it, and drag section headers to put them in your order.\n"
-    .. "- Each section shows a few chats, then Show more. Right-click the Chats tab to mark everything as read." }
+    .. "- Each section shows today's chats; older ones wait behind Show earlier. Right-click the Chats tab to mark everything as read." }
 
 function H:ShowWhatsNew()
     UI:Show()

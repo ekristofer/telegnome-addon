@@ -55,7 +55,7 @@ local DEFAULTS = {
         requestsTab = true,   -- collect strangers' whispers under Requests while listed in the group finder
         requestsCollect = true, -- the tick in the Requests view: untick to pause collecting while listed
         recruiting = false,   -- collect at any time, listed or not (/tg recruit)
-        sectionLimit = 8,     -- Chats: chats shown per section before "Show N more" (0 = all)
+        sectionLimit = 5,     -- Chats: today's chats shown per section before "Show N more" (0 = all)
         archiveOthersDays = 1, -- Others (people you don't know) go to Archive sooner than friends
         showRequestsTab = true, -- the Requests tab is always there; off: only while collecting or with requests
         business = false,     -- Open for business: collecting whispers for your ad
@@ -163,10 +163,16 @@ end
 -- full name instead. Elsewhere this is "Name" on your realm and "Name-Realm" on another.
 function TG.UnitFullName(unit)
     local full = GetUnitName and GetUnitName(unit, true)
-    if type(full) == "string" and full ~= "" and not (TG.isSecret and TG.isSecret(full)) then return full end
-    local name = UnitName and UnitName(unit)
-    if type(name) == "string" and name ~= "" then return name end
-    return nil
+    if not (type(full) == "string" and full ~= "" and not (TG.isSecret and TG.isSecret(full))) then
+        if not UnitName then return nil end
+        local name, realm = UnitName(unit)
+        if type(name) ~= "string" or name == "" then return nil end
+        full = (type(realm) == "string" and realm ~= "") and (name .. "-" .. realm) or name
+    end
+    -- whisper names write the realm without spaces or dashes ("Zed-Azjol-Nerub" -> "Zed-AzjolNerub")
+    local name, realm = full:match("^([^%-]+)%-(.+)$")
+    if name then full = name .. "-" .. realm:gsub("[%s%-]", "") end
+    return full
 end
 
 -- Your own character's whole name.
@@ -195,6 +201,11 @@ end
 
 -- v0.1 keyed character threads case-sensitively; v0.2 uses lowercase keys.
 local function migrate(db)
+    -- 1.0: five of today's chats per section instead of eight (the betas started at 8)
+    if not db.sectionLimit5 then
+        if db.settings.sectionLimit == 8 then db.settings.sectionLimit = 5 end
+        db.sectionLimit5 = true
+    end
     -- 1.0: people coming from an earlier version get a "what's new" card the next time the window opens
     if not db.whatsNew100 then
         if db.soundReset060 ~= nil then db.whatsNewPending = "1.0" end

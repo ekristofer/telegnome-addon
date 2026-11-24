@@ -6,7 +6,7 @@ Two tabs: Chats and Lobby
 - The Lobby tab is no longer greyed out. A dot before its name is green while LFM or Business collects, grey otherwise.
 - **Chats** (the old All tab) holds every conversation; the Direct, Channels and Groups tabs are gone. **Lobby** is the old Queue tab, still with LFM and Business. `/tg lobby` opens it (`/tg queue` still works).
 - New section order: **Pinned · Friends · Group chats · Channels · Others · Archive**. Direct messages from people you don't know sit under Others at the bottom, unread ones first.
-- Each section shows up to 8 conversations, then **Show N more** (Settings > Chats; 0 shows everything). Unread and open conversations always show.
+- **A shorter list:** each section shows today's conversations, up to 5 (Settings > Chats; 0 shows everything), plus anything unread or open. Older ones wait behind **Show N earlier** and then show as one line each - name and when. Archive shows one line per conversation too, and rows and headers are a little tighter.
 - Others go to Archive sooner than friends: after 1 day by default (Settings > Chats). Friends still after 7.
 - Right-click a section header > **Show only this section** hides the others until you click **Show all**.
 - **Your own section order:** drag a section header onto another one (or right-click > Move section up / down) to put, say, Channels above Friends. Pinned stays on top and Archive at the bottom; right-click > Reset section order puts it back.

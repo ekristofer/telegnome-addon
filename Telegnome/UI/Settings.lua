@@ -614,9 +614,10 @@ function O:Create()
         "People who aren't friends, guild members or people you grouped with go to Archive sooner, so strangers "
         .. "you whispered once tidy themselves away. Friends use the number above.")
     gap(4)
-    numBox("Show up to", "sectionLimit", 8, 0, "chats per section, then Show more",
-        "Each section in Chats shows this many conversations, then a Show more link. Pinned and unread "
-        .. "conversations always show. 0 shows everything.")
+    numBox("Show up to", "sectionLimit", 5, 0, "of today's chats per section",
+        "Each section in Chats shows up to this many of today's conversations. Older ones wait behind "
+        .. "Show earlier and then show as one line each. Pinned, unread and open conversations always show. "
+        .. "0 shows everything.")
     gap(4)
 
     section("Dungeons and raids")

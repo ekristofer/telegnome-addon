@@ -8,9 +8,10 @@ local UI = { rows = {}, offset = 0, tab = "all", selectedByTab = {} }
 TG.UI = UI
 
 local LIST_W = 216
-local ROW_H = 40      -- a conversation in the list: name and time, preview and unread badge
-local HEAD_H = 24     -- Pinned / Friends / Others
-local HINT_H = 22     -- the grey line under an empty Pinned section
+local ROW_H = 36      -- a conversation in the list: name and time, preview and unread badge
+local SHORT_H = 22    -- an older conversation: one line, name and when
+local HEAD_H = 22     -- Pinned / Friends / Others
+local HINT_H = 20     -- the grey line under an empty Pinned section, and Show N earlier
 local SUB_H = 22      -- Friends / Others inside Direct messages on the All tab
 local NAME_X = 22     -- every name starts here, with or without an online dot
 local TOP = 74        -- where the list and the conversation start, below the header and the tabs
@@ -1205,8 +1206,21 @@ local function showHeader(row, e)
     UI:LayoutHeaderRule(row)
 end
 
-local function showChat(row, key, selected, width)
+-- Where the top line sits: a little higher on a one-line row.
+local function placeTop(row, short)
+    local t = short and -4 or -5
+    row.dot:ClearAllPoints(); row.dot:SetPoint("TOPLEFT", 8, t - 3)
+    row.name:ClearAllPoints(); row.name:SetPoint("TOPLEFT", NAME_X, t)
+    row.time:ClearAllPoints(); row.time:SetPoint("TOPRIGHT", -8, t - 2)
+    row.hash:ClearAllPoints(); row.hash:SetPoint("TOPLEFT", 7, t)
+    row.groupIcon:ClearAllPoints(); row.groupIcon:SetPoint("TOPLEFT", 5, t - 1)
+    row.close:ClearAllPoints(); row.close:SetPoint("TOPRIGHT", -6, short and -3 or -4)
+end
+
+-- short: an older conversation, shown as one line (name and when).
+local function showChat(row, key, selected, width, short)
     local th = TG.db.threads[key]
+    placeTop(row, short)
     row.key, row.headUnread, row.moreFor = key, nil, nil
     row.chevDown:Hide(); row.chevRight:Hide(); row.caption:Hide(); row.rule:Hide(); row.headPill:Hide(); row.closeAll:Hide()
     row.plus:Hide()
@@ -1231,7 +1245,8 @@ local function showChat(row, key, selected, width)
     row.pill:SetCount((selected or not counted) and 0 or unread)
     row.quiet:SetShown(not selected and not counted and unread > 0)
     row.preview:SetText(UI.PreviewOf(th))
-    row.preview:Show()
+    row.preview:SetShown(not short)
+    if short then row.pill:SetCount(0); row.quiet:Hide() end
     row.preview:SetWidth(math.max(40, width - NAME_X - 8 - (row.pill:IsShown() and num(row.pill:GetWidth(), 16) + 6 or 0)))
     row:SetSelected(selected)
 end
@@ -1598,26 +1613,50 @@ function UI:BuildAllEntries(keys)
                 if #b == 0 then
                     entries[#entries + 1] = { hint = "Star a person, group or channel to pin it here." }
                 end
-                local capped = sec.id ~= "all_pinned" and not focus and limit > 0 and not self.expanded[sec.id]
-                local shown, hidden = 0, 0
+                -- Today's chats show (up to the limit), and anything unread or open; the rest waits behind
+                -- "Show N earlier" and then shows as one line each. Pinned always shows in full, Archive as
+                -- one line each.
+                local pinned, archive = sec.id == "all_pinned", sec.id == "all_archive"
+                local capped = not pinned and not archive and not focus and limit > 0 and not self.expanded[sec.id]
+                local shown, hidden, hiddenRecent, wouldHide = 0, 0, 0, 0
                 for _, k in ipairs(b) do
                     local th = threads[k]
-                    if not capped or shown < limit or (th.unread or 0) > 0 or k == self.selected then
-                        entries[#entries + 1] = { key = k }
-                        shown = shown + 1
+                    local always = (th.unread or 0) > 0 or k == self.selected
+                    local recent = UI.IsRecent(th)
+                    local fits = recent and shown < limit
+                    if not pinned and not archive and limit > 0 and not always and not fits then
+                        wouldHide = wouldHide + 1
+                    end
+                    if not capped or always or fits then
+                        entries[#entries + 1] = { key = k, short = not pinned and not always and not recent or nil }
+                        if recent then shown = shown + 1 end
                     else
                         hidden = hidden + 1
+                        if recent then hiddenRecent = hiddenRecent + 1 end
                     end
                 end
                 if hidden > 0 then
-                    entries[#entries + 1] = { hint = ("Show %d more"):format(hidden), more = sec.id }
-                elseif self.expanded[sec.id] and limit > 0 and #b > limit and not focus then
+                    entries[#entries + 1] = { hint = (hiddenRecent > 0 and "Show %d more" or "Show %d earlier"):format(hidden),
+                        more = sec.id }
+                elseif self.expanded[sec.id] and wouldHide > 0 and not focus then
                     entries[#entries + 1] = { hint = "Show less", more = sec.id }
                 end
             end
         end
     end
     return entries
+end
+
+-- A conversation with something today (or in the last three hours, so nothing vanishes at midnight).
+function UI.IsRecent(th)
+    local last = th and th.msgs and th.msgs[#th.msgs]
+    if not last then return true end -- just opened, nothing said yet
+    local t = last.t or 0
+    local now = time()
+    if now - t < 3 * 3600 then return true end
+    local d = date("*t", now)
+    local midnight = time({ year = d.year, month = d.month, day = d.day, hour = 0, min = 0, sec = 0 })
+    return t >= midnight
 end
 
 -- The conversation at the top of the list as you see it (not inside a folded section), for picking
@@ -1671,7 +1710,9 @@ function UI:RefreshList()
     local entries = self:BuildEntries()
     local listH = math.max(ROW_H, num(self.list:GetHeight(), 300))
     local width = math.max(120, num(self.list:GetWidth(), LIST_W - 12))
-    local function heightOf(e) return e.header and (e.sub and SUB_H or HEAD_H) or e.hint and HINT_H or ROW_H end
+    local function heightOf(e)
+        return e.header and (e.sub and SUB_H or HEAD_H) or e.hint and HINT_H or e.short and SHORT_H or ROW_H
+    end
 
     -- don't scroll past the point where the last entries fill the list
     local fit, maxOffset = 0, #entries
@@ -1705,7 +1746,7 @@ function UI:RefreshList()
         elseif e.hint then
             showHint(row, e)
         else
-            showChat(row, e.key, e.key == self.selected, width)
+            showChat(row, e.key, e.key == self.selected, width, e.short)
         end
         row:Show()
         y = y + h
