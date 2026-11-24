@@ -55,6 +55,9 @@ local DEFAULTS = {
         requestsTab = true,   -- collect strangers' whispers under Requests while listed in the group finder
         requestsCollect = true, -- the tick in the Requests view: untick to pause collecting while listed
         recruiting = false,   -- collect at any time, listed or not (/tg recruit)
+        autoInviteMinutes = 5, -- Lobby > LFM: auto-invite runs this long
+        autoInviteWord = "",   -- and invites whoever whispers this
+        inviteAsk = "friends", -- "inv" whispers: an invite pop-up for friends / everyone / off
         sectionLimit = 5,     -- Chats: today's chats shown per section before "Show N more" (0 = all)
         archiveOthersDays = 1, -- Others (people you don't know) go to Archive sooner than friends
         showRequestsTab = true, -- the Requests tab is always there; off: only while collecting or with requests
@@ -429,6 +432,11 @@ function TG:AddMessage(key, info, outgoing, text, extra)
     while #msgs > max do table.remove(msgs, 1) end
     th.archived = nil -- a new message brings it back from Archive
 
+    -- auto-invite: whispering the keyword gets an invite straight away
+    if not outgoing and info.kind == "WHISPER" and self.Requests and self.Requests.MaybeAutoInvite then
+        self.Requests:MaybeAutoInvite(key, th, text)
+    end
+
     if outgoing then
         th.unread = 0
     elseif not self.UI:IsViewing(key) then
@@ -436,7 +444,9 @@ function TG:AddMessage(key, info, outgoing, text, extra)
         -- do not disturb: no sound, no pop-up preview. In combat they wait for the fight to end.
         if not db.settings.dnd and not (self.Instances and self.Instances:Hold(key, alert)) then
             self:MaybePlaySound(key, alert)
-            self.Toast:OnIncoming(key, text, extra and extra.from, alert)
+            if not (info.kind == "WHISPER" and self.Requests and self.Requests:MaybeOfferInvite(key, th, text)) then
+                self.Toast:OnIncoming(key, text, extra and extra.from, alert)
+            end
         end
     end
 

@@ -226,6 +226,27 @@ function O:Create()
     end
     S.Tooltip(self.radios[3], "Friends only", "Battle.net friends and your in-game friends list.")
     y = y - 24
+    index("Invite pop-up: Friends & guild, Everyone, Off", "When someone whispers \"inv\", a pop-up you click to invite them.")
+    local invLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    invLabel:SetPoint("TOPLEFT", 44, y - 3)
+    invLabel:SetText("\"inv\" whispers, click to invite:")
+    self.invRadios = {}
+    local prevV = invLabel
+    for _, opt in ipairs({ { "friends", "Friends & guild" }, { "all", "Everyone" }, { "off", "Off" } }) do
+        local r = S.Radio(content, opt[2])
+        r:SetPoint("LEFT", prevV, "RIGHT", prevV == invLabel and 8 or 12, prevV == invLabel and 0 or -1)
+        r.value = opt[1]
+        r:SetScript("OnClick", function()
+            TG.db.settings.inviteAsk = opt[1]
+            O:Refresh()
+        end)
+        S.Tooltip(r, "Invite pop-up", "When someone whispers \"inv\", \"inv pls\", \"invite me?\" and so on, "
+            .. "the pop-up says they want an invite, and clicking it invites them. Only when you can invite "
+            .. "(not in a group, or its leader or assistant). Strangers while LFM collects get their card as usual.")
+        prevV = r.label
+        self.invRadios[#self.invRadios + 1] = r
+    end
+    y = y - 24
     check("Tell me about unread messages when I log in", 30,
         function() return s().loginSummary ~= false end, function(v) s().loginSummary = v end,
         "On login", "A line in chat a few seconds after you log in, when messages from last time are still unread.")
@@ -983,6 +1004,7 @@ function O:Refresh()
     for _, r in ipairs(self.sizeRadios) do r:SetChecked(r.value == (st.textSize or "normal")) end
     for _, r in ipairs(self.sortRadios) do r:SetChecked(r.value == (st.listSort or "recent")) end
     for _, r in ipairs(self.instRadios) do r:SetChecked(r.value == (st.instanceChat or "ask")) end
+    for _, r in ipairs(self.invRadios or {}) do r:SetChecked(r.value == (st.inviteAsk or "friends")) end
     if self.archiveDays then
         if not self.archiveDays:HasFocus() then self.archiveDays:SetText(tostring(st.archiveDays or 7)) end
         self.archiveDays:SetAlpha(st.archiveOn == false and 0.5 or 1)

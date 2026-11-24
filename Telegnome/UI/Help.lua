@@ -57,7 +57,8 @@ H.TEXT = {
 H.TEXT.queue = { "Lobby", "Whispers from people you don't know, collected as cards so they don't get lost "
     .. "among your friends' messages. Switch side at the top - only one collects at a time, the one started last.\n\n"
     .. "LFM: while you're listed in the group finder (as the leader), or with Collect now. Each card shows the class "
-    .. "and level; Invite, Reply or Decline. Filter by class with the icons.\n\n"
+    .. "and level; Invite, Reply or Decline. Filter by class with the icons. Auto-invite invites anyone who "
+    .. "whispers your keyword, for a few minutes.\n\n"
     .. "Business: write an ad (shift-click a profession or item to link it), choose where and how long, press Start "
     .. "and Post. Saved ads keeps ads you use again.\n\n"
     .. "Quick replies and decline messages for both are in Settings > Lobby." }

@@ -345,8 +345,10 @@ function UI:Create()
             .. "listing (LFM) or to your ad (Business).", 1, 1, 1, true)
         local st = TG.db.settings
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(TG.Requests:Collecting() and "LFM: collecting" or "LFM: not collecting",
-            TG.Requests:Collecting() and 0.4 or 0.6, TG.Requests:Collecting() and 0.9 or 0.6, 0.4)
+        GameTooltip:AddLine(TG.Requests:AutoOn() and "LFM: auto-inviting"
+            or TG.Requests:Collecting() and "LFM: collecting" or "LFM: not collecting",
+            (TG.Requests:Collecting() or TG.Requests:AutoOn()) and 0.4 or 0.6,
+            (TG.Requests:Collecting() or TG.Requests:AutoOn()) and 0.9 or 0.6, 0.4)
         local biz = not st.business and "Business: closed" or st.businessPaused and "Business: paused" or "Business: open"
         GameTooltip:AddLine(biz, TG.Business:IsOn() and 0.4 or 0.6, TG.Business:IsOn() and 0.9 or 0.6, 0.4)
         GameTooltip:Show()
@@ -1879,7 +1881,7 @@ function UI:UpdateTabs()
             tab.fs:SetTextColor(0.62, 0.57, 0.48)
         end
         if tab.id == "queue" and self.lobbyDot then
-            local active = TG.Requests:Collecting() or TG.Business:IsOn()
+            local active = TG.Requests:Collecting() or TG.Requests:AutoOn() or TG.Business:IsOn()
             self.lobbyDot:SetTexture(active and "Interface\\COMMON\\Indicator-Green" or "Interface\\COMMON\\Indicator-Gray")
         end
         tab:SetWidth(num(tab.fs:GetStringWidth(), 90) + 24 + (tab.id == "queue" and 17 or 0)

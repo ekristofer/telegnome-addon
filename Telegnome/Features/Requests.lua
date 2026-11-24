@@ -352,6 +352,187 @@ function R:Invite(key)
 end
 
 ---------------------------------------------------------------------------
+-- "inv": someone asks for an invite
+---------------------------------------------------------------------------
+
+-- Words that mean "invite me" when a short whisper is mostly about that.
+local INV_WORDS = { inv = true, invite = true, invit = true, ["inv?"] = true, invy = true, invs = true }
+local FILLER = { pls = true, plz = true, please = true, me = true, ["?"] = true, can = true, i = true, get = true,
+    an = true, a = true, you = true, u = true, ty = true, thx = true, ["for"] = true, again = true, back = true,
+    ["2"] = true, to = true, group = true, party = true, raid = true, now = true, sry = true, mate = true }
+
+-- True for "inv", "inv pls", "invite me?", "can i get an inv" - but not "I invited you" or a long sentence.
+function R.AsksForInvite(text)
+    if type(text) ~= "string" or #text > 40 then return false end
+    local found = false
+    for raw in text:lower():gsub("[!%.,]", " "):gmatch("%S+") do
+        local word = raw:gsub("%?$", "")
+        if INV_WORDS[word] then found = true
+        elseif not FILLER[word] and word ~= "" then return false end
+    end
+    return found
+end
+
+-- A pop-up that invites them when clicked, instead of the usual message pop-up. True when it showed.
+-- Setting inviteAsk: "friends" (friends, guild and people you grouped with), "all" or "off".
+function R:MaybeOfferInvite(key, th, text)
+    local who = TG.db.settings.inviteAsk or "friends"
+    if who == "off" or not th or th.kind ~= "WHISPER" or th.req or th.muted then return false end
+    if not R.AsksForInvite(text) then return false end
+    if who == "friends" and not TG:IsFriendly(th) then return false end
+    -- you can only invite when you lead, or aren't in a group yet
+    if IsInGroup and IsInGroup() and UnitIsGroupLeader and not UnitIsGroupLeader("player")
+        and not (UnitIsGroupAssistant and UnitIsGroupAssistant("player")) then return false end
+    local target = TG.WhisperTarget(th.name)
+    if UnitInParty and (UnitInParty(target) or (UnitInRaid and UnitInRaid(target))) then return false end
+    if not TG.Toast then return false end
+    local name, color = TG:ThreadDisplay(key)
+    return TG.Toast:Notice(("|cff%s%s|r wants an invite"):format(UI.hex(color), name),
+        ("\"%s\"  Click to invite them."):format(text), function()
+            local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
+            if (TG.Demo and TG.Demo.on) or th.fake then
+                TG:Print("Demo: " .. name .. " would be invited now.")
+            elseif invite then
+                invite(target)
+            end
+            th.invited = time()
+        end) and true or false
+end
+
+---------------------------------------------------------------------------
+-- Auto-invite: anyone who whispers your keyword is invited straight away, for a few minutes
+---------------------------------------------------------------------------
+
+R.AUTO_MINUTES = { 5, 10, 15, 30, 60 }
+
+-- Running right now? (Only for this session: a /reload or logout stops it.)
+function R:AutoOn()
+    if not self.auto then return false end
+    if time() >= self.auto.untilT then
+        self:StopAuto("time")
+        return false
+    end
+    return true
+end
+
+function R:AutoMinutesLeft()
+    return self.auto and math.max(0, math.ceil((self.auto.untilT - time()) / 60)) or nil
+end
+
+-- "123", "123!" and "123 ?" match the keyword 123; "what's 123" doesn't.
+function R.MatchesKeyword(text, word)
+    if type(text) ~= "string" or type(word) ~= "string" then return false end
+    local w = word:lower():gsub("^%s+", ""):gsub("%s+$", "")
+    if w == "" then return false end
+    local t = text:lower():gsub("^%s+", ""):gsub("[%s%?!%.]+$", "")
+    return t == w
+end
+
+-- Room for one more? A party is full at 5, a raid at 40.
+local function groupFull()
+    local n = GetNumGroupMembers and GetNumGroupMembers() or 0
+    if IsInRaid and IsInRaid() then return n >= 40 end
+    return n >= 5
+end
+
+local function canInvite()
+    if not (IsInGroup and IsInGroup()) then return true end
+    if UnitIsGroupLeader and UnitIsGroupLeader("player") then return true end
+    return UnitIsGroupAssistant and UnitIsGroupAssistant("player") or false
+end
+
+function R:StartAuto()
+    local s = TG.db.settings
+    local word = strtrim(s.autoInviteWord or "")
+    if word == "" then
+        TG:Print("Write the keyword first - the word people whisper you to get invited.")
+        return
+    end
+    if not canInvite() then
+        TG:Print("Only the group's leader or an assistant can invite.")
+        return
+    end
+    local minutes = tonumber(s.autoInviteMinutes) or 5
+    self.auto = { word = word, untilT = time() + minutes * 60, invited = {} }
+    if self.autoTicker then self.autoTicker:Cancel() end
+    if C_Timer and C_Timer.NewTicker then
+        self.autoTicker = C_Timer.NewTicker(5, function()
+            if R:AutoOn() then R:Refresh() end
+        end)
+    end
+    TG:Print(("Auto-invite on for %d minutes: anyone who whispers \"%s\" is invited."):format(minutes, word))
+    TG:RefreshUnread()
+    self:Refresh()
+    if UI.UpdateTabs then UI:UpdateTabs() end
+end
+
+-- why: "time", "full" or nil (you stopped it)
+function R:StopAuto(why)
+    if not self.auto then return end
+    local n = 0
+    for _ in pairs(self.auto.invited) do n = n + 1 end
+    self.auto = nil
+    if self.autoTicker then self.autoTicker:Cancel(); self.autoTicker = nil end
+    local reason = why == "time" and "time's up" or why == "full" and "your group is full" or nil
+    TG:Print(("Auto-invite off%s. %d invited."):format(reason and (" (" .. reason .. ")") or "", n))
+    if TG.Toast and why then
+        TG.Toast:Notice("|cffffd100Auto-invite is off|r", (why == "full" and "Your group is full. " or "Time's up. ")
+            .. n .. " invited.", function() R:OpenPanel(nil, "requests") end)
+    end
+    TG:RefreshUnread()
+    self:Refresh()
+    if UI.UpdateTabs then UI:UpdateTabs() end
+end
+
+function R:ToggleAuto()
+    if self:AutoOn() then self:StopAuto() else self:StartAuto() end
+end
+
+-- A whisper came in: invite them if it's the keyword. True when an invite went out.
+function R:MaybeAutoInvite(key, th, text)
+    if not self:AutoOn() or not th or th.kind ~= "WHISPER" then return false end
+    if not R.MatchesKeyword(text, self.auto.word) then return false end
+    if self.declined[key] or self.auto.invited[key] then return false end
+    local target = TG.WhisperTarget(th.name)
+    if UnitInParty and (UnitInParty(target) or (UnitInRaid and UnitInRaid(target))) then return false end
+    if not canInvite() then return false end
+    if groupFull() then
+        self:StopAuto("full")
+        return false
+    end
+    self.auto.invited[key] = true
+    if (TG.Demo and TG.Demo.on) or th.fake then
+        TG:Print("Demo: " .. TG:ThreadDisplay(key) .. " would be invited now.")
+    else
+        local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
+        if not invite then
+            TG:Print("This version of the game doesn't let addons send invites.")
+            return false
+        end
+        invite(target)
+        TG:Print(("Auto-invite: invited %s."):format(TG:ThreadDisplay(key)))
+    end
+    th.invited = time()
+    self:Refresh()
+    return true
+end
+
+function R:OpenAutoMenu(anchor)
+    if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+    MenuUtil.CreateContextMenu(anchor, function(_, root)
+        root:CreateTitle("Auto-invite for")
+        for _, m in ipairs(R.AUTO_MINUTES) do
+            root:CreateRadio(m .. " minutes", function() return (tonumber(TG.db.settings.autoInviteMinutes) or 5) == m end,
+                function()
+                    TG.db.settings.autoInviteMinutes = m
+                    if R.auto then R.auto.untilT = time() + m * 60 end
+                    R:Refresh()
+                end)
+        end
+    end)
+end
+
+---------------------------------------------------------------------------
 -- Quick replies
 ---------------------------------------------------------------------------
 
@@ -721,6 +902,53 @@ function R:Create()
         .. "here even when you're not listed in the group finder (the same as /tg recruit). Press again to stop.")
     self.collectBtn = collect
 
+    -- LFM's second row: auto-invite on a keyword, for a few minutes
+    local auto = {}
+    local aStart = S.Button(f, "Start", 70, 24, true)
+    aStart:SetPoint("TOPRIGHT", -14, -40)
+    aStart:SetScript("OnClick", function() R:ToggleAuto() end)
+    S.Tooltip(aStart, "Auto-invite", "Invites anyone who whispers your keyword, straight away, until the time runs "
+        .. "out or your group is full. Only works while you can invite (not in a group, or its leader or assistant). "
+        .. "A /reload stops it.")
+    auto.start = aStart
+    local aDur = S.Button(f, "", 110, 24)
+    aDur:SetPoint("RIGHT", aStart, "LEFT", -6, 0)
+    aDur.fs:ClearAllPoints()
+    aDur.fs:SetPoint("LEFT", 10, 0)
+    aDur.fs:SetPoint("RIGHT", -22, 0)
+    aDur.fs:SetJustifyH("LEFT")
+    local aArrow = aDur:CreateTexture(nil, "OVERLAY")
+    aArrow:SetSize(12, 12)
+    aArrow:SetPoint("RIGHT", -8, 0)
+    aArrow:SetTexture(S.CHEV_DOWN)
+    aDur:SetScript("OnClick", function(s) R:OpenAutoMenu(s) end)
+    S.Tooltip(aDur, "How long", "Auto-invite stops by itself after this long.")
+    auto.dur = aDur
+    local aLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    aLabel:SetPoint("TOPLEFT", 16, -46)
+    aLabel:SetText("Auto-invite")
+    auto.label = aLabel
+    local word = S.EditBox(f)
+    word:SetPoint("TOPLEFT", 100, -40)
+    word:SetPoint("RIGHT", aDur, "LEFT", -6, 0)
+    word:SetHeight(24)
+    word:SetMaxLetters(32)
+    word:SetScript("OnTextChanged", function(b, userInput)
+        if userInput then TG.db.settings.autoInviteWord = b:GetText() end
+        b.hint:SetShown(b:GetText() == "" and not b:HasFocus())
+    end)
+    word:SetScript("OnEditFocusGained", function(b) b.hint:Hide() end)
+    word:SetScript("OnEditFocusLost", function(b) b.hint:SetShown(b:GetText() == "") end)
+    word:SetScript("OnEnterPressed", function(b) b:ClearFocus() end)
+    local hint = word:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("LEFT", 8, 0)
+    hint:SetText("Keyword people whisper, e.g. 123")
+    word.hint = hint
+    S.Tooltip(word, "Keyword", "Whispers that are just this word are invited (\"123\", \"123!\"), not longer "
+        .. "messages that contain it. Upper and lower case don't matter.")
+    auto.word = word
+    self.autoUI = auto
+
     -- the Business tab's own controls: open/close and for how long, then the ad and where it goes
     local biz = {}
     -- a down arrow on the buttons that open a list
@@ -959,6 +1187,16 @@ function R:ApplyView()
     local isBiz = self:View() == "business"
     local s = TG.db.settings
     for _, w in pairs(self.biz) do w:SetShown(isBiz) end
+    for _, w in pairs(self.autoUI) do w:SetShown(not isBiz) end
+    if not isBiz then
+        local on = self:AutoOn()
+        self.autoUI.start:SetText(on and "Stop" or "Start")
+        local m = on and self:AutoMinutesLeft() or (tonumber(s.autoInviteMinutes) or 5)
+        self.autoUI.dur:SetText(on and (m .. " min left") or (m .. " minutes"))
+        local w = self.autoUI.word
+        if not w:HasFocus() then w:SetText(s.autoInviteWord or "") end
+        w.hint:SetShown(w:GetText() == "" and not w:HasFocus())
+    end
     local hosting = self:IsHosting() or (TG.Demo and TG.Demo.on) or false
     self.manual:SetShown(not isBiz and hosting)
     self.collectBtn:SetShown(not isBiz and not hosting)
@@ -966,7 +1204,7 @@ function R:ApplyView()
         local on = s.recruiting
         self.collectBtn:SetText(on and "Stop collecting" or "Collect now")
     end
-    local top = isBiz and -76 or -38
+    local top = -76
     self.chips[1]:ClearAllPoints()
     self.chips[1]:SetPoint("TOPLEFT", 14, top)
     self.list:ClearAllPoints()
@@ -1020,7 +1258,10 @@ function R:UpdateStatus()
         end
         return
     end
-    if s.recruiting then
+    if self:AutoOn() then
+        set(S.ONLINE, ("Auto-invite on: whispers of \"%s\" are invited - %d min left.")
+            :format(self.auto.word, self:AutoMinutesLeft() or 0))
+    elseif s.recruiting then
         set(S.ONLINE, "Collecting (Collect now). Whispers from people you don't know land here." .. paused)
     elseif hosting and s.requestsCollect ~= false then
         set(S.ONLINE, "You're listed in the group finder. Whispers from people you don't know land here." .. paused)
@@ -1196,7 +1437,7 @@ function R:UpdateSegments()
         if b.view == "business" then
             on, paused = TG.Business:IsOn(), s.business and s.businessPaused
         else
-            on = self:Collecting()
+            on = self:Collecting() or self:AutoOn()
         end
         b.dot:SetTexture(on and "Interface\\COMMON\\Indicator-Green"
             or paused and "Interface\\COMMON\\Indicator-Yellow" or "Interface\\COMMON\\Indicator-Gray")

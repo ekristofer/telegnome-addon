@@ -26,6 +26,8 @@ New chat
 - The "Business paused" and "back on" pop-ups are shorter, so they fit.
 - **Recent searches:** Search shows your last searches before you type. A search is kept when you click one of its results, so you can go back and keep looking.
 - The Channel descriptions on New chat are shorter, so they fit.
+- **Auto-invite (Lobby > LFM):** write a keyword, pick how long (5 minutes by default, up to an hour) and press Start: anyone who whispers just that word is invited straight away. It stops by itself when the time is up or your group is full, skips people you declined, and invites each person once.
+- **Invite pop-up:** when a friend whispers "inv", "inv pls", "invite me?" and the like, the pop-up says they want an invite, and clicking it invites them. Settings > Notifications: Friends & guild (default), Everyone or Off. Only shows when you can invite.
 - Fixed: unread badges and the gold dot overlapped the time and the preview text in the Chats list.
 - Fixed: item links in search results showed colour codes like "|cnIQ3:" in front of the name.
 - Hover a section header for a small **+** that goes straight there: new message on Friends and Others, new group on Group chats, channel options on Channels.
