@@ -17,7 +17,8 @@ H.TEXT = {
         .. "- Click the star or drag a conversation onto Pinned to pin it; drag pinned ones to reorder them.\n"
         .. "- Drag a section header (or right-click > Move section up) to put the sections in your order.\n"
         .. "- Right-click a section for Show only this section, sorting and Mark all as read.\n"
-        .. "- Right-click a conversation for a note, notifications, archive and more." },
+        .. "- Right-click a conversation for a note, notifications, archive and more.\n"
+        .. "- When a friend whispers \"inv\", the pop-up offers to invite them (Settings > Notifications)." },
     dm = { "Direct messages", "Whispers and Battle.net messages, one conversation per person. Friends, guild "
         .. "members and people you grouped with this week are under Friends, everyone else under Others.\n\n"
         .. "- + New message starts a conversation with anyone.\n"
@@ -42,6 +43,8 @@ H.TEXT = {
         .. "(also /tg lfm).\n"
         .. "- Each card shows the class and level. Invite, Reply with a quick reply, or Decline.\n"
         .. "- Filter by class with the icons at the top. Decline all answers everyone still waiting.\n"
+        .. "- Auto-invite: write a keyword, pick how long and press Start. Anyone who whispers just that word is "
+        .. "invited straight away, until the time is up or the group is full.\n"
         .. "- Quick replies and decline messages are in Settings > Lobby." },
     business = { "Business", "For crafters, sellers and guild ads: post an ad and collect the whispers you "
         .. "get back.\n\n"
@@ -71,6 +74,8 @@ H.WHATS_NEW = { "Welcome to Telegnome 1.0", "Two tabs now instead of five.\n\n"
     .. "- + New chat starts a direct message, a group chat or a channel. Hover a section header for its "
     .. "own + shortcut.\n"
     .. "- Drag a chat onto Pinned to pin it, and drag section headers to put them in your order.\n"
+    .. "- Lobby > LFM has Auto-invite: anyone who whispers your keyword is invited straight away.\n"
+    .. "- When a friend whispers \"inv\", the pop-up offers to invite them with one click.\n"
     .. "- Each section shows today's chats; older ones wait behind Show earlier. Right-click the Chats tab to mark everything as read." }
 
 function H:ShowWhatsNew()
